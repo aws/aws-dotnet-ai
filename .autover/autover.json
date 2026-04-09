@@ -1,0 +1,15 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore",
+      "Paths": [
+        "src/AWS.AgentCore/AWS.AgentCore.csproj",
+        "src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj"
+      ]
+    }
+  ],
+  "UseCommitsForChangelog": false,
+  "UseSameVersionForAllProjects": false,
+  "DefaultIncrementType": "Patch",
+  "ChangeFilesDetermineIncrementType": true
+}

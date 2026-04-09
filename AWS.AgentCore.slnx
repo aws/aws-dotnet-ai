@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />
+    <Project Path="src/AWS.AgentCore/AWS.AgentCore.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/AWS.AgentCore.UnitTests/AWS.AgentCore.UnitTests.csproj" />
+  </Folder>
+</Solution>

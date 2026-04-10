@@ -16,7 +16,7 @@ public class AgentCoreBuilderExtensionsTests
     {
         var builder = WebApplication.CreateBuilder();
 
-        builder.AddAgentCore();
+        builder.AddAgentCore(options => options.ModelId = "test-model");
 
         var sp = builder.Build().Services;
         var options = sp.GetRequiredService<AgentCoreOptions>();
@@ -48,7 +48,7 @@ public class AgentCoreBuilderExtensionsTests
     {
         var builder = WebApplication.CreateBuilder();
 
-        builder.AddAgentCore();
+        builder.AddAgentCore(options => options.ModelId = "test-model");
 
         var sp = builder.Build().Services;
         var bedrockClient = sp.GetService<IAmazonBedrockRuntime>();
@@ -73,16 +73,22 @@ public class AgentCoreBuilderExtensionsTests
     }
 
     [Fact]
-    public void AddAgentCore_WithNullConfigure_UsesDefaults()
+    public void AddAgentCore_WithoutModelId_ThrowsArgumentException()
     {
         var builder = WebApplication.CreateBuilder();
 
-        builder.AddAgentCore(null);
+        var ex = Assert.Throws<ArgumentException>(() => builder.AddAgentCore());
 
-        var sp = builder.Build().Services;
-        var options = sp.GetRequiredService<AgentCoreOptions>();
+        Assert.Contains("ModelId", ex.Message);
+    }
 
-        Assert.Equal("anthropic.claude-sonnet-4-20250514-v1:0", options.ModelId);
-        Assert.Equal(8080, options.Port);
+    [Fact]
+    public void AddAgentCore_WithNullConfigure_ThrowsArgumentException()
+    {
+        var builder = WebApplication.CreateBuilder();
+
+        var ex = Assert.Throws<ArgumentException>(() => builder.AddAgentCore(null));
+
+        Assert.Contains("ModelId", ex.Message);
     }
 }

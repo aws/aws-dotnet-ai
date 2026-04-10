@@ -6,11 +6,11 @@ namespace AWS.AgentCore.UnitTests;
 public class AgentCoreOptionsTests
 {
     [Fact]
-    public void DefaultModelId_IsClaudeSonnet()
+    public void DefaultModelId_IsEmpty()
     {
         var options = new AgentCoreOptions();
 
-        Assert.Equal("anthropic.claude-sonnet-4-20250514-v1:0", options.ModelId);
+        Assert.Equal(string.Empty, options.ModelId);
     }
 
     [Fact]

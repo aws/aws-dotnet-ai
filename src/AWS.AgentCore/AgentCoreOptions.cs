@@ -9,9 +9,10 @@ namespace AWS.AgentCore;
 public class AgentCoreOptions
 {
     /// <summary>
-    /// The Bedrock model ID to use for the chat client.
+    /// The Bedrock model ID to use for the chat client. This field is required and must be set
+    /// via the <c>AddAgentCore</c> configure callback.
     /// </summary>
-    public string ModelId { get; set; } = "anthropic.claude-sonnet-4-20250514-v1:0";
+    public string ModelId { get; set; } = string.Empty;
 
     /// <summary>
     /// The port to listen on. AgentCore Runtime expects 8080. Default: 8080.

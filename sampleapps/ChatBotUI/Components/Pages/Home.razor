@@ -1,0 +1,322 @@
+﻿@page "/"
+@using ChatBotUI.Models
+@using ChatBotUI.Services
+@using Markdig
+@inject AgentCoreService AgentService
+@inject ChatSessionManager SessionManager
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>AgentCore Chat</PageTitle>
+
+<div class="chat-container">
+    <!-- Header -->
+    <header class="chat-header">
+        <div class="chat-header-inner">
+            <svg class="chat-header-logo" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+            </svg>
+            <span class="chat-header-title">AgentCore Chat</span>
+            @if (CurrentSession is not null && CurrentSession.Messages.Count > 0)
+            {
+                <span class="chat-header-session">@CurrentSession.Title</span>
+            }
+        </div>
+    </header>
+
+    @if (CurrentSession is null || CurrentSession.Messages.Count == 0)
+    {
+        <!-- Empty state / Welcome -->
+        <div class="welcome-container">
+            <div class="welcome-content">
+                <div class="welcome-logo">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <h1 class="welcome-title">AgentCore Chat</h1>
+                <p class="welcome-subtitle">Powered by Amazon Bedrock AgentCore Runtime</p>
+
+                <div class="suggestion-grid">
+                    <button class="suggestion-card" @onclick='() => SendSuggestion("How do I use the AWS SDK for .NET to upload a file to S3?")'>
+                        <span class="suggestion-text">Upload a file to S3 with .NET</span>
+                    </button>
+                    <button class="suggestion-card" @onclick='() => SendSuggestion("Write a .NET Lambda function that processes SQS messages")'>
+                        <span class="suggestion-text">Process SQS messages in .NET Lambda</span>
+                    </button>
+                    <button class="suggestion-card" @onclick='() => SendSuggestion("How do I set up DynamoDB in an ASP.NET Core app with dependency injection?")'>
+                        <span class="suggestion-text">DynamoDB in ASP.NET Core with DI</span>
+                    </button>
+                    <button class="suggestion-card" @onclick='() => SendSuggestion("Explain how to deploy a .NET 8 container to Amazon ECS with Fargate")'>
+                        <span class="suggestion-text">Deploy .NET container to ECS Fargate</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Chat messages -->
+        <div class="messages-container" @ref="_messagesContainer">
+            <div class="messages-inner">
+                @foreach (var message in CurrentSession.Messages)
+                {
+                    <div class="message-row @(message.Role == ChatRole.User ? "user" : "assistant")">
+                        <div class="message-wrapper">
+                            <div class="message-avatar">
+                                @if (message.Role == ChatRole.User)
+                                {
+                                    <div class="avatar user-avatar">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                            <circle cx="12" cy="7" r="4"/>
+                                        </svg>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="avatar assistant-avatar">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                            <path d="M2 17l10 5 10-5"/>
+                                            <path d="M2 12l10 5 10-5"/>
+                                        </svg>
+                                    </div>
+                                }
+                            </div>
+                            <div class="message-content">
+                                <div class="message-role">@(message.Role == ChatRole.User ? "You" : "AgentCore")</div>
+                                <div class="message-text markdown-content">
+                                    @if (message.Role == ChatRole.Assistant)
+                                    {
+                                        @((MarkupString)RenderMarkdown(message.Content))
+
+                                    }
+                                    else
+                                    {
+                                        @message.Content
+                                    }
+                                </div>
+                                @if (message.Role == ChatRole.Assistant)
+                                {
+                                    <div class="message-actions">
+                                        <button class="action-btn" @onclick="() => CopyMessage(message.Content)" title="Copy">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @if (_isLoading)
+                {
+                    <div class="message-row assistant">
+                        <div class="message-wrapper">
+                            <div class="message-avatar">
+                                <div class="avatar assistant-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                        <path d="M2 17l10 5 10-5"/>
+                                        <path d="M2 12l10 5 10-5"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-role">AgentCore</div>
+                                <div class="thinking-indicator">
+                                    <div class="thinking-dot"></div>
+                                    <div class="thinking-dot"></div>
+                                    <div class="thinking-dot"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Input area -->
+    <div class="input-area">
+        <div class="input-wrapper">
+            <textarea
+                @ref="_textInput"
+                @bind="_userInput"
+                @bind:event="oninput"
+                @onkeydown="HandleKeyDown"
+                placeholder="Message AgentCore..."
+                rows="1"
+                disabled="@_isLoading"
+                class="chat-input">
+            </textarea>
+            <button class="send-btn @(_isLoading || string.IsNullOrWhiteSpace(_userInput) ? "disabled" : "")"
+                    @onclick="SendMessage"
+                    disabled="@(_isLoading || string.IsNullOrWhiteSpace(_userInput))"
+                    title="Send message">
+                @if (_isLoading)
+                {
+                    <div class="send-spinner"></div>
+                }
+                else
+                {
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                }
+            </button>
+        </div>
+        <div class="input-footer">
+            <span>AgentCore can make mistakes. Verify important information.</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _userInput = string.Empty;
+    private bool _isLoading;
+    private ElementReference _messagesContainer;
+    private ElementReference _textInput;
+    private CancellationTokenSource? _cts;
+
+    private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
+
+    private ChatSession? CurrentSession => SessionManager.ActiveSession;
+
+    protected override void OnInitialized()
+    {
+        SessionManager.OnChange += HandleSessionChange;
+    }
+
+    private void HandleSessionChange()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await FocusInput();
+        }
+        await ScrollToBottom();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendSuggestion(string text)
+    {
+        _userInput = text;
+        await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        var input = _userInput?.Trim();
+        if (string.IsNullOrEmpty(input) || _isLoading)
+            return;
+
+        _userInput = string.Empty;
+        _isLoading = true;
+
+        var session = SessionManager.GetOrCreateActiveSession();
+
+        // Add user message
+        var userMessage = new ChatMessage
+        {
+            Role = ChatRole.User,
+            Content = input
+        };
+        SessionManager.AddMessage(session.Id, userMessage);
+
+        StateHasChanged();
+        await Task.Delay(50); // Allow UI to update
+
+        // Add placeholder assistant message
+        var assistantMessage = new ChatMessage
+        {
+            Role = ChatRole.Assistant,
+            Content = "",
+        };
+        SessionManager.AddMessage(session.Id, assistantMessage);
+
+        try
+        {
+            _cts = new CancellationTokenSource();
+
+            var response = await AgentService.InvokeAgentAsync(input, session.Id, _cts.Token);
+            assistantMessage.Content = response;
+        }
+        catch (OperationCanceledException)
+        {
+            SessionManager.UpdateMessage(session.Id, assistantMessage.Id, "*Request cancelled.*");
+        }
+        catch (Exception ex)
+        {
+            var errorContent = $"**Error:** {ex.Message}";
+            SessionManager.UpdateMessage(session.Id, assistantMessage.Id, errorContent);
+        }
+        finally
+        {
+            _isLoading = false;
+            _cts?.Dispose();
+            _cts = null;
+            StateHasChanged();
+            await FocusInput();
+        }
+    }
+
+    private static string RenderMarkdown(string? content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return string.Empty;
+
+        return Markdown.ToHtml(content, MarkdownPipeline);
+    }
+
+    private async Task CopyMessage(string content)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", content);
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval", "document.querySelector('.messages-container')?.scrollTo({ top: document.querySelector('.messages-container')?.scrollHeight, behavior: 'smooth' })");
+        }
+        catch { /* ignore if element doesn't exist yet */ }
+    }
+
+    private async Task FocusInput()
+    {
+        try
+        {
+            await _textInput.FocusAsync();
+        }
+        catch { /* ignore focus errors */ }
+    }
+
+    public void Dispose()
+    {
+        SessionManager.OnChange -= HandleSessionChange;
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

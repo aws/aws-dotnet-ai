@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 
 # JetBrains IDEs
 .idea/
+
+# Visual Studio
+*.Development.json

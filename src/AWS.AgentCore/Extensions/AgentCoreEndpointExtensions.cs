@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -32,8 +34,6 @@ public static class AgentCoreEndpointExtensions
     ///     parameters on the handler are resolved automatically using Minimal API-style binding:
     ///     <see cref="AgentCoreRuntimeContext"/> from AgentCore headers, <see cref="CancellationToken"/>
     ///     from the request, <see cref="HttpContext"/> directly, and any other type from the DI container.
-    ///     The handler's string return value is wrapped in a JSON response with <c>message</c> and
-    ///     <c>timestamp</c> fields.
     ///     </description>
     ///   </item>
     ///   <item>
@@ -46,14 +46,18 @@ public static class AgentCoreEndpointExtensions
     ///   </item>
     /// </list>
     /// <para>
-    /// Pair this method with <see cref="AgentCoreBuilderExtensions.AddAgentCore"/> which registers
-    /// the required services (<see cref="AgentCoreOptions"/>) and configures the listening port.
+    /// The handler's return type determines the response format:
     /// </para>
-    /// <para>
-    /// See <see href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-http-protocol-contract.html">AgentCore Runtime service contract</see>
-    /// for the full specification of the endpoints and expected behavior.
-    /// </para>
-    /// </remarks>
+    /// <list type="bullet">
+    ///   <item><description>
+    ///     <c>Task&lt;string&gt;</c> or <c>string</c> — JSON response: <c>{"message":"...","timestamp":"..."}</c>
+    ///   </description></item>
+    ///   <item><description>
+    ///     <c>IAsyncEnumerable&lt;string&gt;</c> — SSE streaming: each chunk sent as
+    ///     <c>data: {"chunk":"..."}\n\n</c>, followed by a final
+    ///     <c>data: {"message":"...","done":true}\n\n</c>
+    ///   </description></item>
+    /// </list>
     /// <para>
     /// The <paramref name="handler"/> delegate uses Minimal API-style parameter binding.
     /// Each parameter is resolved automatically based on its type:
@@ -68,50 +72,53 @@ public static class AgentCoreEndpointExtensions
     /// <para>
     /// Parameters can appear in any order and are all optional — include only what you need.
     /// </para>
+    /// <para>
+    /// Pair this method with <see cref="AgentCoreBuilderExtensions.AddAgentCore"/> which registers
+    /// the required services (<see cref="AgentCoreOptions"/>) and configures the listening port.
+    /// </para>
+    /// <para>
+    /// See <see href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-http-protocol-contract.html">AgentCore Runtime service contract</see>
+    /// for the full specification of the endpoints and expected behavior.
+    /// </para>
     /// </remarks>
     /// <typeparam name="TRequest">
     /// The type to deserialize the request body into (e.g., <c>record PromptRequest(string? Prompt)</c>).
     /// </typeparam>
     /// <param name="app">The endpoint route builder.</param>
     /// <param name="handler">
-    /// An asynchronous handler delegate. Must return <see cref="Task{String}"/>.
+    /// An asynchronous handler delegate. Return <see cref="Task{String}"/> for a JSON response,
+    /// or <see cref="IAsyncEnumerable{String}"/> for SSE streaming.
     /// Parameters are bound from the request body, AgentCore headers, DI container, or the HTTP context.
     /// </param>
-    /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
     /// <param name="pingHandler">
     /// An optional delegate for the <c>GET /ping</c> health-check endpoint. When <c>null</c>
-    /// (the default), a built-in handler returns <c>{"status":"healthy"}</c>. When provided,
-    /// the delegate uses the same Minimal API-style DI binding as <paramref name="handler"/>
+    /// (the default), a built-in handler returns <c>{"status":"Healthy","time_of_last_update":...}</c>.
+    /// When provided, the delegate uses the same Minimal API-style DI binding as <paramref name="handler"/>
     /// (except <typeparamref name="TRequest"/> and <see cref="AgentCoreRuntimeContext"/> are
     /// not available). The return value is serialized as JSON.
     /// </param>
+    /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
     /// <example>
     /// <code>
-    /// // Minimal — just the request, default ping
-    /// app.MapAgentCore&lt;PromptRequest&gt;(async (PromptRequest request) =>
+    /// // Non-streaming — returns JSON
+    /// app.MapAgentCore&lt;PromptRequest&gt;(async (PromptRequest request, IChatClient chatClient, CancellationToken ct) =>
     /// {
-    ///     return $"echo: {request.Prompt}";
-    /// });
-    ///
-    /// // With DI services — add any registered service as a parameter
-    /// app.MapAgentCore&lt;PromptRequest&gt;(async (PromptRequest request, IChatClient chatClient,
-    ///     ILogger&lt;Program&gt; logger, CancellationToken ct) =>
-    /// {
-    ///     logger.LogInformation("Processing request");
     ///     var response = await chatClient.GetResponseAsync(request.Prompt, ct);
     ///     return response.Text;
     /// });
     ///
-    /// // Custom ping handler with DI
+    /// // Streaming — returns SSE
+    /// app.MapAgentCore&lt;PromptRequest&gt;(async IAsyncEnumerable&lt;string&gt;
+    ///     (PromptRequest request, IChatClient chatClient, [EnumeratorCancellation] CancellationToken ct) =>
+    /// {
+    ///     await foreach (var chunk in chatClient.StreamAsync(request.Prompt, ct))
+    ///         yield return chunk;
+    /// });
+    ///
+    /// // Custom ping handler
     /// app.MapAgentCore&lt;PromptRequest&gt;(
-    ///     handler: async (PromptRequest request, IChatClient chatClient) =>
-    ///     {
-    ///         return "response";
-    ///     },
-    ///     pingHandler: async (IMyHealthService health) =>
-    ///     {
-    ///         return new { status = await health.CheckAsync() };
-    ///     });
+    ///     handler: async (PromptRequest request) => "response",
+    ///     pingHandler: () => new { status = "Healthy", time_of_last_update = DateTimeOffset.UtcNow.ToUnixTimeSeconds() });
     /// </code>
     /// </example>
     public static IEndpointRouteBuilder MapAgentCore<TRequest>(
@@ -132,9 +139,16 @@ public static class AgentCoreEndpointExtensions
             }
 
             var args = bindingPlan.ResolveArguments(request, httpContext);
-            var result = await bindingPlan.InvokeAsync(handler, args);
 
-            await httpContext.Response.WriteAsJsonAsync(new { message = result, timestamp = DateTime.UtcNow });
+            if (bindingPlan.IsStreaming)
+            {
+                await WriteStreamingResponse(httpContext, handler, args);
+            }
+            else
+            {
+                var result = await bindingPlan.InvokeAsync(handler, args);
+                await httpContext.Response.WriteAsJsonAsync(new { message = result, timestamp = DateTime.UtcNow });
+            }
         });
 
         if (pingHandler is not null)
@@ -157,8 +171,92 @@ public static class AgentCoreEndpointExtensions
     }
 
     /// <summary>
+    /// Writes an SSE streaming response by iterating the handler's <see cref="IAsyncEnumerable{String}"/>
+    /// result. Each chunk is sent as <c>data: {"chunk":"..."}\n\n</c>. A final event with the full
+    /// accumulated message and <c>"done":true</c> is sent after the stream completes.
+    /// If the handler throws before streaming starts, a JSON 500 error is returned instead.
+    /// Errors after headers are written are sent as <c>data: {"error":"..."}\n\n</c>.
+    /// </summary>
+    private static async Task WriteStreamingResponse(HttpContext httpContext, Delegate handler, object?[] args)
+    {
+        IAsyncEnumerable<string> stream;
+
+        try
+        {
+            var result = handler.DynamicInvoke(args);
+            if (result is not IAsyncEnumerable<string> asyncStream)
+            {
+                throw new InvalidOperationException(
+                    $"Streaming handler must return IAsyncEnumerable<string>, but returned {result?.GetType().Name ?? "null"}.");
+            }
+            stream = asyncStream;
+        }
+        catch (Exception ex)
+        {
+            // Handler threw before yielding — response hasn't started, return JSON error
+            httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            await httpContext.Response.WriteAsJsonAsync(new { error = ex.InnerException?.Message ?? ex.Message });
+            return;
+        }
+
+        var fullMessage = new System.Text.StringBuilder();
+        var headersWritten = false;
+
+        try
+        {
+            await foreach (var chunk in stream.WithCancellation(httpContext.RequestAborted))
+            {
+                if (string.IsNullOrEmpty(chunk)) continue;
+
+                if (!headersWritten)
+                {
+                    httpContext.Response.ContentType = "text/event-stream";
+                    httpContext.Response.Headers.CacheControl = "no-cache";
+                    httpContext.Response.Headers.Connection = "keep-alive";
+                    headersWritten = true;
+                }
+
+                fullMessage.Append(chunk);
+                var chunkJson = JsonSerializer.Serialize(new { chunk });
+                await httpContext.Response.WriteAsync($"data: {chunkJson}\n\n", httpContext.RequestAborted);
+                await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+            }
+
+            if (!headersWritten)
+            {
+                // Stream completed without yielding any chunks — return empty JSON response
+                await httpContext.Response.WriteAsJsonAsync(new { message = string.Empty, timestamp = DateTime.UtcNow });
+                return;
+            }
+
+            var doneJson = JsonSerializer.Serialize(new { message = fullMessage.ToString(), timestamp = DateTime.UtcNow, done = true });
+            await httpContext.Response.WriteAsync($"data: {doneJson}\n\n", httpContext.RequestAborted);
+            await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+        }
+        catch (OperationCanceledException)
+        {
+            // Client disconnected — nothing to write
+        }
+        catch (Exception ex)
+        {
+            if (!httpContext.Response.HasStarted)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                await httpContext.Response.WriteAsJsonAsync(new { error = ex.Message });
+            }
+            else
+            {
+                var errorJson = JsonSerializer.Serialize(new { error = ex.Message });
+                await httpContext.Response.WriteAsync($"data: {errorJson}\n\n");
+                await httpContext.Response.Body.FlushAsync();
+            }
+        }
+    }
+
+    /// <summary>
     /// Pre-computed binding plan that maps each parameter of a user-supplied handler delegate
-    /// to a <see cref="ParameterSource"/>.
+    /// to a <see cref="ParameterSource"/>. Also detects whether the handler returns
+    /// <see cref="IAsyncEnumerable{String}"/> (streaming) or <see cref="Task{String}"/> (non-streaming).
     /// </summary>
     /// <remarks>
     /// <para>
@@ -166,11 +264,6 @@ public static class AgentCoreEndpointExtensions
     /// by reflecting over the handler's <see cref="MethodInfo"/>. For every parameter, the plan
     /// records <em>where</em> the argument value should come from at request time. This avoids
     /// repeated reflection on the hot path.
-    /// </para>
-    /// <para>
-    /// At request time, <see cref="ResolveArguments{TRequest}"/> walks the pre-computed
-    /// <see cref="ParameterSource"/> array and materializes an <c>object?[]</c> that is passed
-    /// to <see cref="InvokeAsync"/> for delegate invocation.
     /// </para>
     /// <para><b>Binding rules (evaluated in order):</b></para>
     /// <list type="number">
@@ -180,21 +273,18 @@ public static class AgentCoreEndpointExtensions
     ///   </description></item>
     ///   <item><description>
     ///     If the parameter type is <see cref="AgentCoreRuntimeContext"/> →
-    ///     <see cref="ParameterSource.RuntimeContext"/>: constructed from AgentCore HTTP headers
-    ///     via <see cref="AgentCoreRuntimeContext.FromHttpContext"/>.
+    ///     <see cref="ParameterSource.RuntimeContext"/>: constructed from AgentCore HTTP headers.
     ///   </description></item>
     ///   <item><description>
     ///     If the parameter type is <see cref="CancellationToken"/> →
-    ///     <see cref="ParameterSource.CancellationToken"/>: bound to
-    ///     <see cref="HttpContext.RequestAborted"/>.
+    ///     <see cref="ParameterSource.CancellationToken"/>: bound to <see cref="HttpContext.RequestAborted"/>.
     ///   </description></item>
     ///   <item><description>
     ///     If the parameter type is <see cref="HttpContext"/> →
-    ///     <see cref="ParameterSource.HttpContext"/>: the raw HTTP context for the current request.
+    ///     <see cref="ParameterSource.HttpContext"/>: the raw HTTP context.
     ///   </description></item>
     ///   <item><description>
-    ///     Otherwise → <see cref="ParameterSource.Service"/>: resolved from the request-scoped
-    ///     DI container (<see cref="HttpContext.RequestServices"/>).
+    ///     Otherwise → <see cref="ParameterSource.Service"/>: resolved from the DI container.
     ///   </description></item>
     /// </list>
     /// </remarks>
@@ -207,10 +297,17 @@ public static class AgentCoreEndpointExtensions
         private readonly ParameterSource[] _sources;
         private readonly ParameterInfo[] _parameters;
 
-        private ParameterBindingPlan(ParameterInfo[] parameters, ParameterSource[] sources)
+        /// <summary>
+        /// <c>true</c> when the handler returns <see cref="IAsyncEnumerable{String}"/>,
+        /// indicating the endpoint should use SSE streaming. Determined once at startup.
+        /// </summary>
+        internal bool IsStreaming { get; }
+
+        private ParameterBindingPlan(ParameterInfo[] parameters, ParameterSource[] sources, bool isStreaming)
         {
             _parameters = parameters;
             _sources = sources;
+            IsStreaming = isStreaming;
         }
 
         /// <summary>
@@ -246,7 +343,9 @@ public static class AgentCoreEndpointExtensions
                     sources[i] = ParameterSource.Service;
             }
 
-            return new ParameterBindingPlan(parameters, sources);
+            var isStreaming = typeof(IAsyncEnumerable<string>).IsAssignableFrom(method.ReturnType);
+
+            return new ParameterBindingPlan(parameters, sources, isStreaming);
         }
 
         /// <summary>
@@ -258,7 +357,7 @@ public static class AgentCoreEndpointExtensions
         /// <param name="httpContext">The current HTTP context (provides headers, DI, cancellation).</param>
         /// <returns>
         /// An <c>object?[]</c> aligned with the handler's parameter list, ready for
-        /// <see cref="InvokeAsync"/>.
+        /// <see cref="InvokeAsync"/> or streaming invocation.
         /// </returns>
         internal object?[] ResolveArguments<TRequest>(TRequest request, HttpContext httpContext)
         {
@@ -281,8 +380,8 @@ public static class AgentCoreEndpointExtensions
         }
 
         /// <summary>
-        /// Invokes the handler delegate with the resolved arguments and unwraps the result.
-        /// Supports <see cref="Task{String}"/> (async) and plain <see cref="string"/> (sync) returns.
+        /// Invokes a non-streaming handler and unwraps the result.
+        /// Supports <see cref="Task{String}"/> and plain <see cref="string"/> returns.
         /// </summary>
         /// <param name="handler">The user-supplied handler delegate.</param>
         /// <param name="args">
@@ -290,8 +389,8 @@ public static class AgentCoreEndpointExtensions
         /// </param>
         /// <returns>The handler's string result.</returns>
         /// <exception cref="InvalidOperationException">
-        /// Thrown when the handler returns a type other than <see cref="Task{String}"/> or
-        /// <see cref="string"/>.
+        /// Thrown when the handler returns a type other than <see cref="Task{String}"/>,
+        /// <see cref="string"/>, or <see cref="IAsyncEnumerable{String}"/>.
         /// </exception>
         internal async Task<string> InvokeAsync(Delegate handler, object?[] args)
         {
@@ -303,7 +402,7 @@ public static class AgentCoreEndpointExtensions
                 Task<object> taskObj => (await taskObj)?.ToString() ?? string.Empty,
                 string s => s,
                 _ => throw new InvalidOperationException(
-                    $"Handler must return Task<string>, but returned {result?.GetType().Name ?? "null"}.")
+                    $"Handler must return Task<string> or IAsyncEnumerable<string>, but returned {result?.GetType().Name ?? "null"}.")
             };
         }
     }

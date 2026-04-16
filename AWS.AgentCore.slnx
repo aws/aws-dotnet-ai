@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/sampleapps/">
     <Project Path="sampleapps/MicrosoftAgentFrameworkSample/MicrosoftAgentFrameworkSample.csproj" />
+    <Project Path="sampleapps/AnnotationsSample/AnnotationsSample.csproj" />
     <Project Path="sampleapps/ChatBotUI/ChatBotUI.csproj" />
     <Project Path="sampleapps/StreamingAgent/StreamingAgent.csproj" />
+    <Project Path="sampleapps/AnnotationsStreamingAgent/AnnotationsStreamingAgent.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />
@@ -10,5 +12,6 @@
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/AWS.AgentCore.UnitTests/AWS.AgentCore.UnitTests.csproj" />
+    <Project Path="test/AWS.AgentCore.SourceGenerator.UnitTests/AWS.AgentCore.SourceGenerator.UnitTests.csproj" />
   </Folder>
 </Solution>

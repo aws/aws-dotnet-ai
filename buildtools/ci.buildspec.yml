@@ -4,14 +4,19 @@ phases:
   install:
     runtime-versions:
       dotnet: 10.x
+    commands:
+      # Find and delete the global.json files that were added by CodeBuild. This causes issues when multiple SDKs are installed.
+      - find / -type f -name 'global.json' -delete
+      # Install the latest .NET 10 SDK manually.
+      - curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel 10.0
 
   build:
     commands:
       - dotnet build AWS.AgentCore.slnx -c Release
       - dotnet test AWS.AgentCore.slnx -c Release --no-build --logger trx --results-directory ./testresults
 reports:
-    aws-dotnet-ai-tests:
-        file-format: VisualStudioTrx
-        files:
-            - '**/*'
-        base-directory: './testresults'
+  aws-dotnet-ai-tests:
+    file-format: VisualStudioTrx
+    files:
+      - "**/*"
+    base-directory: "./testresults"

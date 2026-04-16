@@ -69,7 +69,8 @@ namespace Microsoft.AspNetCore.Builder
         var generatedSource = runResult.GeneratedTrees
             .FirstOrDefault(t => t.FilePath.Contains("AgentCore_GeneratedProgram"))
             ?.GetText()
-            .ToString();
+            .ToString()
+            ?.ReplaceLineEndings("\n");
 
         return new GeneratorResult
         {

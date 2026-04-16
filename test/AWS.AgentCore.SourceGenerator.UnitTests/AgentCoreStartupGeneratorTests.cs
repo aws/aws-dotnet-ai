@@ -6,7 +6,7 @@ namespace AWS.AgentCore.SourceGenerator.UnitTests;
 public class AgentCoreStartupGeneratorTests
 {
     [Fact]
-    public void Generator_WithStartupAndAgent_EmitsProgram()
+    public async Task Generator_WithStartupAndAgent_EmitsProgram()
     {
         var source = @"
 using AWS.AgentCore;
@@ -34,18 +34,14 @@ namespace TestApp
 }";
 
         var result = GeneratorTestHelper.RunGenerator(source);
+        var expected = await ReadSnapshot("StartupAndAgent.g.cs");
 
         Assert.NotNull(result.GeneratedSource);
-        Assert.Contains("var builder = WebApplication.CreateBuilder(args);", result.GeneratedSource);
-        Assert.Contains("var startup = new TestApp.Startup();", result.GeneratedSource);
-        Assert.Contains("startup.ConfigureServices(builder);", result.GeneratedSource);
-        Assert.Contains("builder.Services.AddTransient<TestApp.MyAgent>();", result.GeneratedSource);
-        Assert.Contains("app.MapAgentCore<TestApp.PromptRequest>(", result.GeneratedSource);
-        Assert.Contains("agent.Handle(request, context, ct)", result.GeneratedSource);
+        Assert.Equal(expected, result.GeneratedSource);
     }
 
     [Fact]
-    public void Generator_WithPingHandler_EmitsPingDelegate()
+    public async Task Generator_WithPingHandler_EmitsPingDelegate()
     {
         var source = @"
 using AWS.AgentCore;
@@ -70,14 +66,14 @@ namespace TestApp
 }";
 
         var result = GeneratorTestHelper.RunGenerator(source);
+        var expected = await ReadSnapshot("WithPingHandler.g.cs");
 
         Assert.NotNull(result.GeneratedSource);
-        Assert.Contains("pingHandler:", result.GeneratedSource);
-        Assert.Contains("agent.Ping()", result.GeneratedSource);
+        Assert.Equal(expected, result.GeneratedSource);
     }
 
     [Fact]
-    public void Generator_WithoutStartup_SkipsConfigureServices()
+    public async Task Generator_WithoutStartup_SkipsConfigureServices()
     {
         var source = @"
 using AWS.AgentCore;
@@ -99,14 +95,14 @@ namespace TestApp
 }";
 
         var result = GeneratorTestHelper.RunGenerator(source);
+        var expected = await ReadSnapshot("WithoutStartup.g.cs");
 
         Assert.NotNull(result.GeneratedSource);
-        Assert.DoesNotContain("ConfigureServices", result.GeneratedSource);
-        Assert.Contains("builder.Services.AddTransient<TestApp.MyAgent>();", result.GeneratedSource);
+        Assert.Equal(expected, result.GeneratedSource);
     }
 
     [Fact]
-    public void Generator_WithoutInvocation_EmitsNothing()
+    public void Generator_WithoutHandler_EmitsNothing()
     {
         var source = @"
 using AWS.AgentCore;
@@ -126,7 +122,7 @@ namespace TestApp
     }
 
     [Fact]
-    public void Generator_StreamingHandler_DetectsReturnType()
+    public async Task Generator_StreamingHandler_DetectsReturnType()
     {
         var source = @"
 using AWS.AgentCore;
@@ -148,14 +144,14 @@ namespace TestApp
 }";
 
         var result = GeneratorTestHelper.RunGenerator(source);
+        var expected = await ReadSnapshot("StreamingHandler.g.cs");
 
         Assert.NotNull(result.GeneratedSource);
-        Assert.Contains("app.MapAgentCore<TestApp.PromptRequest>(", result.GeneratedSource);
-        Assert.Contains("agent.Handle(request, ct)", result.GeneratedSource);
+        Assert.Equal(expected, result.GeneratedSource);
     }
 
     [Fact]
-    public void Generator_RequestOnlyParameter_IdentifiesRequestType()
+    public async Task Generator_RequestOnlyParameter_IdentifiesRequestType()
     {
         var source = @"
 using AWS.AgentCore;
@@ -176,13 +172,14 @@ namespace TestApp
 }";
 
         var result = GeneratorTestHelper.RunGenerator(source);
+        var expected = await ReadSnapshot("RequestOnly.g.cs");
 
         Assert.NotNull(result.GeneratedSource);
-        Assert.Contains("app.MapAgentCore<TestApp.MyRequest>(", result.GeneratedSource);
+        Assert.Equal(expected, result.GeneratedSource);
     }
 
     [Fact]
-    public void Generator_GlobalNamespace_HandlesCorrectly()
+    public async Task Generator_GlobalNamespace_HandlesCorrectly()
     {
         var source = @"
 using AWS.AgentCore;
@@ -200,9 +197,16 @@ public class MyAgent
 }";
 
         var result = GeneratorTestHelper.RunGenerator(source);
+        var expected = await ReadSnapshot("GlobalNamespace.g.cs");
 
         Assert.NotNull(result.GeneratedSource);
-        Assert.Contains("builder.Services.AddTransient<MyAgent>();", result.GeneratedSource);
-        Assert.Contains("app.MapAgentCore<PromptRequest>(", result.GeneratedSource);
+        Assert.Equal(expected, result.GeneratedSource);
+    }
+
+    private static async Task<string> ReadSnapshot(string fileName)
+    {
+        var path = Path.Combine("Snapshots", fileName);
+        var content = await File.ReadAllTextAsync(path);
+        return content.ReplaceLineEndings("\n");
     }
 }

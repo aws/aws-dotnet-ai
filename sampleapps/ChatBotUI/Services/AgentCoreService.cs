@@ -3,6 +3,7 @@
 
 using System.Text;
 using System.Text.Json;
+using System.Runtime.CompilerServices;
 using Amazon;
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockAgentCore.Model;
@@ -86,7 +87,7 @@ public class AgentCoreService
     /// </summary>
     public async IAsyncEnumerable<string> InvokeAgentStreamingAsync(
         string prompt, string? sessionId = null,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var arn = _settings.StreamingRuntimeArn;
         if (string.IsNullOrEmpty(arn))

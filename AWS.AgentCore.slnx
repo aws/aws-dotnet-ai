@@ -2,6 +2,7 @@
   <Folder Name="/sampleapps/">
     <Project Path="sampleapps/MicrosoftAgentFrameworkSample/MicrosoftAgentFrameworkSample.csproj" />
     <Project Path="sampleapps/ChatBotUI/ChatBotUI.csproj" />
+    <Project Path="sampleapps/StreamingAgent/StreamingAgent.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />

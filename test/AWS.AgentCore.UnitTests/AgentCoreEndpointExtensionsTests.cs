@@ -210,6 +210,121 @@ public class AgentCoreEndpointExtensionsTests : IAsyncDisposable
         Assert.True(json.GetProperty("async").GetBoolean());
     }
 
+    [Fact]
+    public async Task InvocationsEndpoint_StreamingHandler_ReturnsSSE()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (app, client) = await CreateTestAppAsync(
+            StreamingHandler());
+
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/invocations");
+        httpRequest.Content = JsonContent.Create(new TestRequest("test"));
+
+        var response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+        var lines = body.Split("\n", StringSplitOptions.RemoveEmptyEntries);
+
+        // Should have 3 chunk events + 1 done event
+        var dataLines = lines.Where(l => l.StartsWith("data: ")).ToList();
+        Assert.Equal(4, dataLines.Count);
+
+        // Verify chunks
+        var chunk1 = JsonDocument.Parse(dataLines[0]["data: ".Length..]);
+        Assert.Equal("Hello ", chunk1.RootElement.GetProperty("chunk").GetString());
+
+        var chunk2 = JsonDocument.Parse(dataLines[1]["data: ".Length..]);
+        Assert.Equal("World", chunk2.RootElement.GetProperty("chunk").GetString());
+
+        var chunk3 = JsonDocument.Parse(dataLines[2]["data: ".Length..]);
+        Assert.Equal("!", chunk3.RootElement.GetProperty("chunk").GetString());
+
+        // Verify done event
+        var done = JsonDocument.Parse(dataLines[3]["data: ".Length..]);
+        Assert.Equal("Hello World!", done.RootElement.GetProperty("message").GetString());
+        Assert.True(done.RootElement.GetProperty("done").GetBoolean());
+    }
+
+    [Fact]
+    public async Task InvocationsEndpoint_StreamingHandler_ResolvesServicesFromDI()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        IChatClient? capturedClient = null;
+
+        var (app, client) = await CreateTestAppAsync(
+            StreamingHandlerWithDI(c => capturedClient = c));
+
+        await client.PostAsJsonAsync("/invocations", new TestRequest("test"), ct);
+
+        Assert.NotNull(capturedClient);
+    }
+
+    [Fact]
+    public async Task InvocationsEndpoint_StreamingHandler_SkipsEmptyChunks()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (app, client) = await CreateTestAppAsync(
+            StreamingHandlerWithEmptyChunks());
+
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/invocations");
+        httpRequest.Content = JsonContent.Create(new TestRequest("test"));
+
+        var response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        var dataLines = body.Split("\n", StringSplitOptions.RemoveEmptyEntries)
+            .Where(l => l.StartsWith("data: ")).ToList();
+
+        // 1 chunk + 1 done (empty chunks skipped)
+        Assert.Equal(2, dataLines.Count);
+
+        var chunk = JsonDocument.Parse(dataLines[0]["data: ".Length..]);
+        Assert.Equal("content", chunk.RootElement.GetProperty("chunk").GetString());
+    }
+
+    // Helper methods that return Delegate for streaming handlers.
+    // Using static methods because async iterators can't be lambdas in C#.
+
+    private static Delegate StreamingHandler()
+    {
+        return (TestRequest request) => StreamChunks();
+
+        static async IAsyncEnumerable<string> StreamChunks()
+        {
+            yield return "Hello ";
+            yield return "World";
+            yield return "!";
+        }
+    }
+
+    private static Delegate StreamingHandlerWithDI(Action<IChatClient> capture)
+    {
+        return (TestRequest request, IChatClient chatClient) =>
+        {
+            capture(chatClient);
+            return StreamChunks();
+        };
+
+        static async IAsyncEnumerable<string> StreamChunks()
+        {
+            yield return "chunk";
+        }
+    }
+
+    private static Delegate StreamingHandlerWithEmptyChunks()
+    {
+        return (TestRequest request) => StreamChunks();
+
+        static async IAsyncEnumerable<string> StreamChunks()
+        {
+            yield return "";
+            yield return "content";
+            yield return "";
+        }
+    }
+
     private async Task<(WebApplication app, HttpClient client)> CreateTestAppAsync(Delegate handler)
         => await CreateTestAppAsync(handler, pingHandler: null);
 

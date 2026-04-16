@@ -6,5 +6,6 @@ namespace ChatBotUI.Models;
 public class AgentCoreSettings
 {
     public string RuntimeArn { get; set; } = string.Empty;
+    public string StreamingRuntimeArn { get; set; } = string.Empty;
     public string Region { get; set; } = "us-west-2";
 }

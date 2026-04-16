@@ -23,6 +23,13 @@
             {
                 <span class="chat-header-session">@CurrentSession.Title</span>
             }
+            <div class="streaming-toggle" title="@(_useStreaming ? "Streaming mode (SSE)" : "Standard mode (JSON)")">
+                <label class="toggle-label">
+                    <input type="checkbox" @bind="_useStreaming" />
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-text">@(_useStreaming ? "Streaming" : "Standard")</span>
+            </div>
         </div>
     </header>
 
@@ -183,6 +190,7 @@
 @code {
     private string _userInput = string.Empty;
     private bool _isLoading;
+    private bool _useStreaming;
     private ElementReference _messagesContainer;
     private ElementReference _textInput;
     private CancellationTokenSource? _cts;
@@ -260,8 +268,20 @@
         {
             _cts = new CancellationTokenSource();
 
-            var response = await AgentService.InvokeAgentAsync(input, session.Id, _cts.Token);
-            assistantMessage.Content = response;
+            if (_useStreaming)
+            {
+                await foreach (var chunk in AgentService.InvokeAgentStreamingAsync(input, session.Id, _cts.Token))
+                {
+                    assistantMessage.Content += chunk;
+                    StateHasChanged();
+                    await Task.Delay(10); // Allow UI to render incrementally
+                }
+            }
+            else
+            {
+                var response = await AgentService.InvokeAgentAsync(input, session.Id, _cts.Token);
+                assistantMessage.Content = response;
+            }
         }
         catch (OperationCanceledException)
         {

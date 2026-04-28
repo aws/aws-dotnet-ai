@@ -5,6 +5,8 @@
     <Project Path="sampleapps/ChatBotUI/ChatBotUI.csproj" />
     <Project Path="sampleapps/StreamingAgent/StreamingAgent.csproj" />
     <Project Path="sampleapps/AnnotationsStreamingAgent/AnnotationsStreamingAgent.csproj" />
+    <Project Path="sampleapps/NativeAotExtensions/NativeAotExtensions.csproj" />
+    <Project Path="sampleapps/NativeAotAnnotations/NativeAotAnnotations.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />

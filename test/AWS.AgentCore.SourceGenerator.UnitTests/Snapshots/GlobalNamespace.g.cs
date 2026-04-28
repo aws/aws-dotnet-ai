@@ -12,10 +12,10 @@ builder.Services.AddTransient<MyAgent>();
 var app = builder.Build();
 
 app.MapAgentCore<PromptRequest>(
-    handler: (PromptRequest request) =>
+    async (request, context, services, ct) =>
     {
-        var agent = app.Services.GetRequiredService<MyAgent>();
-        return agent.Handle(request);
+        var agent = services.GetRequiredService<MyAgent>();
+        return await agent.Handle(request);
     }
 );
 

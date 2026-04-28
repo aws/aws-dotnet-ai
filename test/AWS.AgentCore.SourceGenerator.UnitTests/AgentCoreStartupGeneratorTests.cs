@@ -203,6 +203,39 @@ public class MyAgent
         Assert.Equal(expected, result.GeneratedSource);
     }
 
+    [Fact]
+    public async Task Generator_WithJsonContext_EmitsJsonTypeInfo()
+    {
+        var source = @"
+using AWS.AgentCore;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace TestApp
+{
+    public record PromptRequest(string? Prompt);
+
+    [JsonSerializable(typeof(PromptRequest))]
+    internal partial class MyJsonContext : System.Text.Json.Serialization.JsonSerializerContext { }
+
+    public class MyAgent
+    {
+        [AgentCoreHandler(JsonContext = typeof(MyJsonContext))]
+        public Task<string> Handle(PromptRequest request, CancellationToken ct)
+        {
+            return Task.FromResult(""hello"");
+        }
+    }
+}";
+
+        var result = GeneratorTestHelper.RunGenerator(source);
+        var expected = await ReadSnapshot("WithJsonContext.g.cs");
+
+        Assert.NotNull(result.GeneratedSource);
+        Assert.Equal(expected, result.GeneratedSource);
+    }
+
     private static async Task<string> ReadSnapshot(string fileName)
     {
         var path = Path.Combine("Snapshots", fileName);

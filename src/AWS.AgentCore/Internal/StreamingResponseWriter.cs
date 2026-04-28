@@ -34,9 +34,10 @@ internal static class StreamingResponseWriter
         }
         catch (Exception ex)
         {
-            // Handler threw before yielding — response hasn't started, return JSON error
             httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            await httpContext.Response.WriteAsJsonAsync(new { error = ex.InnerException?.Message ?? ex.Message });
+            await httpContext.Response.WriteAsJsonAsync(
+                new SseErrorResponse(ex.InnerException?.Message ?? ex.Message),
+                AgentCoreJsonContext.Default.SseErrorResponse);
             return;
         }
 
@@ -58,19 +59,22 @@ internal static class StreamingResponseWriter
                 }
 
                 fullMessage.Append(chunk);
-                var chunkJson = JsonSerializer.Serialize(new { chunk });
+                var chunkJson = JsonSerializer.Serialize(new SseChunkResponse(chunk), AgentCoreJsonContext.Default.SseChunkResponse);
                 await httpContext.Response.WriteAsync($"data: {chunkJson}\n\n", httpContext.RequestAborted);
                 await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
             }
 
             if (!headersWritten)
             {
-                // Stream completed without yielding any chunks — return empty JSON response
-                await httpContext.Response.WriteAsJsonAsync(new { message = string.Empty, timestamp = DateTime.UtcNow });
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonEmptyMessageResponse(string.Empty, DateTime.UtcNow),
+                    AgentCoreJsonContext.Default.JsonEmptyMessageResponse);
                 return;
             }
 
-            var doneJson = JsonSerializer.Serialize(new { message = fullMessage.ToString(), timestamp = DateTime.UtcNow, done = true });
+            var doneJson = JsonSerializer.Serialize(
+                new SseDoneResponse(fullMessage.ToString(), DateTime.UtcNow, true),
+                AgentCoreJsonContext.Default.SseDoneResponse);
             await httpContext.Response.WriteAsync($"data: {doneJson}\n\n", httpContext.RequestAborted);
             await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
         }
@@ -83,11 +87,82 @@ internal static class StreamingResponseWriter
             if (!httpContext.Response.HasStarted)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
-                await httpContext.Response.WriteAsJsonAsync(new { error = ex.Message });
+                await httpContext.Response.WriteAsJsonAsync(
+                    new SseErrorResponse(ex.Message),
+                    AgentCoreJsonContext.Default.SseErrorResponse);
             }
             else
             {
-                var errorJson = JsonSerializer.Serialize(new { error = ex.Message });
+                var errorJson = JsonSerializer.Serialize(
+                    new SseErrorResponse(ex.Message),
+                    AgentCoreJsonContext.Default.SseErrorResponse);
+                await httpContext.Response.WriteAsync($"data: {errorJson}\n\n");
+                await httpContext.Response.Body.FlushAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Writes an SSE streaming response from a pre-resolved <see cref="IAsyncEnumerable{String}"/>.
+    /// NativeAOT-compatible — no reflection or DynamicInvoke.
+    /// </summary>
+    internal static async Task WriteStreamingResponseAsync(HttpContext httpContext, IAsyncEnumerable<string> stream)
+    {
+        var fullMessage = new System.Text.StringBuilder();
+        var headersWritten = false;
+
+        try
+        {
+            await foreach (var chunk in stream.WithCancellation(httpContext.RequestAborted))
+            {
+                if (string.IsNullOrEmpty(chunk)) continue;
+
+                if (!headersWritten)
+                {
+                    httpContext.Response.ContentType = "text/event-stream";
+                    httpContext.Response.Headers.CacheControl = "no-cache";
+                    httpContext.Response.Headers.Connection = "keep-alive";
+                    headersWritten = true;
+                }
+
+                fullMessage.Append(chunk);
+                var chunkJson = JsonSerializer.Serialize(new SseChunkResponse(chunk), AgentCoreJsonContext.Default.SseChunkResponse);
+                await httpContext.Response.WriteAsync($"data: {chunkJson}\n\n", httpContext.RequestAborted);
+                await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+            }
+
+            if (!headersWritten)
+            {
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonEmptyMessageResponse(string.Empty, DateTime.UtcNow),
+                    AgentCoreJsonContext.Default.JsonEmptyMessageResponse);
+                return;
+            }
+
+            var doneJson = JsonSerializer.Serialize(
+                new SseDoneResponse(fullMessage.ToString(), DateTime.UtcNow, true),
+                AgentCoreJsonContext.Default.SseDoneResponse);
+            await httpContext.Response.WriteAsync($"data: {doneJson}\n\n", httpContext.RequestAborted);
+            await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted);
+        }
+        catch (OperationCanceledException)
+        {
+            // Client disconnected
+        }
+        catch (Exception ex)
+        {
+            if (!httpContext.Response.HasStarted)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                await httpContext.Response.WriteAsJsonAsync(
+                    new SseErrorResponse(ex.Message),
+                    AgentCoreJsonContext.Default.SseErrorResponse);
+            }
+            else
+            {
+                var errorJson = JsonSerializer.Serialize(
+                    new SseErrorResponse(ex.Message),
+                    AgentCoreJsonContext.Default.SseErrorResponse);
                 await httpContext.Response.WriteAsync($"data: {errorJson}\n\n");
                 await httpContext.Response.Body.FlushAsync();
             }

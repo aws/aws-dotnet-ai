@@ -17,6 +17,7 @@ app.MapAgentCore<TestApp.PromptRequest>(
         var agent = services.GetRequiredService<TestApp.MyAgent>();
         return await agent.Handle(request, ct);
     }
+    , TestApp.MyJsonContext.Default.PromptRequest
 );
 
 app.Run();

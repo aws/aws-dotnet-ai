@@ -11,10 +11,10 @@ builder.Services.AddTransient<TestApp.MyAgent>();
 
 var app = builder.Build();
 
-app.MapAgentCore<TestApp.PromptRequest>(
-    handler: (TestApp.PromptRequest request, System.Threading.CancellationToken ct) =>
+app.MapAgentCoreStreaming<TestApp.PromptRequest>(
+    (request, context, services, ct) =>
     {
-        var agent = app.Services.GetRequiredService<TestApp.MyAgent>();
+        var agent = services.GetRequiredService<TestApp.MyAgent>();
         return agent.Handle(request, ct);
     }
 );

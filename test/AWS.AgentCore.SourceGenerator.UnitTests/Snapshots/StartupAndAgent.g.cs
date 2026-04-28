@@ -15,10 +15,10 @@ builder.Services.AddTransient<TestApp.MyAgent>();
 var app = builder.Build();
 
 app.MapAgentCore<TestApp.PromptRequest>(
-    handler: (TestApp.PromptRequest request, AWS.AgentCore.AgentCoreRuntimeContext context, System.Threading.CancellationToken ct) =>
+    async (request, context, services, ct) =>
     {
-        var agent = app.Services.GetRequiredService<TestApp.MyAgent>();
-        return agent.Handle(request, context, ct);
+        var agent = services.GetRequiredService<TestApp.MyAgent>();
+        return await agent.Handle(request, context, ct);
     }
 );
 

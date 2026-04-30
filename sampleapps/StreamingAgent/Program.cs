@@ -12,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddAgentCore(options =>
 {
-    options.ModelId = "global.anthropic.claude-sonnet-4-20250514-v1:0";
+    options.ModelId = "global.anthropic.claude-opus-4-7";
 });
 
 var app = builder.Build();
@@ -28,7 +28,7 @@ app.MapAgentCore<PromptRequest>(
 
         async IAsyncEnumerable<string> Stream([EnumeratorCancellation] CancellationToken ct = default)
         {
-            var agent = chatClient.AsAIAgent(tools: [AIFunctionFactory.Create(GetWeather)]);
+            var agent = chatClient.AsAIAgent(tools: [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(GetAppInfo)]);
             var session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
 
             await foreach (var update in agent.RunStreamingAsync(
@@ -49,3 +49,17 @@ app.Run();
 [Description("Gets the current weather for a given location.")]
 static string GetWeather([Description("The city or location to get weather for.")] string location)
     => $"The current weather in {location} is 72°F and sunny.";
+
+[Description("Returns runtime information about this application as a JSON string. Call this when asked about the app's name, architecture, framework, or whether it is running as NativeAOT. Return the JSON result directly to the user without modification.")]
+static string GetAppInfo()
+{
+    var isAot = typeof(object).Assembly.Location == string.Empty;
+    return System.Text.Json.JsonSerializer.Serialize(new
+    {
+        appName = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name ?? "Unknown",
+        isNativeAot = isAot,
+        framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+        architecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString(),
+        os = System.Runtime.InteropServices.RuntimeInformation.OSDescription
+    });
+}

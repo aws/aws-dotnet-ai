@@ -1,0 +1,159 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Integration test resources for AWS.AgentCore — IAM role and ECR repository.",
+  "Parameters": {
+    "TestRunId": {
+      "Type": "String",
+      "Description": "Unique identifier for this test run."
+    }
+  },
+  "Resources": {
+    "AgentCoreRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": { "Fn::Sub": "AgentCoreIntTest_${TestRunId}" },
+        "Description": {
+          "Fn::Sub": "Temporary role for AgentCore integration tests (${TestRunId})"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "bedrock-agentcore.amazonaws.com" },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": { "Ref": "AWS::AccountId" }
+                },
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:*"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        ],
+        "Policies": [
+          {
+            "PolicyName": { "Fn::Sub": "AgentCoreIntTestPolicy_${TestRunId}" },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "BedrockInvoke",
+                  "Effect": "Allow",
+                  "Action": [
+                    "bedrock:InvokeModel",
+                    "bedrock:InvokeModelWithResponseStream"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:bedrock:${AWS::Region}::foundation-model/*"
+                    },
+                    "arn:aws:bedrock:::foundation-model/*",
+                    {
+                      "Fn::Sub": "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "LogGroupAccess",
+                  "Effect": "Allow",
+                  "Action": ["logs:DescribeLogStreams", "logs:CreateLogGroup"],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/runtimes/*"
+                  }
+                },
+                {
+                  "Sid": "DescribeLogGroups",
+                  "Effect": "Allow",
+                  "Action": ["logs:DescribeLogGroups"],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
+                  }
+                },
+                {
+                  "Sid": "LogStreamAccess",
+                  "Effect": "Allow",
+                  "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
+                  }
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords",
+                    "xray:GetSamplingRules",
+                    "xray:GetSamplingTargets"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchMetrics",
+                  "Effect": "Allow",
+                  "Action": ["cloudwatch:PutMetricData"],
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": {
+                      "cloudwatch:namespace": "bedrock-agentcore"
+                    }
+                  }
+                },
+                {
+                  "Sid": "LogsGeneral",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          { "Key": "CreatedBy", "Value": "AgentCoreIntegrationTests" },
+          { "Key": "TestRunId", "Value": { "Ref": "TestRunId" } }
+        ]
+      }
+    },
+    "EcrRepository": {
+      "Type": "AWS::ECR::Repository",
+      "Properties": {
+        "RepositoryName": { "Fn::Sub": "agentcore-inttest-${TestRunId}" },
+        "ImageScanningConfiguration": { "ScanOnPush": false },
+        "ImageTagMutability": "MUTABLE",
+        "Tags": [
+          { "Key": "CreatedBy", "Value": "AgentCoreIntegrationTests" },
+          { "Key": "TestRunId", "Value": { "Ref": "TestRunId" } }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "RoleArn": {
+      "Description": "ARN of the IAM role for AgentCore runtimes.",
+      "Value": { "Fn::GetAtt": ["AgentCoreRole", "Arn"] }
+    },
+    "EcrRepositoryUri": {
+      "Description": "URI of the ECR repository.",
+      "Value": { "Fn::GetAtt": ["EcrRepository", "RepositoryUri"] }
+    },
+    "EcrRepositoryName": {
+      "Description": "Name of the ECR repository.",
+      "Value": { "Ref": "EcrRepository" }
+    }
+  }
+}

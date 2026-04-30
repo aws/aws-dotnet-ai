@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Suppress NETSDK1188: locale warnings from third-party test packages
+         (Microsoft.CodeAnalysis, Microsoft.Testing.Platform, Microsoft.TestPlatform)
+         that haven't updated their resource locales for .NET 10 yet. -->
+    <NoWarn>$(NoWarn);NETSDK1188</NoWarn>
+  </PropertyGroup>
+</Project>

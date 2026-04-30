@@ -394,8 +394,17 @@ public static class AgentCoreEndpointExtensions
             app.MapGet("/ping", async (HttpContext httpContext) =>
             {
                 var result = await pingHandler(httpContext.RequestServices, httpContext.RequestAborted);
-                if (result is not null)
+                if (result is string jsonString)
+                {
+                    // Pre-serialized JSON string — write directly
+                    httpContext.Response.ContentType = "application/json";
+                    await httpContext.Response.WriteAsync(jsonString);
+                }
+                else if (result is not null)
+                {
+                    // Object — serialize via ASP.NET Core's configured JsonOptions
                     await httpContext.Response.WriteAsJsonAsync(result);
+                }
             });
         }
         else

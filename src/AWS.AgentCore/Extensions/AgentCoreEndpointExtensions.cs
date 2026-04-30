@@ -194,7 +194,7 @@ public static class AgentCoreEndpointExtensions
     public static IEndpointRouteBuilder MapAgentCore<TRequest>(
         this IEndpointRouteBuilder app,
         Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, Task<string>> handler,
-        Func<IServiceProvider, CancellationToken, Task>? pingHandler = null)
+        Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
@@ -254,7 +254,7 @@ public static class AgentCoreEndpointExtensions
         this IEndpointRouteBuilder app,
         Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, Task<string>> handler,
         JsonTypeInfo<TRequest> requestTypeInfo,
-        Func<IServiceProvider, CancellationToken, Task>? pingHandler = null)
+        Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
@@ -297,7 +297,7 @@ public static class AgentCoreEndpointExtensions
     public static IEndpointRouteBuilder MapAgentCoreStreaming<TRequest>(
         this IEndpointRouteBuilder app,
         Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, IAsyncEnumerable<string>> handler,
-        Func<IServiceProvider, CancellationToken, Task>? pingHandler = null)
+        Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
@@ -355,7 +355,7 @@ public static class AgentCoreEndpointExtensions
         this IEndpointRouteBuilder app,
         Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, IAsyncEnumerable<string>> handler,
         JsonTypeInfo<TRequest> requestTypeInfo,
-        Func<IServiceProvider, CancellationToken, Task>? pingHandler = null)
+        Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
@@ -387,13 +387,15 @@ public static class AgentCoreEndpointExtensions
         Justification = "The MapGet lambdas only use AOT-safe types (PingResponse with source-generated JsonTypeInfo).")]
     [UnconditionalSuppressMessage("AOT", "IL3050:RequiresDynamicCode",
         Justification = "The MapGet lambdas only use AOT-safe types (PingResponse with source-generated JsonTypeInfo).")]
-    private static void MapPingEndpoint(IEndpointRouteBuilder app, Func<IServiceProvider, CancellationToken, Task>? pingHandler)
+    private static void MapPingEndpoint(IEndpointRouteBuilder app, Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler)
     {
         if (pingHandler is not null)
         {
             app.MapGet("/ping", async (HttpContext httpContext) =>
             {
-                await pingHandler(httpContext.RequestServices, httpContext.RequestAborted);
+                var result = await pingHandler(httpContext.RequestServices, httpContext.RequestAborted);
+                if (result is not null)
+                    await httpContext.Response.WriteAsJsonAsync(result);
             });
         }
         else

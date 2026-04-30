@@ -31,20 +31,20 @@ public sealed class AgentCoreInvoker : IDisposable
     {
         var payload = JsonSerializer.Serialize(new { prompt });
 
-        var request = new InvokeAgentRuntimeRequest
-        {
-            AgentRuntimeArn = runtimeArn,
-            Payload = new MemoryStream(Encoding.UTF8.GetBytes(payload)),
-            ContentType = "application/json",
-            Accept = "application/json",
-        };
-
         // Retry up to 3 times with delay to handle cold start / transient 500s
         Exception? lastException = null;
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             try
             {
+                var request = new InvokeAgentRuntimeRequest
+                {
+                    AgentRuntimeArn = runtimeArn,
+                    Payload = new MemoryStream(Encoding.UTF8.GetBytes(payload)),
+                    ContentType = "application/json",
+                    Accept = "application/json",
+                };
+
                 var response = await _client.InvokeAgentRuntimeAsync(request, ct);
 
                 using var reader = new StreamReader(response.Response);
@@ -75,8 +75,6 @@ public sealed class AgentCoreInvoker : IDisposable
                 if (attempt < 3)
                 {
                     Console.Error.WriteLine($"[AgentCore] Invocation attempt {attempt} failed: {ex.Message}. Retrying in 10s...");
-                    // Reset the payload stream for retry
-                    request.Payload = new MemoryStream(Encoding.UTF8.GetBytes(payload));
                     await Task.Delay(TimeSpan.FromSeconds(10), ct);
                 }
             }

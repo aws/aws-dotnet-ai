@@ -8,16 +8,17 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddTransient<MyAgent>();
+builder.Services.AddTransient<TestApp.MyAgent>();
 
 var app = builder.Build();
 
-app.MapAgentCore<PromptRequest>(
+app.MapAgentCore<TestApp.PromptRequest>(
     async (request, context, services, ct) =>
     {
-        var agent = services.GetRequiredService<MyAgent>();
-        return await agent.Handle(request);
+        var agent = services.GetRequiredService<TestApp.MyAgent>();
+        return await agent.Handle(request, ct);
     }
+    , TestApp.MyJsonContext.Default.PromptRequest
 );
 
 app.Run();

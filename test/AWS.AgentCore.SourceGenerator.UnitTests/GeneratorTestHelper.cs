@@ -41,7 +41,10 @@ namespace AWS.AgentCore
     public class AgentCoreStartupAttribute : System.Attribute { }
 
     [System.AttributeUsage(System.AttributeTargets.Method)]
-    public class AgentCoreHandlerAttribute : System.Attribute { }
+    public class AgentCoreHandlerAttribute : System.Attribute
+    {
+        public System.Type? JsonContext { get; set; }
+    }
 
     [System.AttributeUsage(System.AttributeTargets.Method)]
     public class AgentCorePingAttribute : System.Attribute { }
@@ -52,6 +55,17 @@ namespace AWS.AgentCore
 namespace Microsoft.AspNetCore.Builder
 {
     public class WebApplicationBuilder { }
+}
+
+namespace System.Text.Json.Serialization
+{
+    public abstract class JsonSerializerContext { }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public class JsonSerializableAttribute : System.Attribute
+    {
+        public JsonSerializableAttribute(System.Type type) { }
+    }
 }
 ");
 

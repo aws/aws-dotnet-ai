@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using AWS.AgentCore.Internal;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -118,6 +120,8 @@ public static class AgentCoreEndpointExtensions
     ///     pingHandler: () => new { status = "Healthy", time_of_last_update = DateTimeOffset.UtcNow.ToUnixTimeSeconds() });
     /// </code>
     /// </example>
+    [RequiresUnreferencedCode("This overload uses reflection-based parameter binding and DynamicInvoke. For NativeAOT, use the strongly-typed overload with JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
+    [RequiresDynamicCode("This overload uses reflection-based parameter binding and DynamicInvoke. For NativeAOT, use the strongly-typed overload with JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
     public static IEndpointRouteBuilder MapAgentCore<TRequest>(
         this IEndpointRouteBuilder app,
         Delegate handler,
@@ -131,7 +135,9 @@ public static class AgentCoreEndpointExtensions
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await httpContext.Response.WriteAsJsonAsync(new { error = "Invalid request body." });
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonErrorResponse("Invalid request body."),
+                    AgentCoreJsonContext.Default.JsonErrorResponse);
                 return;
             }
 
@@ -144,7 +150,9 @@ public static class AgentCoreEndpointExtensions
             else
             {
                 var result = await bindingPlan.InvokeAsync(handler, args);
-                await httpContext.Response.WriteAsJsonAsync(new { message = result, timestamp = DateTime.UtcNow });
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonMessageResponse(result, DateTime.UtcNow),
+                    AgentCoreJsonContext.Default.JsonMessageResponse);
             }
         });
 
@@ -161,9 +169,240 @@ public static class AgentCoreEndpointExtensions
         }
         else
         {
-            app.MapGet("/ping", () => Results.Ok(new { status = "Healthy", time_of_last_update = DateTimeOffset.UtcNow.ToUnixTimeSeconds() }));
+            app.MapGet("/ping", () => Results.Json(
+                new PingResponse("Healthy", DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+                AgentCoreJsonContext.Default.PingResponse));
         }
 
         return app;
+    }
+
+    /// <summary>
+    /// Maps the required AgentCore Runtime endpoints with a strongly-typed handler signature.
+    /// This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload
+    /// that accepts <see cref="JsonTypeInfo{TRequest}"/>.
+    /// </summary>
+    /// <typeparam name="TRequest">The type to deserialize the request body into.</typeparam>
+    /// <param name="app">The endpoint route builder.</param>
+    /// <param name="handler">
+    /// A strongly-typed handler that receives the request, runtime context, service provider, and cancellation token.
+    /// </param>
+    /// <param name="pingHandler">Optional custom ping handler. When <c>null</c>, returns the default healthy response.</param>
+    /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
+    [RequiresUnreferencedCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
+    [RequiresDynamicCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
+    public static IEndpointRouteBuilder MapAgentCore<TRequest>(
+        this IEndpointRouteBuilder app,
+        Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, Task<string>> handler,
+        Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
+    {
+        app.MapPost("/invocations", async (HttpContext httpContext) =>
+        {
+            var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
+            if (request is null)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonErrorResponse("Invalid request body."),
+                    AgentCoreJsonContext.Default.JsonErrorResponse);
+                return;
+            }
+
+            var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            var result = await handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
+            await httpContext.Response.WriteAsJsonAsync(
+                new JsonMessageResponse(result, DateTime.UtcNow),
+                AgentCoreJsonContext.Default.JsonMessageResponse);
+        });
+
+        MapPingEndpoint(app, pingHandler);
+
+        return app;
+    }
+
+    /// <summary>
+    /// Maps the required AgentCore Runtime endpoints with a strongly-typed handler signature.
+    /// This overload is NativeAOT-compatible — no reflection or dynamic invocation is used.
+    /// </summary>
+    /// <typeparam name="TRequest">
+    /// The type to deserialize the request body into.
+    /// </typeparam>
+    /// <param name="app">The endpoint route builder.</param>
+    /// <param name="handler">
+    /// A strongly-typed handler that receives the request, runtime context, service provider, and cancellation token.
+    /// Use <c>services.GetRequiredService&lt;T&gt;()</c> to resolve dependencies.
+    /// </param>
+    /// <param name="requestTypeInfo">
+    /// Source-generated JSON type info for <typeparamref name="TRequest"/>.
+    /// Obtain from a <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> annotated with
+    /// <c>[JsonSerializable(typeof(TRequest))]</c>.
+    /// </param>
+    /// <param name="pingHandler">Optional custom ping handler that writes the response directly. When <c>null</c>, returns the default healthy response.</param>
+    /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
+    /// <example>
+    /// <code>
+    /// app.MapAgentCore&lt;PromptRequest&gt;(
+    ///     async (request, context, services, ct) =>
+    ///     {
+    ///         var chatClient = services.GetRequiredService&lt;IChatClient&gt;();
+    ///         return "response";
+    ///     },
+    ///     AppJsonContext.Default.PromptRequest);
+    /// </code>
+    /// </example>
+    public static IEndpointRouteBuilder MapAgentCore<TRequest>(
+        this IEndpointRouteBuilder app,
+        Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, Task<string>> handler,
+        JsonTypeInfo<TRequest> requestTypeInfo,
+        Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
+    {
+        app.MapPost("/invocations", async (HttpContext httpContext) =>
+        {
+            var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
+            if (request is null)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonErrorResponse("Invalid request body."),
+                    AgentCoreJsonContext.Default.JsonErrorResponse);
+                return;
+            }
+
+            var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            var result = await handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
+            await httpContext.Response.WriteAsJsonAsync(
+                new JsonMessageResponse(result, DateTime.UtcNow),
+                AgentCoreJsonContext.Default.JsonMessageResponse);
+        });
+
+        MapPingEndpoint(app, pingHandler);
+
+        return app;
+    }
+
+    /// <summary>
+    /// Maps the required AgentCore Runtime endpoints with a strongly-typed streaming handler.
+    /// This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload
+    /// that accepts <see cref="JsonTypeInfo{TRequest}"/>.
+    /// </summary>
+    /// <typeparam name="TRequest">The type to deserialize the request body into.</typeparam>
+    /// <param name="app">The endpoint route builder.</param>
+    /// <param name="handler">
+    /// A strongly-typed handler that returns <see cref="IAsyncEnumerable{String}"/> for SSE streaming.
+    /// </param>
+    /// <param name="pingHandler">Optional custom ping handler. When <c>null</c>, returns the default healthy response.</param>
+    /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
+    [RequiresUnreferencedCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
+    [RequiresDynamicCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
+    public static IEndpointRouteBuilder MapAgentCoreStreaming<TRequest>(
+        this IEndpointRouteBuilder app,
+        Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, IAsyncEnumerable<string>> handler,
+        Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
+    {
+        app.MapPost("/invocations", async (HttpContext httpContext) =>
+        {
+            var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
+            if (request is null)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonErrorResponse("Invalid request body."),
+                    AgentCoreJsonContext.Default.JsonErrorResponse);
+                return;
+            }
+
+            var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            var stream = handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
+            await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, stream);
+        });
+
+        MapPingEndpoint(app, pingHandler);
+
+        return app;
+    }
+
+    /// <summary>
+    /// Maps the required AgentCore Runtime endpoints with a strongly-typed streaming handler.
+    /// This overload is NativeAOT-compatible — no reflection or dynamic invocation is used.
+    /// </summary>
+    /// <typeparam name="TRequest">
+    /// The type to deserialize the request body into.
+    /// </typeparam>
+    /// <param name="app">The endpoint route builder.</param>
+    /// <param name="handler">
+    /// A strongly-typed handler that returns <see cref="IAsyncEnumerable{String}"/> for SSE streaming.
+    /// Use <c>services.GetRequiredService&lt;T&gt;()</c> to resolve dependencies.
+    /// </param>
+    /// <param name="requestTypeInfo">
+    /// Source-generated JSON type info for <typeparamref name="TRequest"/>.
+    /// Obtain from a <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> annotated with
+    /// <c>[JsonSerializable(typeof(TRequest))]</c>.
+    /// </param>
+    /// <param name="pingHandler">Optional custom ping handler. When <c>null</c>, returns the default healthy response.</param>
+    /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
+    /// <example>
+    /// <code>
+    /// app.MapAgentCoreStreaming&lt;PromptRequest&gt;(
+    ///     (request, context, services, ct) =>
+    ///     {
+    ///         var chatClient = services.GetRequiredService&lt;IChatClient&gt;();
+    ///         return StreamChunks(chatClient, request.Prompt, ct);
+    ///     },
+    ///     AppJsonContext.Default.PromptRequest);
+    /// </code>
+    /// </example>
+    public static IEndpointRouteBuilder MapAgentCoreStreaming<TRequest>(
+        this IEndpointRouteBuilder app,
+        Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, IAsyncEnumerable<string>> handler,
+        JsonTypeInfo<TRequest> requestTypeInfo,
+        Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
+    {
+        app.MapPost("/invocations", async (HttpContext httpContext) =>
+        {
+            var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
+            if (request is null)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonErrorResponse("Invalid request body."),
+                    AgentCoreJsonContext.Default.JsonErrorResponse);
+                return;
+            }
+
+            var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            var stream = handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
+            await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, stream);
+        });
+
+        MapPingEndpoint(app, pingHandler);
+
+        return app;
+    }
+
+    /// <summary>
+    /// Registers the <c>GET /ping</c> endpoint with either a custom or default handler.
+    /// Shared by the AOT-safe overloads.
+    /// </summary>
+    [UnconditionalSuppressMessage("AOT", "IL2026:RequiresUnreferencedCode",
+        Justification = "The MapGet lambdas only use AOT-safe types (PingResponse with source-generated JsonTypeInfo).")]
+    [UnconditionalSuppressMessage("AOT", "IL3050:RequiresDynamicCode",
+        Justification = "The MapGet lambdas only use AOT-safe types (PingResponse with source-generated JsonTypeInfo).")]
+    private static void MapPingEndpoint(IEndpointRouteBuilder app, Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler)
+    {
+        if (pingHandler is not null)
+        {
+            app.MapGet("/ping", async (HttpContext httpContext) =>
+            {
+                var result = await pingHandler(httpContext.RequestServices, httpContext.RequestAborted);
+                if (result is not null)
+                    await httpContext.Response.WriteAsJsonAsync(result);
+            });
+        }
+        else
+        {
+            app.MapGet("/ping", () => Results.Json(
+                new PingResponse("Healthy", DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+                AgentCoreJsonContext.Default.PingResponse));
+        }
     }
 }

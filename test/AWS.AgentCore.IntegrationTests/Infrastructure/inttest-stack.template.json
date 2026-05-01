@@ -118,6 +118,12 @@
                   "Resource": {
                     "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
                   }
+                },
+                {
+                  "Sid": "S3ListBuckets",
+                  "Effect": "Allow",
+                  "Action": ["s3:ListAllMyBuckets"],
+                  "Resource": "*"
                 }
               ]
             }

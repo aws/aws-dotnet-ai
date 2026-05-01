@@ -102,6 +102,22 @@ public class AnnotationsSampleTests : IClassFixture<AnnotationsSampleFixture>, I
         Assert.Contains("\"isNativeAot\":false", result.Message.Replace(" ", ""), StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Invoke_S3BucketCountReturnsNumber()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await _invoker.InvokeAsync(
+            _fixture.RuntimeArn,
+            "Call the GetS3BucketCount tool and respond with ONLY the exact JSON it returns. Do not add any other text.",
+            ct);
+
+        Assert.Equal(200, result.HttpStatusCode);
+        // The tool must successfully call S3 — meaning credentials resolved correctly.
+        // If credentials fail, the tool returns {"error":"...", "message":"..."} instead.
+        Assert.Contains("bucketCount", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("error", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose() => _invoker.Dispose();
 }
 

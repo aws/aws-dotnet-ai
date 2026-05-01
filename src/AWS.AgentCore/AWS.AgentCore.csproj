@@ -9,10 +9,10 @@
 
     <ItemGroup>
         <FrameworkReference Include="Microsoft.AspNetCore.App" />
-        <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.17.2" />
-        <PackageReference Include="AWSSDK.Extensions.Bedrock.MEAI" Version="4.0.6.8" />
-        <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.32" />
-        <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0" />
+        <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.17.5" />
+        <PackageReference Include="AWSSDK.Extensions.Bedrock.MEAI" Version="4.0.6.12" />
+        <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.35" />
+        <PackageReference Include="Microsoft.Agents.AI" Version="1.3.0" />
     </ItemGroup>
 
 </Project>

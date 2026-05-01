@@ -1,0 +1,174 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AgentCore integration test runtimes — one per sample app.",
+  "Parameters": {
+    "TestRunId": {
+      "Type": "String"
+    },
+    "RoleArn": {
+      "Type": "String"
+    },
+    "MicrosoftAgentFrameworkSampleImageUri": {
+      "Type": "String"
+    },
+    "AnnotationsSampleImageUri": {
+      "Type": "String"
+    },
+    "StreamingAgentImageUri": {
+      "Type": "String"
+    },
+    "AnnotationsStreamingAgentImageUri": {
+      "Type": "String"
+    },
+    "NativeAotExtensionsImageUri": {
+      "Type": "String"
+    },
+    "NativeAotAnnotationsImageUri": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "MicrosoftAgentFrameworkSample": {
+      "Type": "AWS::BedrockAgentCore::Runtime",
+      "Properties": {
+        "AgentRuntimeName": {
+          "Fn::Sub": "MicrosoftAgentFrameworkSample_${TestRunId}"
+        },
+        "RoleArn": { "Ref": "RoleArn" },
+        "AgentRuntimeArtifact": {
+          "ContainerConfiguration": {
+            "ContainerUri": { "Ref": "MicrosoftAgentFrameworkSampleImageUri" }
+          }
+        },
+        "NetworkConfiguration": {
+          "NetworkMode": "PUBLIC"
+        },
+        "Tags": {
+          "CreatedBy": "IntegrationTests",
+          "TestRunId": { "Ref": "TestRunId" }
+        }
+      }
+    },
+    "AnnotationsSample": {
+      "Type": "AWS::BedrockAgentCore::Runtime",
+      "Properties": {
+        "AgentRuntimeName": { "Fn::Sub": "AnnotationsSample_${TestRunId}" },
+        "RoleArn": { "Ref": "RoleArn" },
+        "AgentRuntimeArtifact": {
+          "ContainerConfiguration": {
+            "ContainerUri": { "Ref": "AnnotationsSampleImageUri" }
+          }
+        },
+        "NetworkConfiguration": {
+          "NetworkMode": "PUBLIC"
+        },
+        "Tags": {
+          "CreatedBy": "IntegrationTests",
+          "TestRunId": { "Ref": "TestRunId" }
+        }
+      }
+    },
+    "StreamingAgent": {
+      "Type": "AWS::BedrockAgentCore::Runtime",
+      "Properties": {
+        "AgentRuntimeName": { "Fn::Sub": "StreamingAgent_${TestRunId}" },
+        "RoleArn": { "Ref": "RoleArn" },
+        "AgentRuntimeArtifact": {
+          "ContainerConfiguration": {
+            "ContainerUri": { "Ref": "StreamingAgentImageUri" }
+          }
+        },
+        "NetworkConfiguration": {
+          "NetworkMode": "PUBLIC"
+        },
+        "Tags": {
+          "CreatedBy": "IntegrationTests",
+          "TestRunId": { "Ref": "TestRunId" }
+        }
+      }
+    },
+    "AnnotationsStreamingAgent": {
+      "Type": "AWS::BedrockAgentCore::Runtime",
+      "Properties": {
+        "AgentRuntimeName": {
+          "Fn::Sub": "AnnotationsStreamingAgent_${TestRunId}"
+        },
+        "RoleArn": { "Ref": "RoleArn" },
+        "AgentRuntimeArtifact": {
+          "ContainerConfiguration": {
+            "ContainerUri": { "Ref": "AnnotationsStreamingAgentImageUri" }
+          }
+        },
+        "NetworkConfiguration": {
+          "NetworkMode": "PUBLIC"
+        },
+        "Tags": {
+          "CreatedBy": "IntegrationTests",
+          "TestRunId": { "Ref": "TestRunId" }
+        }
+      }
+    },
+    "NativeAotExtensions": {
+      "Type": "AWS::BedrockAgentCore::Runtime",
+      "Properties": {
+        "AgentRuntimeName": { "Fn::Sub": "NativeAotExtensions_${TestRunId}" },
+        "RoleArn": { "Ref": "RoleArn" },
+        "AgentRuntimeArtifact": {
+          "ContainerConfiguration": {
+            "ContainerUri": { "Ref": "NativeAotExtensionsImageUri" }
+          }
+        },
+        "NetworkConfiguration": {
+          "NetworkMode": "PUBLIC"
+        },
+        "Tags": {
+          "CreatedBy": "IntegrationTests",
+          "TestRunId": { "Ref": "TestRunId" }
+        }
+      }
+    },
+    "NativeAotAnnotations": {
+      "Type": "AWS::BedrockAgentCore::Runtime",
+      "Properties": {
+        "AgentRuntimeName": { "Fn::Sub": "NativeAotAnnotations_${TestRunId}" },
+        "RoleArn": { "Ref": "RoleArn" },
+        "AgentRuntimeArtifact": {
+          "ContainerConfiguration": {
+            "ContainerUri": { "Ref": "NativeAotAnnotationsImageUri" }
+          }
+        },
+        "NetworkConfiguration": {
+          "NetworkMode": "PUBLIC"
+        },
+        "Tags": {
+          "CreatedBy": "IntegrationTests",
+          "TestRunId": { "Ref": "TestRunId" }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "MicrosoftAgentFrameworkSampleArn": {
+      "Value": {
+        "Fn::GetAtt": ["MicrosoftAgentFrameworkSample", "AgentRuntimeArn"]
+      }
+    },
+    "AnnotationsSampleArn": {
+      "Value": { "Fn::GetAtt": ["AnnotationsSample", "AgentRuntimeArn"] }
+    },
+    "StreamingAgentArn": {
+      "Value": { "Fn::GetAtt": ["StreamingAgent", "AgentRuntimeArn"] }
+    },
+    "AnnotationsStreamingAgentArn": {
+      "Value": {
+        "Fn::GetAtt": ["AnnotationsStreamingAgent", "AgentRuntimeArn"]
+      }
+    },
+    "NativeAotExtensionsArn": {
+      "Value": { "Fn::GetAtt": ["NativeAotExtensions", "AgentRuntimeArn"] }
+    },
+    "NativeAotAnnotationsArn": {
+      "Value": { "Fn::GetAtt": ["NativeAotAnnotations", "AgentRuntimeArn"] }
+    }
+  }
+}

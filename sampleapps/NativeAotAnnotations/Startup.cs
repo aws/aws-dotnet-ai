@@ -3,7 +3,6 @@
 
 using AWS.AgentCore;
 using AWS.AgentCore.Extensions;
-using Microsoft.AspNetCore.Builder;
 
 namespace NativeAotAnnotations;
 
@@ -14,7 +13,7 @@ public class Startup
     {
         builder.AddAgentCore(options =>
         {
-            options.ModelId = "global.anthropic.claude-sonnet-4-20250514-v1:0";
+            options.ModelId = "global.anthropic.claude-opus-4-7";
         });
     }
 }

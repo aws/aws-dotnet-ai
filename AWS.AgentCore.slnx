@@ -15,5 +15,6 @@
   <Folder Name="/test/">
     <Project Path="test/AWS.AgentCore.UnitTests/AWS.AgentCore.UnitTests.csproj" />
     <Project Path="test/AWS.AgentCore.SourceGenerator.UnitTests/AWS.AgentCore.SourceGenerator.UnitTests.csproj" />
+    <Project Path="test/AWS.AgentCore.IntegrationTests/AWS.AgentCore.IntegrationTests.csproj" />
   </Folder>
 </Solution>

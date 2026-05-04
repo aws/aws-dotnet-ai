@@ -1,0 +1,178 @@
+name: Build Agent
+
+# Triggered when someone comments on a PR.
+# The agent is invoked only if the commenter is a member of the configured GitHub team
+# and the comment starts with "/build".
+#
+# Example PR comments:
+#   /build run the CI pipeline on this branch
+#   /build what's the status of the last build?
+#   /build show me the logs from the latest build
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  invoke-agent:
+    # Only run on PR comments (not issue comments) that start with "/build"
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/build')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check team membership
+        id: auth
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const team = '${{ vars.BUILD_AGENT_TEAM }}' || 'build-agents';
+            const org = context.repo.owner;
+            const username = context.payload.comment.user.login;
+
+            try {
+              const { status } = await github.rest.teams.getMembershipForUserInOrg({
+                org,
+                team_slug: team,
+                username,
+              });
+              if (status === 200) {
+                core.setOutput('authorized', 'true');
+                console.log(`✓ ${username} is a member of ${org}/${team}`);
+              } else {
+                core.setOutput('authorized', 'false');
+                console.log(`✗ ${username} is NOT a member of ${org}/${team}`);
+              }
+            } catch (error) {
+              core.setOutput('authorized', 'false');
+              console.log(`✗ Team membership check failed for ${username}: ${error.message}`);
+            }
+
+      - name: Post unauthorized message
+        if: steps.auth.outputs.authorized != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const team = '${{ vars.BUILD_AGENT_TEAM }}' || 'build-agents';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⛔ @${context.payload.comment.user.login} You are not authorized to use the build agent. You must be a member of the \`${team}\` team.`,
+            });
+
+      - name: Get PR metadata
+        if: steps.auth.outputs.authorized == 'true'
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('branch', pr.head.ref);
+            core.setOutput('sha', pr.head.sha);
+            core.setOutput('repo_full_name', pr.head.repo.full_name);
+            core.setOutput('pr_number', context.issue.number);
+            core.setOutput('pr_title', pr.title);
+            console.log(`PR #${context.issue.number}: ${pr.head.ref} @ ${pr.head.sha}`);
+
+      - name: Post thinking reaction
+        if: steps.auth.outputs.authorized == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes',
+            });
+
+      - name: Configure AWS credentials
+        if: steps.auth.outputs.authorized == 'true'
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 #v4
+        with:
+          role-to-assume: ${{ secrets.BUILD_AGENT_ROLE_ARN }}
+          aws-region: ${{ vars.BUILD_AGENT_REGION || 'us-west-2' }}
+
+      - name: Invoke Build Agent
+        if: steps.auth.outputs.authorized == 'true'
+        id: invoke
+        shell: bash
+        env:
+          RUNTIME_ARN: ${{ secrets.BUILD_AGENT_RUNTIME_ARN }}
+          CODEBUILD_PROJECT: ${{ secrets.CI_TESTING_CODE_BUILD_PROJECT_NAME }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR_BRANCH: ${{ steps.pr.outputs.branch }}
+          PR_SHA: ${{ steps.pr.outputs.sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          PR_TITLE: ${{ steps.pr.outputs.pr_title }}
+          REPO_FULL_NAME: ${{ steps.pr.outputs.repo_full_name }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+        run: |
+          # Strip the "/build" prefix from the comment to get the user's command
+          COMMAND="${COMMENT_BODY#/build}"
+          COMMAND="${COMMAND#"${COMMAND%%[![:space:]]*}"}"  # trim leading whitespace
+
+          if [ -z "$COMMAND" ]; then
+            COMMAND="Run the CI build on this branch."
+          fi
+
+          # Build the enriched prompt with PR context and the CodeBuild project name
+          PROMPT="GitHub PR #${PR_NUMBER} (${PR_TITLE})
+          Repository: ${REPO_FULL_NAME}
+          Branch: ${PR_BRANCH}
+          Commit: ${PR_SHA}
+          CodeBuild project: ${CODEBUILD_PROJECT}
+          Requested by: @${COMMENTER}
+
+          Command: ${COMMAND}"
+
+          # Invoke the AgentCore runtime
+          PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{"prompt": $prompt}')
+
+          RESPONSE=$(aws bedrock-agent-runtime invoke-agent-runtime \
+            --agent-runtime-arn "$RUNTIME_ARN" \
+            --payload "$PAYLOAD" \
+            --query 'output' \
+            --output text 2>&1) || true
+
+          # Save response for the next step
+          echo "AGENT_RESPONSE<<EOF" >> "$GITHUB_ENV"
+          echo "$RESPONSE" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: Post agent response
+        if: steps.auth.outputs.authorized == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const response = process.env.AGENT_RESPONSE || 'No response from agent.';
+            const commenter = context.payload.comment.user.login;
+
+            const body = [
+              `### 🤖 Build Agent Response`,
+              ``,
+              `> Requested by @${commenter}`,
+              ``,
+              response,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });

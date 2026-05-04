@@ -12,6 +12,7 @@
         <ProjectReference Include="..\..\src\AWS.AgentCore.SourceGenerator\AWS.AgentCore.SourceGenerator.csproj"
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.14" />
     </ItemGroup>
 
 </Project>

@@ -97,9 +97,23 @@ public static class DockerHelper
         var fullUri = $"{ecrRepositoryUri}:{remoteTag}";
         Console.Error.WriteLine($"[Docker] Tagging {localImageTag}:latest as {fullUri}");
         await RunProcessAsync("docker", $"tag {localImageTag}:latest {fullUri}", ct: ct);
-        Console.Error.WriteLine($"[Docker] Pushing {fullUri}");
-        await RunProcessAsync("docker", $"{configFlag} push {fullUri}", ct: ct);
-        Console.Error.WriteLine($"[Docker] Push complete: {fullUri}");
+
+        // Push with retry — ECR pushes can fail with transient TCP resets
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            try
+            {
+                Console.Error.WriteLine($"[Docker] Pushing {fullUri} (attempt {attempt})");
+                await RunProcessAsync("docker", $"{configFlag} push {fullUri}", ct: ct);
+                Console.Error.WriteLine($"[Docker] Push complete: {fullUri}");
+                break;
+            }
+            catch (Exception ex) when (attempt < 3)
+            {
+                Console.Error.WriteLine($"[Docker] Push attempt {attempt} failed: {ex.Message}. Retrying in 5s...");
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            }
+        }
 
         return fullUri;
     }

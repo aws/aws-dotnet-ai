@@ -1,9 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AWS.AgentCore;
 using AWS.AgentCore.Extensions;
 using Microsoft.Extensions.AI;
 using NativeAotExtensions.Models;
@@ -21,19 +23,13 @@ var app = builder.Build();
 app.MapAgentCore<PromptRequest>(
     async (request, context, services, ct) =>
     {
+        var chatClient = services.GetRequiredService<IChatClient>();
         var logger = services.GetRequiredService<ILogger<Program>>();
 
         logger.LogInformation("Invocation — SessionId={SessionId}, RequestId={RequestId}",
             context.SessionId, context.RequestId);
 
-        // Return app info directly without calling the LLM (deterministic, avoids Bedrock SDK AOT tool bug)
-        if (request.Prompt?.Contains("GetAppInfo", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            return GetAppInfo();
-        }
-
-        var chatClient = services.GetRequiredService<IChatClient>();
-        var agent = chatClient.AsAIAgent();
+        var agent = chatClient.AsAIAgent(tools: [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(GetAppInfo)]);
         var session = await agent.CreateSessionAsync(cancellationToken: ct);
         var response = await agent.RunAsync(request.Prompt ?? "Hello!", session, cancellationToken: ct);
 
@@ -43,6 +39,11 @@ app.MapAgentCore<PromptRequest>(
 
 app.Run();
 
+[Description("Gets the current weather for a given location.")]
+static string GetWeather([Description("The city or location to get weather for.")] string location)
+    => $"The current weather in {location} is 72°F and sunny.";
+
+[Description("Returns runtime information about this application as a JSON string. Call this when asked about the app's name, architecture, framework, or whether it is running as NativeAOT. Return the JSON result directly to the user without modification.")]
 [UnconditionalSuppressMessage("SingleFile", "IL3000", Justification = "Assembly.Location returning empty is the intentional AOT detection mechanism.")]
 static string GetAppInfo()
 {

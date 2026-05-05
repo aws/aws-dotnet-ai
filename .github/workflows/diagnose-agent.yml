@@ -1,0 +1,290 @@
+name: Diagnose Agent
+
+# Two trigger surfaces:
+#   1. /explain comment on a PR -> manual diagnostic run.
+#   2. AWS CI workflow run completes with conclusion=failure -> auto-diagnose.
+#
+# Both jobs invoke the same Bedrock AgentCore runtime; the agent decides what
+# tools to call based on the prompt context.
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: ["AWS CI"]
+    types: [completed]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  on-explain-comment:
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/explain')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check team membership
+        id: auth
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ORG_READ_TOKEN }}
+          script: |
+            const team = '${{ secrets.BUILD_AGENT_TEAM }}';
+            if (!team) {
+              core.setFailed('BUILD_AGENT_TEAM secret is not configured.');
+              return;
+            }
+            const org = 'aws';
+            const username = context.payload.comment.user.login;
+
+            try {
+              const { status } = await github.rest.teams.getMembershipForUserInOrg({
+                org,
+                team_slug: team,
+                username,
+              });
+              if (status === 200) {
+                core.setOutput('authorized', 'true');
+                console.log(`✓ ${username} is a member of ${org}/${team}`);
+              } else {
+                core.setOutput('authorized', 'false');
+                console.log(`✗ ${username} is NOT a member of ${org}/${team}`);
+              }
+            } catch (error) {
+              core.setOutput('authorized', 'false');
+              console.log(`✗ Team membership check failed for ${username}: ${error.message}`);
+            }
+
+      - name: Post unauthorized message
+        if: steps.auth.outputs.authorized != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⛔ @${context.payload.comment.user.login} You are not authorized to use the diagnostic agent.`,
+            });
+
+      - name: Get PR metadata
+        if: steps.auth.outputs.authorized == 'true'
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('branch', pr.head.ref);
+            core.setOutput('sha', pr.head.sha);
+            core.setOutput('pr_number', context.issue.number);
+            core.setOutput('pr_title', pr.title);
+
+      - name: Post thinking reaction
+        if: steps.auth.outputs.authorized == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes',
+            });
+
+      - name: Configure AWS credentials
+        if: steps.auth.outputs.authorized == 'true'
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 #v4
+        with:
+          role-to-assume: ${{ secrets.DIAGNOSE_AGENT_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Invoke Diagnostic Agent
+        if: steps.auth.outputs.authorized == 'true'
+        id: invoke
+        shell: bash
+        env:
+          RUNTIME_ARN: ${{ secrets.DIAGNOSE_AGENT_RUNTIME_ARN }}
+          CODEBUILD_PROJECT: ${{ secrets.CI_TESTING_CODE_BUILD_PROJECT_NAME }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR_BRANCH: ${{ steps.pr.outputs.branch }}
+          PR_SHA: ${{ steps.pr.outputs.sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          PR_TITLE: ${{ steps.pr.outputs.pr_title }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+        run: |
+          COMMAND="${COMMENT_BODY#/explain}"
+          COMMAND="${COMMAND#"${COMMAND%%[![:space:]]*}"}"
+
+          if [ -z "$COMMAND" ]; then
+            COMMAND="Diagnose the most recent failed build for this PR's branch."
+          fi
+
+          PROMPT="GitHub PR #${PR_NUMBER} (${PR_TITLE})
+          Repository: ${GITHUB_REPOSITORY}
+          Branch: ${PR_BRANCH}
+          Commit: ${PR_SHA}
+          CodeBuild project: ${CODEBUILD_PROJECT}
+          Requested by: @${COMMENTER}
+
+          Command: ${COMMAND}"
+
+          PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{"prompt": $prompt}')
+
+          RESPONSE=$(aws bedrock-agent-runtime invoke-agent-runtime \
+            --agent-runtime-arn "$RUNTIME_ARN" \
+            --payload "$PAYLOAD" \
+            --query 'output' \
+            --output text 2>&1) || true
+
+          echo "AGENT_RESPONSE<<EOF" >> "$GITHUB_ENV"
+          echo "$RESPONSE" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: Post diagnosis
+        if: steps.auth.outputs.authorized == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const response = process.env.AGENT_RESPONSE || 'No response from agent.';
+            const commenter = context.payload.comment.user.login;
+
+            const body = [
+              `### 🔬 Diagnostic Agent Response`,
+              ``,
+              `> Requested by @${commenter}`,
+              ``,
+              response,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+  on-failed-build:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve PR metadata from workflow_run
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const wr = context.payload.workflow_run;
+            let prNumber, branch, sha, title;
+
+            if (wr.pull_requests && wr.pull_requests.length > 0) {
+              prNumber = wr.pull_requests[0].number;
+              branch = wr.head_branch;
+              sha = wr.head_sha;
+            } else {
+              const { data: prs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                head: `${context.repo.owner}:${wr.head_branch}`,
+              });
+              if (prs.length === 0) {
+                core.setOutput('skip', 'true');
+                console.log(`No open PR for branch ${wr.head_branch}; skipping auto-diagnosis.`);
+                return;
+              }
+              prNumber = prs[0].number;
+              branch = wr.head_branch;
+              sha = wr.head_sha;
+              title = prs[0].title;
+            }
+
+            if (!title) {
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+              });
+              title = pr.title;
+            }
+
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('branch', branch);
+            core.setOutput('sha', sha);
+            core.setOutput('pr_title', title);
+            core.setOutput('run_id', wr.id);
+            core.setOutput('run_url', wr.html_url);
+
+      - name: Configure AWS credentials
+        if: steps.pr.outputs.skip != 'true'
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 #v4
+        with:
+          role-to-assume: ${{ secrets.DIAGNOSE_AGENT_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Invoke Diagnostic Agent (auto)
+        if: steps.pr.outputs.skip != 'true'
+        id: invoke
+        shell: bash
+        env:
+          RUNTIME_ARN: ${{ secrets.DIAGNOSE_AGENT_RUNTIME_ARN }}
+          CODEBUILD_PROJECT: ${{ secrets.CI_TESTING_CODE_BUILD_PROJECT_NAME }}
+          PR_BRANCH: ${{ steps.pr.outputs.branch }}
+          PR_SHA: ${{ steps.pr.outputs.sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          PR_TITLE: ${{ steps.pr.outputs.pr_title }}
+          RUN_URL: ${{ steps.pr.outputs.run_url }}
+        run: |
+          PROMPT="AWS CI workflow failed on PR #${PR_NUMBER} (${PR_TITLE}).
+          Repository: ${GITHUB_REPOSITORY}
+          Branch: ${PR_BRANCH}
+          Commit: ${PR_SHA}
+          CodeBuild project: ${CODEBUILD_PROJECT}
+          Workflow run: ${RUN_URL}
+
+          Command: Locate the most recent failed CodeBuild build for this branch using ListRecentBuilds, then diagnose the failure. Post a Markdown comment back to the PR with your findings."
+
+          PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{"prompt": $prompt}')
+
+          RESPONSE=$(aws bedrock-agent-runtime invoke-agent-runtime \
+            --agent-runtime-arn "$RUNTIME_ARN" \
+            --payload "$PAYLOAD" \
+            --query 'output' \
+            --output text 2>&1) || true
+
+          echo "AGENT_RESPONSE<<EOF" >> "$GITHUB_ENV"
+          echo "$RESPONSE" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: Post auto-diagnosis
+        if: steps.pr.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const response = process.env.AGENT_RESPONSE || 'No response from agent.';
+            const prNumber = ${{ steps.pr.outputs.pr_number }};
+
+            const body = [
+              `### 🔬 Auto-Diagnostic (AWS CI failed)`,
+              ``,
+              `> Triggered automatically by workflow run [${{ steps.pr.outputs.run_id }}](${{ steps.pr.outputs.run_url }}). Comment \`/explain\` to re-run.`,
+              ``,
+              response,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });

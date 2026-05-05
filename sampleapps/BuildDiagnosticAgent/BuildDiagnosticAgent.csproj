@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\AWS.AgentCore\AWS.AgentCore.csproj" />
+        <ProjectReference Include="..\..\src\AWS.AgentCore.SourceGenerator\AWS.AgentCore.SourceGenerator.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false" />
+        <PackageReference Include="AWSSDK.CodeBuild" Version="4.0.5.27" />
+        <PackageReference Include="AWSSDK.CloudWatchLogs" Version="4.0.23" />
+        <PackageReference Include="AWSSDK.SecretsManager" Version="4.0.4.20" />
+    </ItemGroup>
+
+</Project>

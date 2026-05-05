@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Added BuildDiagnosticAgent sample: a PR-comment-driven agent that diagnoses CodeBuild failures by parsing CloudWatch logs, correlating with the PR diff, searching for past occurrences, and surfacing recent commits to the failing file. Includes a /explain command and an auto-fire workflow that runs on AWS CI failure."
+      ]
+    }
+  ]
+}

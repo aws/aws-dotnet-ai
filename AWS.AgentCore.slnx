@@ -8,6 +8,7 @@
     <Project Path="sampleapps/NativeAotExtensions/NativeAotExtensions.csproj" />
     <Project Path="sampleapps/NativeAotAnnotations/NativeAotAnnotations.csproj" />
     <Project Path="sampleapps/BuildSystemAgent/BuildSystemAgent.csproj" />
+    <Project Path="sampleapps/BuildDiagnosticAgent/BuildDiagnosticAgent.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />

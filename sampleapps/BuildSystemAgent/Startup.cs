@@ -3,8 +3,10 @@
 
 using Amazon.CloudWatchLogs;
 using Amazon.CodeBuild;
+using Amazon.SecretsManager;
 using AWS.AgentCore;
 using AWS.AgentCore.Extensions;
+using BuildSystemAgent.Services;
 using Microsoft.AspNetCore.Builder;
 
 namespace BuildSystemAgent;
@@ -21,5 +23,12 @@ public class Startup
 
         builder.Services.AddAWSService<IAmazonCodeBuild>();
         builder.Services.AddAWSService<IAmazonCloudWatchLogs>();
+        builder.Services.AddAWSService<IAmazonSecretsManager>();
+        builder.Services.AddHttpClient<GitHubClient>(client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("BuildSystemAgent/1.0");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+        });
     }
 }

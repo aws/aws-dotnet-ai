@@ -29,10 +29,14 @@ jobs:
         id: auth
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.ORG_READ_TOKEN }}
           script: |
-            const team = '${{ vars.BUILD_AGENT_TEAM }}' || 'build-agents';
-            const org = context.repo.owner;
+            const team = '${{ secrets.BUILD_AGENT_TEAM }}';
+            if (!team) {
+              core.setFailed('BUILD_AGENT_TEAM secret is not configured.');
+              return;
+            }
+            const org = 'aws';
             const username = context.payload.comment.user.login;
 
             try {
@@ -59,12 +63,11 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const team = '${{ vars.BUILD_AGENT_TEAM }}' || 'build-agents';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `⛔ @${context.payload.comment.user.login} You are not authorized to use the build agent. You must be a member of the \`${team}\` team.`,
+              body: `⛔ @${context.payload.comment.user.login} You are not authorized to use the build agent.`,
             });
 
       - name: Get PR metadata
@@ -104,7 +107,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 #v4
         with:
           role-to-assume: ${{ secrets.BUILD_AGENT_ROLE_ARN }}
-          aws-region: ${{ vars.BUILD_AGENT_REGION || 'us-west-2' }}
+          aws-region: us-west-2
 
       - name: Invoke Build Agent
         if: steps.auth.outputs.authorized == 'true'

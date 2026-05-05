@@ -9,6 +9,7 @@ using Amazon.CodeBuild;
 using Amazon.CodeBuild.Model;
 using AWS.AgentCore;
 using BuildSystemAgent.Models;
+using BuildSystemAgent.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +19,7 @@ public class Agent(
     IChatClient chatClient,
     IAmazonCodeBuild codeBuild,
     IAmazonCloudWatchLogs cloudWatchLogs,
+    GitHubClient gitHubClient,
     ILogger<Agent> logger)
 {
     [AgentCoreHandler]
@@ -30,21 +32,46 @@ public class Agent(
             context.SessionId, context.RequestId);
 
         const string systemPrompt = """
-            You are a build system agent that manages AWS CodeBuild builds.
-            You can start builds, check build status, and retrieve build logs.
+            You are a build and code review agent for GitHub pull requests.
 
-            The caller's prompt includes the CodeBuild project name and PR context.
-            Use the project name from the prompt when starting builds.
-            When starting a build from a PR, use the PR branch name as the sourceVersion.
-            Always confirm what you're about to do before starting a build.
-            After starting a build, report the build ID so the user can track it.
+            You have two sets of capabilities:
+            1. **Build management** — Start CodeBuild builds, check status, and fetch logs.
+            2. **PR review** — Read PR diffs, file contents, CI check results, and submit inline review comments.
+
+            The caller's prompt includes the GitHub repository (owner/repo), PR number, branch, and CodeBuild project name.
+
+            When reviewing a PR:
+            - First get the PR description and file list to understand the scope.
+            - Then get the diff to see exactly what changed.
+            - If you need more context around a change, fetch the full file content.
+            - Identify bugs, security issues, performance problems, and style inconsistencies.
+            - Use SubmitPRReview to post inline comments on specific problematic lines.
+              The 'line' field must be the line number as it appears in the diff (the new file line number for additions/modifications).
+            - After submitting the review, return a brief summary of your findings.
+            - Be concise and actionable. Don't comment on things that are fine — only flag real issues.
+            - Do NOT approve or request changes. Your review status will always be "Commented".
+
+            When managing builds:
+            - Use the CodeBuild project name from the prompt.
+            - Use the PR branch as the sourceVersion.
+            - Report the build ID after starting.
+
+            Your response will be posted as a GitHub PR comment, so format it in markdown.
             """;
 
         var agent = chatClient.AsAIAgent(tools:
         [
+            // Build tools
             AIFunctionFactory.Create(StartBuild),
             AIFunctionFactory.Create(GetBuildStatus),
             AIFunctionFactory.Create(GetBuildLogs),
+            // PR review tools
+            AIFunctionFactory.Create(GetPRDescription),
+            AIFunctionFactory.Create(GetPRDiff),
+            AIFunctionFactory.Create(GetPRFiles),
+            AIFunctionFactory.Create(GetFileContent),
+            AIFunctionFactory.Create(GetPRChecks),
+            AIFunctionFactory.Create(SubmitPRReview),
         ]);
 
         var session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
@@ -56,6 +83,195 @@ public class Agent(
 
     [AgentCorePing]
     public object Ping() => new { status = "Healthy", time_of_last_update = DateTimeOffset.UtcNow.ToUnixTimeSeconds() };
+
+    // ──────────────────────────────────────────────────────────────────
+    // PR Review Tools
+    // ──────────────────────────────────────────────────────────────────
+
+    [Description("Gets the pull request metadata including title, description body, labels, and base/head branches.")]
+    async Task<string> GetPRDescription(
+        [Description("The GitHub repository owner (org or user).")] string owner,
+        [Description("The GitHub repository name.")] string repo,
+        [Description("The pull request number.")] int prNumber)
+    {
+        try
+        {
+            var json = await gitHubClient.GetPullRequestAsync(owner, repo, prNumber);
+            var pr = JsonDocument.Parse(json).RootElement;
+
+            return JsonSerializer.Serialize(new
+            {
+                title = pr.GetProperty("title").GetString(),
+                body = pr.GetProperty("body").GetString(),
+                state = pr.GetProperty("state").GetString(),
+                baseBranch = pr.GetProperty("base").GetProperty("ref").GetString(),
+                headBranch = pr.GetProperty("head").GetProperty("ref").GetString(),
+                headSha = pr.GetProperty("head").GetProperty("sha").GetString(),
+                additions = pr.GetProperty("additions").GetInt32(),
+                deletions = pr.GetProperty("deletions").GetInt32(),
+                changedFiles = pr.GetProperty("changed_files").GetInt32(),
+                labels = pr.GetProperty("labels").EnumerateArray()
+                    .Select(l => l.GetProperty("name").GetString()).ToList(),
+            });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.GetType().Name, message = ex.Message });
+        }
+    }
+
+    [Description("Gets the unified diff of all changes in the pull request. Shows exactly what lines were added, removed, or modified.")]
+    async Task<string> GetPRDiff(
+        [Description("The GitHub repository owner (org or user).")] string owner,
+        [Description("The GitHub repository name.")] string repo,
+        [Description("The pull request number.")] int prNumber)
+    {
+        try
+        {
+            var diff = await gitHubClient.GetPullRequestDiffAsync(owner, repo, prNumber);
+
+            // Truncate very large diffs to avoid blowing up the context
+            const int maxLength = 100_000;
+            if (diff.Length > maxLength)
+            {
+                diff = diff[..maxLength] + "\n\n... [diff truncated — use GetFileContent for specific files]";
+            }
+
+            return diff;
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.GetType().Name, message = ex.Message });
+        }
+    }
+
+    [Description("Lists all files changed in the pull request with their status (added, modified, removed) and line change counts.")]
+    async Task<string> GetPRFiles(
+        [Description("The GitHub repository owner (org or user).")] string owner,
+        [Description("The GitHub repository name.")] string repo,
+        [Description("The pull request number.")] int prNumber)
+    {
+        try
+        {
+            var json = await gitHubClient.GetPullRequestFilesAsync(owner, repo, prNumber);
+            var files = JsonDocument.Parse(json).RootElement;
+
+            var summary = files.EnumerateArray().Select(f => new
+            {
+                filename = f.GetProperty("filename").GetString(),
+                status = f.GetProperty("status").GetString(),
+                additions = f.GetProperty("additions").GetInt32(),
+                deletions = f.GetProperty("deletions").GetInt32(),
+                changes = f.GetProperty("changes").GetInt32(),
+            }).ToList();
+
+            return JsonSerializer.Serialize(new { fileCount = summary.Count, files = summary });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.GetType().Name, message = ex.Message });
+        }
+    }
+
+    [Description("Gets the full content of a file at the PR's head commit. Useful for understanding context around changes shown in the diff.")]
+    async Task<string> GetFileContent(
+        [Description("The GitHub repository owner (org or user).")] string owner,
+        [Description("The GitHub repository name.")] string repo,
+        [Description("The file path relative to the repository root.")] string filePath,
+        [Description("The git ref to read the file at (branch name or commit SHA). Use the PR's head SHA or branch.")] string gitRef)
+    {
+        try
+        {
+            var content = await gitHubClient.GetFileContentAsync(owner, repo, filePath, gitRef);
+
+            // Truncate very large files
+            const int maxLength = 50_000;
+            if (content.Length > maxLength)
+            {
+                content = content[..maxLength] + "\n\n... [file truncated]";
+            }
+
+            return content;
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.GetType().Name, message = ex.Message });
+        }
+    }
+
+    [Description("Gets CI check run results for the PR's head commit. Shows which checks passed, failed, or are still running.")]
+    async Task<string> GetPRChecks(
+        [Description("The GitHub repository owner (org or user).")] string owner,
+        [Description("The GitHub repository name.")] string repo,
+        [Description("The commit SHA to get check runs for (use the PR's head SHA).")] string commitSha)
+    {
+        try
+        {
+            var json = await gitHubClient.GetCheckRunsAsync(owner, repo, commitSha);
+            var root = JsonDocument.Parse(json).RootElement;
+
+            var checkRuns = root.GetProperty("check_runs").EnumerateArray().Select(c => new
+            {
+                name = c.GetProperty("name").GetString(),
+                status = c.GetProperty("status").GetString(),
+                conclusion = c.TryGetProperty("conclusion", out var conc) ? conc.GetString() : null,
+                startedAt = c.TryGetProperty("started_at", out var sa) ? sa.GetString() : null,
+                completedAt = c.TryGetProperty("completed_at", out var ca) ? ca.GetString() : null,
+            }).ToList();
+
+            return JsonSerializer.Serialize(new
+            {
+                totalCount = root.GetProperty("total_count").GetInt32(),
+                checkRuns,
+            });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.GetType().Name, message = ex.Message });
+        }
+    }
+
+    [Description("Submits a PR review with inline comments on specific lines of code. The review appears as 'Commented' (not approved or changes requested). Use this after analyzing the diff to leave feedback on problematic lines. All comments are posted as a single grouped review.")]
+    async Task<string> SubmitPRReview(
+        [Description("The GitHub repository owner (org or user).")] string owner,
+        [Description("The GitHub repository name.")] string repo,
+        [Description("The pull request number.")] int prNumber,
+        [Description("The head commit SHA of the PR (ensures comments are anchored to the correct version).")] string commitSha,
+        [Description("A summary body for the review (appears as the top-level review comment). Use actual newlines for formatting, not escaped \\n.")] string summary,
+        [Description("JSON array of inline comments. Each object must have: 'path' (file path), 'line' (line number in the diff), 'body' (comment text). Example: [{\"path\":\"src/Foo.cs\",\"line\":42,\"body\":\"Potential null reference here.\"}]")] string commentsJson)
+    {
+        try
+        {
+            // Unescape literal \n sequences that the LLM may produce
+            summary = summary.Replace("\\n", "\n");
+
+            var comments = JsonSerializer.Deserialize<List<ReviewCommentInput>>(commentsJson)
+                ?? throw new ArgumentException("Failed to parse comments JSON.");
+
+            var reviewComments = comments.Select(c =>
+                new GitHubClient.ReviewComment(c.Path, c.Line, c.Body.Replace("\\n", "\n"))).ToList();
+
+            var result = await gitHubClient.SubmitPullRequestReviewAsync(
+                owner, repo, prNumber, commitSha, summary, reviewComments);
+
+            return JsonSerializer.Serialize(new
+            {
+                success = true,
+                commentCount = reviewComments.Count,
+                message = "Review submitted successfully with inline comments.",
+            });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.GetType().Name, message = ex.Message });
+        }
+    }
+
+    private record ReviewCommentInput(string Path, int Line, string Body);
+
+    // ──────────────────────────────────────────────────────────────────
+    // Build Tools
+    // ──────────────────────────────────────────────────────────────────
 
     [Description("Starts an AWS CodeBuild build for a given project and source version (branch, tag, or commit SHA). Returns the build ID.")]
     async Task<string> StartBuild(

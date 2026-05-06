@@ -131,6 +131,7 @@ public static class AgentCoreEndpointExtensions
 
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
+            EnsureJsonContentType(httpContext);
             var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
             if (request is null)
             {
@@ -198,6 +199,7 @@ public static class AgentCoreEndpointExtensions
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
+            EnsureJsonContentType(httpContext);
             var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
             if (request is null)
             {
@@ -258,6 +260,7 @@ public static class AgentCoreEndpointExtensions
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
+            EnsureJsonContentType(httpContext);
             var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
             if (request is null)
             {
@@ -301,6 +304,7 @@ public static class AgentCoreEndpointExtensions
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
+            EnsureJsonContentType(httpContext);
             var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
             if (request is null)
             {
@@ -359,6 +363,7 @@ public static class AgentCoreEndpointExtensions
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
+            EnsureJsonContentType(httpContext);
             var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
             if (request is null)
             {
@@ -377,6 +382,18 @@ public static class AgentCoreEndpointExtensions
         MapPingEndpoint(app, pingHandler);
 
         return app;
+    }
+
+    /// <summary>
+    /// The AgentCore Runtime may not send a Content-Type header on POST requests.
+    /// Default to application/json so that ReadFromJsonAsync does not throw.
+    /// </summary>
+    private static void EnsureJsonContentType(HttpContext httpContext)
+    {
+        if (string.IsNullOrEmpty(httpContext.Request.ContentType))
+        {
+            httpContext.Request.ContentType = "application/json";
+        }
     }
 
     /// <summary>

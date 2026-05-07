@@ -6,6 +6,7 @@ using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.AI;
 
 namespace AWS.AgentCore.Extensions;
@@ -101,8 +102,8 @@ public static class AgentCoreBuilderExtensions
         else if (!string.IsNullOrWhiteSpace(options.ModelId))
         {
             // Bedrock fallback when ModelId is provided
-            builder.Services.AddAWSService<IAmazonBedrockRuntime>();
-            builder.Services.AddSingleton<IChatClient>(sp =>
+            builder.Services.TryAddAWSService<IAmazonBedrockRuntime>();
+            builder.Services.TryAddSingleton<IChatClient>(sp =>
             {
                 var bedrockClient = sp.GetRequiredService<IAmazonBedrockRuntime>();
                 return bedrockClient.AsIChatClient(options.ModelId);

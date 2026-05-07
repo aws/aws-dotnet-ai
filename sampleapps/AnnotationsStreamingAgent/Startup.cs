@@ -3,7 +3,8 @@
 
 using AWS.AgentCore;
 using AWS.AgentCore.Extensions;
-using Microsoft.AspNetCore.Builder;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 
 namespace AnnotationsStreamingAgent;
 
@@ -15,6 +16,17 @@ public class Startup
         builder.AddAgentCore(options =>
         {
             options.ModelId = "global.anthropic.claude-opus-4-7";
+            options.AgentOptions = new ChatClientAgentOptions
+            {
+                ChatOptions = new()
+                {
+                    Tools =
+                    [
+                        AIFunctionFactory.Create(Agent.GetWeather),
+                        AIFunctionFactory.Create(Agent.GetAppInfo)
+                    ]
+                }
+            };
         });
     }
 }

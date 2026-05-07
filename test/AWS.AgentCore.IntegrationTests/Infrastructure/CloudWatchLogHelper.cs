@@ -35,6 +35,41 @@ public static class CloudWatchLogHelper
     }
 
     /// <summary>
+    /// Polls CloudWatch logs until all specified markers are found, or the timeout is reached.
+    /// Returns the full log output. Retries every <paramref name="pollInterval"/> seconds.
+    /// </summary>
+    public static async Task<string> WaitForLogsContainingAsync(
+        string runtimeArn,
+        string region,
+        IReadOnlyList<string> markers,
+        TimeSpan? timeout = null,
+        TimeSpan? pollInterval = null,
+        CancellationToken ct = default)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(90);
+        var effectiveInterval = pollInterval ?? TimeSpan.FromSeconds(15);
+        var deadline = DateTime.UtcNow + effectiveTimeout;
+
+        string logs = "";
+        while (DateTime.UtcNow < deadline)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Delay(effectiveInterval, ct);
+
+            FlushLogBuffer(); // Clear previous buffer
+            await DumpRuntimeLogsAsync(runtimeArn, region, ct);
+            logs = FlushLogBuffer();
+
+            if (markers.All(marker => logs.Contains(marker)))
+            {
+                return logs;
+            }
+        }
+
+        return logs;
+    }
+
+    /// <summary>
     /// Fetches recent log events for an AgentCore runtime and writes them to stderr.
     /// </summary>
     public static async Task DumpRuntimeLogsAsync(string runtimeArn, string region, CancellationToken ct = default)
@@ -121,8 +156,8 @@ public static class CloudWatchLogHelper
             var allEvents = new List<FilteredLogEvent>();
             string? nextToken = null;
 
-            // Get events from the last 5 minutes to focus on recent invocations
-            var startTime = DateTimeOffset.UtcNow.AddMinutes(-5).ToUnixTimeMilliseconds();
+            // Get events from the last 20 minutes to account for test suite duration
+            var startTime = DateTimeOffset.UtcNow.AddMinutes(-20).ToUnixTimeMilliseconds();
 
             do
             {

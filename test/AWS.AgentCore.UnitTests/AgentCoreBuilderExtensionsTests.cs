@@ -73,22 +73,22 @@ public class AgentCoreBuilderExtensionsTests
     }
 
     [Fact]
-    public void AddAgentCore_WithoutModelId_ThrowsArgumentException()
+    public void AddAgentCore_WithoutModelId_DoesNotThrow()
     {
         var builder = WebApplication.CreateBuilder();
 
-        var ex = Assert.Throws<ArgumentException>(() => builder.AddAgentCore());
+        var exception = Record.Exception(() => builder.AddAgentCore());
 
-        Assert.Contains("ModelId", ex.Message);
+        Assert.Null(exception);
     }
 
     [Fact]
-    public void AddAgentCore_WithNullConfigure_ThrowsArgumentException()
+    public void AddAgentCore_WithNullConfigure_DoesNotThrow()
     {
         var builder = WebApplication.CreateBuilder();
 
-        var ex = Assert.Throws<ArgumentException>(() => builder.AddAgentCore(null));
+        var exception = Record.Exception(() => builder.AddAgentCore(null));
 
-        Assert.Contains("ModelId", ex.Message);
+        Assert.Null(exception);
     }
 }

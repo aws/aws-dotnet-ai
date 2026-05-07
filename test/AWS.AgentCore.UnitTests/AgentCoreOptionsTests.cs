@@ -6,11 +6,11 @@ namespace AWS.AgentCore.UnitTests;
 public class AgentCoreOptionsTests
 {
     [Fact]
-    public void DefaultModelId_IsEmpty()
+    public void DefaultModelId_IsNull()
     {
         var options = new AgentCoreOptions();
 
-        Assert.Equal(string.Empty, options.ModelId);
+        Assert.Null(options.ModelId);
     }
 
     [Fact]

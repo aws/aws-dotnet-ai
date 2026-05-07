@@ -3,10 +3,11 @@
 
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AWS.AgentCore;
 using AWS.AgentCore.Extensions;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using NativeAotExtensions.Models;
 
@@ -15,6 +16,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddAgentCore(options =>
 {
     options.ModelId = "global.anthropic.claude-opus-4-7";
+    options.AgentOptions = new ChatClientAgentOptions
+    {
+        ChatOptions = new() { Tools = [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(GetAppInfo)] }
+    };
 });
 
 var app = builder.Build();
@@ -23,15 +28,14 @@ var app = builder.Build();
 app.MapAgentCore<PromptRequest>(
     async (request, context, services, ct) =>
     {
-        var chatClient = services.GetRequiredService<IChatClient>();
+        var agent = services.GetRequiredService<ChatClientAgent>();
         var logger = services.GetRequiredService<ILogger<Program>>();
 
         logger.LogInformation("Invocation — SessionId={SessionId}, RequestId={RequestId}",
             context.SessionId, context.RequestId);
 
-        var agent = chatClient.AsAIAgent(tools: [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(GetAppInfo)]);
         var session = await agent.CreateSessionAsync(cancellationToken: ct);
-        var response = await agent.RunAsync(request.Prompt ?? "Hello!", session, cancellationToken: ct);
+        var response = await agent.RunAsync(request.Prompt ?? "Hello!", session: session, cancellationToken: ct);
 
         return response.ToString();
     },
@@ -51,9 +55,9 @@ static string GetAppInfo()
     {
         AppName = "NativeAotExtensions",
         IsNativeAot = typeof(object).Assembly.Location == string.Empty,
-        Framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
-        Architecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString(),
-        Os = System.Runtime.InteropServices.RuntimeInformation.OSDescription
+        Framework = RuntimeInformation.FrameworkDescription,
+        Architecture = RuntimeInformation.OSArchitecture.ToString(),
+        Os = RuntimeInformation.OSDescription
     };
     return JsonSerializer.Serialize(info, AppJsonContext.Default.AppInfoResponse);
 }

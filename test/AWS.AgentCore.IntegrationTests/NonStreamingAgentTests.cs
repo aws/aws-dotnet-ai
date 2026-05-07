@@ -59,6 +59,63 @@ public class MicrosoftAgentFrameworkTests : IClassFixture<MicrosoftAgentFramewor
     }
 
     [Fact]
+    public async Task Invoke_WeatherToolExecutesThroughMiddleware()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await _invoker.InvokeAsync(
+            _fixture.RuntimeArn,
+            "What is the weather in Seattle? Respond with only the weather information, nothing else.",
+            ct);
+
+        Assert.Equal(200, result.HttpStatusCode);
+        // The weather tool should have been called through the function-calling middleware
+        // and returned a result containing the hardcoded temperature
+        Assert.Contains("72", result.Message);
+    }
+
+    [Fact]
+    public async Task Invoke_FlightSearchToolExecutesThroughMiddleware()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await _invoker.InvokeAsync(
+            _fixture.RuntimeArn,
+            "Search for flights from NYC to LA on 2026-06-15. Respond with only the flight information.",
+            ct);
+
+        Assert.Equal(200, result.HttpStatusCode);
+        // The flight search tool should have been called through the function-calling middleware
+        Assert.Contains("NYC", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("LA", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Invoke_MiddlewareLogsVisibleInCloudWatch()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Invoke with a prompt that triggers a tool call
+        await _invoker.InvokeAsync(
+            _fixture.RuntimeArn,
+            "What is the weather in Tokyo?",
+            ct);
+
+        // Poll CloudWatch until middleware markers appear
+        var logs = await CloudWatchLogHelper.WaitForLogsContainingAsync(
+            _fixture.RuntimeArn,
+            _fixture.Region,
+            ["[Middleware] Agent run starting", "[Middleware] Agent run complete", "[ToolMiddleware] Calling tool:"],
+            timeout: TimeSpan.FromSeconds(90),
+            ct: ct);
+
+        // Agent middleware should have logged
+        Assert.Contains("[Middleware] Agent run starting", logs);
+        Assert.Contains("[Middleware] Agent run complete", logs);
+
+        // Function-calling middleware should have logged the tool name
+        Assert.Contains("[ToolMiddleware] Calling tool:", logs);
+    }
+
+    [Fact]
     public async Task Invoke_AppInfoReportsArm64()
     {
         var ct = TestContext.Current.CancellationToken;

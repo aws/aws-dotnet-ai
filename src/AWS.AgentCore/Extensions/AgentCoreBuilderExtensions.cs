@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using Amazon.BedrockRuntime;
+using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.AI;
 
 namespace AWS.AgentCore.Extensions;
@@ -37,15 +39,23 @@ public static class AgentCoreBuilderExtensions
     ///   </item>
     ///   <item>
     ///     <description>
-    ///     Registers <see cref="IAmazonBedrockRuntime"/> via
-    ///     <c>AddAWSService</c>, which resolves AWS credentials and region from the standard
+    ///     Registers <see cref="IChatClient"/> based on priority: explicit <see cref="AgentCoreOptions.ChatClient"/>,
+    ///     Bedrock via <see cref="AgentCoreOptions.ModelId"/>, or relies on a pre-registered IChatClient in DI.
+    ///     When <see cref="AgentCoreOptions.ModelId"/> is used, also registers <see cref="IAmazonBedrockRuntime"/>
+    ///     via <c>AddAWSService</c>, which resolves AWS credentials and region from the standard
     ///     provider chain (environment variables, instance profile, etc.).
     ///     </description>
     ///   </item>
     ///   <item>
     ///     <description>
-    ///     Registers <see cref="IChatClient"/> as a singleton backed by Amazon Bedrock, using the
-    ///     model specified in <see cref="AgentCoreOptions.ModelId"/>.
+    ///     Registers <see cref="ChatClientAgent"/> as a singleton, configured with the resolved IChatClient
+    ///     and optional <see cref="AgentCoreOptions.AgentOptions"/>.
+    ///     </description>
+    ///   </item>
+    ///   <item>
+    ///     <description>
+    ///     Registers <see cref="AgentCoreRuntimeContextProvider"/> as a singleton for injecting
+    ///     AgentCore runtime context into the MS AF pipeline.
     ///     </description>
     ///   </item>
     /// </list>
@@ -60,9 +70,9 @@ public static class AgentCoreBuilderExtensions
     /// </remarks>
     /// <param name="builder">The web application builder to configure.</param>
     /// <param name="configure">
-    /// A callback to configure <see cref="AgentCoreOptions"/>. You must set
-    /// <see cref="AgentCoreOptions.ModelId"/> to a valid Bedrock model ID; an
-    /// <see cref="ArgumentException"/> is thrown if it is not provided.
+    /// An optional callback to configure <see cref="AgentCoreOptions"/>. You can set
+    /// <see cref="AgentCoreOptions.ModelId"/> for Bedrock, provide an explicit
+    /// <see cref="AgentCoreOptions.ChatClient"/>, or rely on a pre-registered IChatClient in DI.
     /// </param>
     /// <returns>The <see cref="WebApplicationBuilder"/> for further chaining.</returns>
     /// <example>
@@ -79,23 +89,67 @@ public static class AgentCoreBuilderExtensions
         var options = new AgentCoreOptions();
         configure?.Invoke(options);
 
-        if (string.IsNullOrWhiteSpace(options.ModelId))
-        {
-            throw new ArgumentException(
-                $"{nameof(AgentCoreOptions.ModelId)} is required. " +
-                "Set it via the configure callback: builder.AddAgentCore(options => options.ModelId = \"your-model-id\");",
-                nameof(configure));
-        }
-
         builder.Services.AddSingleton(options);
 
         builder.WebHost.UseUrls($"http://0.0.0.0:{options.Port}");
 
-        builder.Services.AddAWSService<IAmazonBedrockRuntime>();
-        builder.Services.AddSingleton<IChatClient>(sp =>
+        // IChatClient registration (priority order)
+        if (options.ChatClient is not null)
         {
-            var bedrockClient = sp.GetRequiredService<IAmazonBedrockRuntime>();
-            return bedrockClient.AsIChatClient(options.ModelId);
+            // Explicit client takes highest priority
+            builder.Services.AddSingleton<IChatClient>(options.ChatClient);
+        }
+        else if (!string.IsNullOrWhiteSpace(options.ModelId))
+        {
+            // Bedrock fallback when ModelId is provided
+            builder.Services.TryAddAWSService<IAmazonBedrockRuntime>();
+            builder.Services.TryAddSingleton<IChatClient>(sp =>
+            {
+                var bedrockClient = sp.GetRequiredService<IAmazonBedrockRuntime>();
+                return bedrockClient.AsIChatClient(options.ModelId);
+            });
+        }
+        // else: user must have pre-registered IChatClient in DI, or resolution will fail
+
+        // Register AgentCoreRuntimeContextProvider (AIContextProvider)
+        builder.Services.AddSingleton<AgentCoreRuntimeContextProvider>();
+
+        // Register AIAgent (may be a ChatClientAgent or a middleware-decorated agent)
+        builder.Services.AddSingleton<AIAgent>(sp =>
+        {
+            var chatClient = sp.GetService<IChatClient>();
+            if (chatClient is null)
+            {
+                throw new InvalidOperationException(
+                    "No IChatClient is registered. Provide one via: " +
+                    "options.ChatClient = myClient, " +
+                    "options.ModelId = \"model-id\" (for Bedrock), " +
+                    "or register IChatClient in DI before calling AddAgentCore().");
+            }
+
+            var agentOptions = options.AgentOptions ?? new ChatClientAgentOptions();
+            var agent = new ChatClientAgent(chatClient, agentOptions);
+
+            if (options.ConfigureAgent is not null)
+            {
+                return options.ConfigureAgent(agent);
+            }
+
+            return agent;
+        });
+
+        // Also register ChatClientAgent for users who need the concrete type (when no middleware is applied)
+        builder.Services.AddSingleton<ChatClientAgent>(sp =>
+        {
+            var aiAgent = sp.GetRequiredService<AIAgent>();
+            if (aiAgent is ChatClientAgent chatClientAgent)
+            {
+                return chatClientAgent;
+            }
+
+            throw new InvalidOperationException(
+                "Cannot resolve ChatClientAgent because ConfigureAgent was used to decorate the agent with middleware. " +
+                "Use AIAgent instead, which supports the full middleware pipeline.");
         });
 
         return builder;

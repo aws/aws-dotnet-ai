@@ -8,11 +8,12 @@ using System.Text.Json;
 using Amazon.S3;
 using AWS.AgentCore;
 using AnnotationsSample.Models;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace AnnotationsSample;
 
-public class Agent(IChatClient chatClient, IAmazonS3 s3Client, ILogger<Agent> logger)
+public class Agent(ChatClientAgent chatAgent, IAmazonS3 s3Client, ILogger<Agent> logger)
 {
     [AgentCoreHandler]
     public async Task<string> HandleInvocation(
@@ -23,14 +24,15 @@ public class Agent(IChatClient chatClient, IAmazonS3 s3Client, ILogger<Agent> lo
         logger.LogInformation("Invocation — SessionId={SessionId}, RequestId={RequestId}",
             context.SessionId, context.RequestId);
 
-        var agent = chatClient.AsAIAgent(tools:
-        [
-            AIFunctionFactory.Create(GetWeather),
-            AIFunctionFactory.Create(GetAppInfo),
-            AIFunctionFactory.Create(GetS3BucketCount)
-        ]);
-        var session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
-        var response = await agent.RunAsync(request.Prompt ?? "Hello!", session, cancellationToken: cancellationToken);
+        var session = await chatAgent.CreateSessionAsync(cancellationToken: cancellationToken);
+
+        // Add instance-method tools that require DI dependencies via per-run ChatOptions
+        var runOptions = new ChatClientAgentRunOptions(new ChatOptions
+        {
+            Tools = [AIFunctionFactory.Create(GetS3BucketCount)]
+        });
+        var response = await chatAgent.RunAsync(
+            request.Prompt ?? "Hello!", session: session, options: runOptions, cancellationToken: cancellationToken);
 
         return response.ToString();
     }
@@ -39,11 +41,11 @@ public class Agent(IChatClient chatClient, IAmazonS3 s3Client, ILogger<Agent> lo
     public object Ping() => new { status = "Healthy", time_of_last_update = DateTimeOffset.UtcNow.ToUnixTimeSeconds() };
 
     [Description("Gets the current weather for a given location.")]
-    static string GetWeather([Description("The city or location to get weather for.")] string location)
+    public static string GetWeather([Description("The city or location to get weather for.")] string location)
         => $"The current weather in {location} is 72°F and sunny.";
 
     [Description("Returns runtime information about this application as a JSON string. Call this when asked about the app's name, architecture, framework, or whether it is running as NativeAOT. Return the JSON result directly to the user without modification.")]
-    static string GetAppInfo()
+    public static string GetAppInfo()
     {
         var isAot = typeof(object).Assembly.Location == string.Empty;
         return JsonSerializer.Serialize(new
@@ -57,7 +59,7 @@ public class Agent(IChatClient chatClient, IAmazonS3 s3Client, ILogger<Agent> lo
     }
 
     [Description("Returns the number of S3 buckets in the AWS account. Use this when asked about S3 buckets or AWS resources. This uses the AWS SDK credential chain to authenticate.")]
-    async Task<string> GetS3BucketCount()
+    public async Task<string> GetS3BucketCount()
     {
         try
         {

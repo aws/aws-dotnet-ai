@@ -2,15 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System.ComponentModel;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text.Json;
 using AWS.AgentCore;
 using AnnotationsStreamingAgent.Models;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging;
+using Microsoft.Agents.AI;
 
 namespace AnnotationsStreamingAgent;
 
-public class Agent(IChatClient chatClient, ILogger<Agent> logger)
+public class Agent(ChatClientAgent chatAgent, ILogger<Agent> logger)
 {
     [AgentCoreHandler]
     public IAsyncEnumerable<string> HandleInvocation(
@@ -21,15 +23,14 @@ public class Agent(IChatClient chatClient, ILogger<Agent> logger)
         logger.LogInformation("Streaming invocation — SessionId={SessionId}, RequestId={RequestId}",
             context.SessionId, context.RequestId);
 
-        return Stream();
+        return Stream(cancellationToken);
 
         async IAsyncEnumerable<string> Stream([EnumeratorCancellation] CancellationToken ct = default)
         {
-            var agent = chatClient.AsAIAgent(tools: [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(GetAppInfo)]);
-            var session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
+            var session = await chatAgent.CreateSessionAsync(cancellationToken: ct);
 
-            await foreach (var update in agent.RunStreamingAsync(
-                request.Prompt ?? "Hello!", session, cancellationToken: cancellationToken))
+            await foreach (var update in chatAgent.RunStreamingAsync(
+                request.Prompt ?? "Hello!", session: session, cancellationToken: ct))
             {
                 var text = update.Text;
                 if (!string.IsNullOrEmpty(text))
@@ -45,20 +46,20 @@ public class Agent(IChatClient chatClient, ILogger<Agent> logger)
     public object Ping() => new { status = "Healthy", time_of_last_update = DateTimeOffset.UtcNow.ToUnixTimeSeconds() };
 
     [Description("Gets the current weather for a given location.")]
-    static string GetWeather([Description("The city or location to get weather for.")] string location)
+    public static string GetWeather([Description("The city or location to get weather for.")] string location)
         => $"The current weather in {location} is 72°F and sunny.";
 
     [Description("Returns runtime information about this application as a JSON string. Call this when asked about the app's name, architecture, framework, or whether it is running as NativeAOT. Return the JSON result directly to the user without modification.")]
-    static string GetAppInfo()
+    public static string GetAppInfo()
     {
         var isAot = typeof(object).Assembly.Location == string.Empty;
-        return System.Text.Json.JsonSerializer.Serialize(new
+        return JsonSerializer.Serialize(new
         {
-            appName = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name ?? "Unknown",
+            appName = Assembly.GetEntryAssembly()?.GetName().Name ?? "Unknown",
             isNativeAot = isAot,
-            framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
-            architecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString(),
-            os = System.Runtime.InteropServices.RuntimeInformation.OSDescription
+            framework = RuntimeInformation.FrameworkDescription,
+            architecture = RuntimeInformation.OSArchitecture.ToString(),
+            os = RuntimeInformation.OSDescription
         });
     }
 }

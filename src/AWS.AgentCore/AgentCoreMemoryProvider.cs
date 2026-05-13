@@ -76,7 +76,7 @@ public sealed class AgentCoreMemoryProvider(
         var sessionId = GetSessionId(context.Session);
         if (sessionId is null)
         {
-            logger.LogWarning("SessionId not available in session StateBag. Skipping memory load.");
+            logger.LogWarning("SessionId not available. Ensure the request is handled by a MapAgentCore endpoint. Skipping memory load.");
             return [];
         }
 
@@ -131,6 +131,8 @@ public sealed class AgentCoreMemoryProvider(
         var messages = new List<ChatMessage>();
         string? nextToken = null;
 
+        // AgentCore Memory ListEvents returns events in chronological order (oldest first).
+        // We append them directly — no sorting needed.
         do
         {
             ListEventsResponse response;
@@ -139,6 +141,7 @@ public sealed class AgentCoreMemoryProvider(
                 response = await memoryClient.ListEventsAsync(new ListEventsRequest
                 {
                     MemoryId = memoryId,
+                    // ActorId = sessionId: see SaveEventAsync comment for rationale
                     ActorId = sessionId,
                     SessionId = sessionId,
                     IncludePayloads = true,
@@ -207,6 +210,9 @@ public sealed class AgentCoreMemoryProvider(
         {
             MemoryId = memoryId,
             SessionId = sessionId,
+            // NOTE: ActorId is set to sessionId intentionally. In this session-scoped short-term
+            // memory implementation, the session IS the actor scope. A future long-term memory
+            // feature may introduce a separate ActorId/UserId concept.
             ActorId = sessionId,
             EventTimestamp = DateTime.UtcNow,
             Payload = [
@@ -234,15 +240,19 @@ public sealed class AgentCoreMemoryProvider(
             if (HasToolContent(message))
                 continue;
 
+            // Only persist User and Assistant messages — skip System, Tool, and any other roles
+            Role role;
+            if (message.Role == ChatRole.User)
+                role = Role.USER;
+            else if (message.Role == ChatRole.Assistant)
+                role = Role.ASSISTANT;
+            else
+                continue;
+
             // Extract text content
             var text = message.Text;
             if (string.IsNullOrWhiteSpace(text))
                 continue;
-
-            // Map role
-            var role = message.Role == ChatRole.User
-                ? Role.USER
-                : Role.ASSISTANT;
 
             yield return (role, text);
         }

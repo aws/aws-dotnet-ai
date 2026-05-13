@@ -175,7 +175,7 @@ public class AgentCoreMemoryProviderPropertyTests
     // ──────────────────────────────────────────────────────────────────
 
     [Property(MaxTest = 100)]
-    public async void Pagination_FetchesAllPagesInOrder(PositiveInt pageCountWrapper)
+    public async Task Pagination_FetchesAllPagesInOrder(PositiveInt pageCountWrapper)
     {
         var pageCount = Math.Min(pageCountWrapper.Get, 10); // Cap at 10 pages for test performance
         var callCount = 0;
@@ -241,7 +241,7 @@ public class AgentCoreMemoryProviderPropertyTests
     // ──────────────────────────────────────────────────────────────────
 
     [Property(MaxTest = 100)]
-    public async void Errors_NeverPropagate_OnLoad(NonEmptyString exceptionMessage)
+    public async Task Errors_NeverPropagate_OnLoad(NonEmptyString exceptionMessage)
     {
         var mockClient = new Mock<IAmazonBedrockAgentCore>();
         mockClient
@@ -260,7 +260,7 @@ public class AgentCoreMemoryProviderPropertyTests
     }
 
     [Property(MaxTest = 100)]
-    public async void Errors_NeverPropagate_OnSave(NonEmptyString exceptionMessage, NonEmptyString messageText)
+    public async Task Errors_NeverPropagate_OnSave(NonEmptyString exceptionMessage, NonEmptyString messageText)
     {
         if (string.IsNullOrWhiteSpace(messageText.Get))
             return;
@@ -292,7 +292,7 @@ public class AgentCoreMemoryProviderPropertyTests
     // ──────────────────────────────────────────────────────────────────
 
     [Property(MaxTest = 100)]
-    public async void PartialPaginationFailure_ReturnsLoadedPages(PositiveInt successfulPagesWrapper)
+    public async Task PartialPaginationFailure_ReturnsLoadedPages(PositiveInt successfulPagesWrapper)
     {
         var successfulPages = Math.Min(successfulPagesWrapper.Get, 10); // Cap for performance
         var currentPage = 0;

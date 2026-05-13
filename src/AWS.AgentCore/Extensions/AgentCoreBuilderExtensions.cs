@@ -138,7 +138,8 @@ public static class AgentCoreBuilderExtensions
 
             // Wire the Memory provider as the ChatHistoryProvider
             var memoryProvider = sp.GetRequiredService<AgentCoreMemoryProvider>();
-            agentOptions.ChatHistoryProvider = memoryProvider;
+            // Only set the memory provider if the user hasn't configured their own ChatHistoryProvider
+            agentOptions.ChatHistoryProvider ??= memoryProvider;
 
             var agent = new ChatClientAgent(chatClient, agentOptions);
 

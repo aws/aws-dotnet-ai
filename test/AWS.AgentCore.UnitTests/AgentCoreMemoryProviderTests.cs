@@ -13,6 +13,7 @@ using Moq;
 
 namespace AWS.AgentCore.UnitTests;
 
+[Collection("EnvironmentVariableTests")]
 public class AgentCoreMemoryProviderTests
 {
     private static AgentCoreMemoryProvider CreateProvider(

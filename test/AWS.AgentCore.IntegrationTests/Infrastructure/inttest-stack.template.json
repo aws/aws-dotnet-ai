@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Integration test resources for AWS.AgentCore — IAM role and ECR repository.",
+  "Description": "Integration test resources for AWS.AgentCore — IAM role, ECR repository, and Memory.",
   "Parameters": {
     "TestRunId": {
       "Type": "String",
@@ -124,6 +124,18 @@
                   "Effect": "Allow",
                   "Action": ["s3:ListAllMyBuckets"],
                   "Resource": "*"
+                },
+                {
+                  "Sid": "AgentCoreMemory",
+                  "Effect": "Allow",
+                  "Action": [
+                    "bedrock-agentcore:CreateEvent",
+                    "bedrock-agentcore:ListEvents",
+                    "bedrock-agentcore:GetMemory"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:memory/*"
+                  }
                 }
               ]
             }
@@ -146,6 +158,17 @@
           { "Key": "TestRunId", "Value": { "Ref": "TestRunId" } }
         ]
       }
+    },
+    "AgentCoreMemory": {
+      "Type": "AWS::BedrockAgentCore::Memory",
+      "Properties": {
+        "Name": { "Fn::Sub": "inttest_${TestRunId}" },
+        "EventExpiryDuration": 3,
+        "Tags": {
+          "CreatedBy": "AgentCoreIntegrationTests",
+          "TestRunId": { "Ref": "TestRunId" }
+        }
+      }
     }
   },
   "Outputs": {
@@ -160,6 +183,10 @@
     "EcrRepositoryName": {
       "Description": "Name of the ECR repository.",
       "Value": { "Ref": "EcrRepository" }
+    },
+    "MemoryId": {
+      "Description": "ID of the AgentCore Memory for integration tests.",
+      "Value": { "Fn::GetAtt": ["AgentCoreMemory", "MemoryId"] }
     }
   }
 }

@@ -209,6 +209,7 @@ public static class AgentCoreEndpointExtensions
             }
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            AgentCoreRuntimeContextProvider.Current = context;
             var result = await handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
             await httpContext.Response.WriteAsJsonAsync(
                 new JsonMessageResponse(result, DateTime.UtcNow),
@@ -269,6 +270,7 @@ public static class AgentCoreEndpointExtensions
             }
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            AgentCoreRuntimeContextProvider.Current = context;
             var result = await handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
             await httpContext.Response.WriteAsJsonAsync(
                 new JsonMessageResponse(result, DateTime.UtcNow),
@@ -312,6 +314,7 @@ public static class AgentCoreEndpointExtensions
             }
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            AgentCoreRuntimeContextProvider.Current = context;
             var stream = handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
             await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, stream);
         });
@@ -370,6 +373,7 @@ public static class AgentCoreEndpointExtensions
             }
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            AgentCoreRuntimeContextProvider.Current = context;
             var stream = handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
             await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, stream);
         });

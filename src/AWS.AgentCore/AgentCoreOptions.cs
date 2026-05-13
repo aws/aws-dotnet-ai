@@ -40,4 +40,13 @@ public class AgentCoreOptions
     /// (which may be decorated with middleware).
     /// </summary>
     public Func<ChatClientAgent, AIAgent>? ConfigureAgent { get; set; }
+
+    /// <summary>
+    /// The AgentCore Memory ID for persistent conversation history.
+    /// When set, the Memory provider actively loads and saves conversation history
+    /// across invocations and container restarts.
+    /// Falls back to the <see cref="Constants.MemoryIdEnvironmentVariable"/> environment variable when not set.
+    /// When neither is configured, the agent operates statelessly.
+    /// </summary>
+    public string? MemoryId { get; set; }
 }

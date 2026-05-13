@@ -108,6 +108,12 @@ internal sealed class ParameterBindingPlan
             };
         }
 
+        // Set the ambient AsyncLocal so downstream code (e.g. AgentCoreMemoryProvider)
+        // can access the runtime context without manual StateBag population.
+        var runtimeContext = args.OfType<AgentCoreRuntimeContext>().FirstOrDefault()
+            ?? AgentCoreRuntimeContext.FromHttpContext(httpContext);
+        AgentCoreRuntimeContextProvider.Current = runtimeContext;
+
         return args;
     }
 

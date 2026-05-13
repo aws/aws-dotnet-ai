@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using Amazon.BedrockAgentCore;
 using Amazon.BedrockRuntime;
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Builder;
@@ -114,6 +115,12 @@ public static class AgentCoreBuilderExtensions
         // Register AgentCoreRuntimeContextProvider (AIContextProvider)
         builder.Services.AddSingleton<AgentCoreRuntimeContextProvider>();
 
+        // Register IAmazonBedrockAgentCore for Memory operations
+        builder.Services.TryAddAWSService<IAmazonBedrockAgentCore>();
+
+        // Register AgentCoreMemoryProvider
+        builder.Services.AddSingleton<AgentCoreMemoryProvider>();
+
         // Register AIAgent (may be a ChatClientAgent or a middleware-decorated agent)
         builder.Services.AddSingleton<AIAgent>(sp =>
         {
@@ -128,6 +135,11 @@ public static class AgentCoreBuilderExtensions
             }
 
             var agentOptions = options.AgentOptions ?? new ChatClientAgentOptions();
+
+            // Wire the Memory provider as the ChatHistoryProvider
+            var memoryProvider = sp.GetRequiredService<AgentCoreMemoryProvider>();
+            agentOptions.ChatHistoryProvider = memoryProvider;
+
             var agent = new ChatClientAgent(chatClient, agentOptions);
 
             if (options.ConfigureAgent is not null)

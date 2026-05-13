@@ -33,6 +33,7 @@ public sealed class TestResourceManager : IAsyncDisposable
     private string? _roleArn;
     private string? _ecrRepositoryUri;
     private string? _ecrRepositoryName;
+    private string? _memoryId;
 
     /// <summary>Runtime ARNs keyed by sample app name (e.g. "MicrosoftAgentFrameworkSample").</summary>
     private readonly Dictionary<string, string> _runtimeArns = new();
@@ -79,6 +80,13 @@ public sealed class TestResourceManager : IAsyncDisposable
     {
         await EnsureInitializedAsync(ct);
         return _ecrRepositoryUri!;
+    }
+
+    /// <summary>Gets the AgentCore Memory ID.</summary>
+    public async Task<string> GetMemoryIdAsync(CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        return _memoryId!;
     }
 
     public string Region => _region;
@@ -152,6 +160,7 @@ public sealed class TestResourceManager : IAsyncDisposable
         _roleArn = outputs["RoleArn"];
         _ecrRepositoryUri = outputs["EcrRepositoryUri"];
         _ecrRepositoryName = outputs["EcrRepositoryName"];
+        _memoryId = outputs["MemoryId"];
 
         Console.Error.WriteLine($"[Resources] Base stack ready. Role={_roleArn}, ECR={_ecrRepositoryUri}");
     }
@@ -197,6 +206,7 @@ public sealed class TestResourceManager : IAsyncDisposable
         {
             new() { ParameterKey = "TestRunId", ParameterValue = _testRunId },
             new() { ParameterKey = "RoleArn", ParameterValue = _roleArn! },
+            new() { ParameterKey = "MemoryId", ParameterValue = _memoryId! },
         };
 
         foreach (var (appName, imageUri) in imageUris)

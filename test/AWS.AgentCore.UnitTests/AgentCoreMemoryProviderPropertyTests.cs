@@ -5,6 +5,7 @@
 
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockAgentCore.Model;
+using AWS.AgentCore;
 using FsCheck;
 using FsCheck.Xunit;
 using Microsoft.Agents.AI;
@@ -175,45 +176,33 @@ public class AgentCoreMemoryProviderPropertyTests
     // ──────────────────────────────────────────────────────────────────
 
     [Property(MaxTest = 100)]
-    public async Task Pagination_FetchesAllPagesInOrder(PositiveInt pageCountWrapper)
+    public async Task Pagination_FetchesAllEventsInOrder(PositiveInt eventCountWrapper)
     {
-        var pageCount = Math.Min(pageCountWrapper.Get, 10); // Cap at 10 pages for test performance
-        var callCount = 0;
+        var eventCount = Math.Min(eventCountWrapper.Get, 20); // Cap for test performance
+
+        var events = Enumerable.Range(0, eventCount).Select(i => new Event
+        {
+            Payload =
+            [
+                new PayloadType
+                {
+                    Conversational = new Conversational
+                    {
+                        Role = Role.USER,
+                        Content = new Content { Text = $"message-{i}" }
+                    }
+                }
+            ]
+        }).ToList();
+
+        var mockPaginator = new Mock<IListEventsPaginator>();
+        mockPaginator.Setup(p => p.Events).Returns(new TestPaginatedEnumerable<Event>(events));
+
+        var mockPaginatorFactory = new Mock<IBedrockAgentCorePaginatorFactory>();
+        mockPaginatorFactory.Setup(f => f.ListEvents(It.IsAny<ListEventsRequest>())).Returns(mockPaginator.Object);
 
         var mockClient = new Mock<IAmazonBedrockAgentCore>();
-
-        // Set up paginated responses
-        var currentPage = 0;
-        mockClient
-            .Setup(c => c.ListEventsAsync(It.IsAny<ListEventsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ListEventsRequest req, CancellationToken _) =>
-            {
-                callCount++;
-                var page = currentPage++;
-                var text = $"message-page-{page}";
-
-                return new ListEventsResponse
-                {
-                    Events =
-                    [
-                        new Event
-                        {
-                            Payload =
-                            [
-                                new PayloadType
-                                {
-                                    Conversational = new Conversational
-                                    {
-                                        Role = Role.USER,
-                                        Content = new Content { Text = text }
-                                    }
-                                }
-                            ]
-                        }
-                    ],
-                    NextToken = page < pageCount - 1 ? $"token-{page + 1}" : null
-                };
-            });
+        mockClient.Setup(c => c.Paginators).Returns(mockPaginatorFactory.Object);
 
         var options = new AgentCoreOptions { MemoryId = "test-memory" };
         var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, mockClient.Object);
@@ -224,12 +213,11 @@ public class AgentCoreMemoryProviderPropertyTests
         var result = await InvokeProvideChatHistoryAsync(provider, context);
         var messages = result.ToList();
 
-        Assert.Equal(pageCount, callCount);
-        Assert.Equal(pageCount, messages.Count);
+        Assert.Equal(eventCount, messages.Count);
 
-        for (int i = 0; i < pageCount; i++)
+        for (int i = 0; i < eventCount; i++)
         {
-            Assert.Equal($"message-page-{i}", messages[i].Text);
+            Assert.Equal($"message-{i}", messages[i].Text);
         }
     }
 
@@ -243,10 +231,14 @@ public class AgentCoreMemoryProviderPropertyTests
     [Property(MaxTest = 100)]
     public async Task Errors_NeverPropagate_OnLoad(NonEmptyString exceptionMessage)
     {
+        var mockPaginator = new Mock<IListEventsPaginator>();
+        mockPaginator.Setup(p => p.Events).Returns(new ThrowingPaginatedEnumerable<Event>(new InvalidOperationException(exceptionMessage.Get)));
+
+        var mockPaginatorFactory = new Mock<IBedrockAgentCorePaginatorFactory>();
+        mockPaginatorFactory.Setup(f => f.ListEvents(It.IsAny<ListEventsRequest>())).Returns(mockPaginator.Object);
+
         var mockClient = new Mock<IAmazonBedrockAgentCore>();
-        mockClient
-            .Setup(c => c.ListEventsAsync(It.IsAny<ListEventsRequest>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException(exceptionMessage.Get));
+        mockClient.Setup(c => c.Paginators).Returns(mockPaginatorFactory.Object);
 
         var options = new AgentCoreOptions { MemoryId = "test-memory" };
         var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, mockClient.Object);
@@ -286,52 +278,24 @@ public class AgentCoreMemoryProviderPropertyTests
 
     // ──────────────────────────────────────────────────────────────────
     // Property 6: Partial Pagination Failure Returns Loaded Pages
-    // When an error occurs on page K (K > 1), the provider returns all
-    // events from pages 1 through K-1 and does not throw.
+    // When an error occurs after some events have been loaded, the
+    // provider returns what was loaded and does not throw.
     // Validates: Requirements 10.3
     // ──────────────────────────────────────────────────────────────────
 
     [Property(MaxTest = 100)]
-    public async Task PartialPaginationFailure_ReturnsLoadedPages(PositiveInt successfulPagesWrapper)
+    public async Task PartialPaginationFailure_ReturnsLoadedEvents(PositiveInt successfulEventsWrapper)
     {
-        var successfulPages = Math.Min(successfulPagesWrapper.Get, 10); // Cap for performance
-        var currentPage = 0;
+        var successfulEvents = Math.Min(successfulEventsWrapper.Get, 20); // Cap for performance
+
+        var mockPaginator = new Mock<IListEventsPaginator>();
+        mockPaginator.Setup(p => p.Events).Returns(new EventsThenThrowPaginatedEnumerable(successfulEvents));
+
+        var mockPaginatorFactory = new Mock<IBedrockAgentCorePaginatorFactory>();
+        mockPaginatorFactory.Setup(f => f.ListEvents(It.IsAny<ListEventsRequest>())).Returns(mockPaginator.Object);
 
         var mockClient = new Mock<IAmazonBedrockAgentCore>();
-        mockClient
-            .Setup(c => c.ListEventsAsync(It.IsAny<ListEventsRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ListEventsRequest req, CancellationToken _) =>
-            {
-                var page = currentPage++;
-
-                if (page >= successfulPages)
-                {
-                    throw new AmazonBedrockAgentCoreException("Simulated pagination failure");
-                }
-
-                return new ListEventsResponse
-                {
-                    Events =
-                    [
-                        new Event
-                        {
-                            Payload =
-                            [
-                                new PayloadType
-                                {
-                                    Conversational = new Conversational
-                                    {
-                                        Role = Role.USER,
-                                        Content = new Content { Text = $"page-{page}-msg" }
-                                    }
-                                }
-                            ]
-                        }
-                    ],
-                    // All successful pages have a NextToken (pointing to next page which may fail)
-                    NextToken = $"token-{page + 1}"
-                };
-            });
+        mockClient.Setup(c => c.Paginators).Returns(mockPaginatorFactory.Object);
 
         var options = new AgentCoreOptions { MemoryId = "test-memory" };
         var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, mockClient.Object);
@@ -343,11 +307,11 @@ public class AgentCoreMemoryProviderPropertyTests
         var result = await InvokeProvideChatHistoryAsync(provider, context);
         var messages = result.ToList();
 
-        // Should have exactly the messages from successful pages
-        Assert.Equal(successfulPages, messages.Count);
-        for (int i = 0; i < successfulPages; i++)
+        // Should have exactly the messages from successful events
+        Assert.Equal(successfulEvents, messages.Count);
+        for (int i = 0; i < successfulEvents; i++)
         {
-            Assert.Equal($"page-{i}-msg", messages[i].Text);
+            Assert.Equal($"event-{i}", messages[i].Text);
         }
     }
 
@@ -421,5 +385,65 @@ public class AgentCoreMemoryProviderPropertyTests
             provider, new object[] { context, CancellationToken.None })!;
 
         await task;
+    }
+
+    /// <summary>Helper: wraps a list as IPaginatedEnumerable for mocking paginator.Events</summary>
+    private sealed class TestPaginatedEnumerable<T> : Amazon.Runtime.IPaginatedEnumerable<T>
+    {
+        private readonly IEnumerable<T> _items;
+        public TestPaginatedEnumerable(IEnumerable<T> items) => _items = items;
+        public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default)
+        {
+            foreach (var item in _items)
+            {
+                await Task.CompletedTask;
+                yield return item;
+            }
+        }
+    }
+
+    /// <summary>Helper: IPaginatedEnumerable that throws immediately</summary>
+    private sealed class ThrowingPaginatedEnumerable<T> : Amazon.Runtime.IPaginatedEnumerable<T>
+    {
+        private readonly Exception _ex;
+        public ThrowingPaginatedEnumerable(Exception ex) => _ex = ex;
+#pragma warning disable CS0162
+        public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            throw _ex;
+            yield break;
+        }
+#pragma warning restore CS0162
+    }
+
+    /// <summary>Helper: yields N events then throws</summary>
+    private sealed class EventsThenThrowPaginatedEnumerable : Amazon.Runtime.IPaginatedEnumerable<Event>
+    {
+        private readonly int _successfulCount;
+        public EventsThenThrowPaginatedEnumerable(int successfulCount) => _successfulCount = successfulCount;
+        public async IAsyncEnumerator<Event> GetAsyncEnumerator(CancellationToken ct = default)
+        {
+            for (int i = 0; i < _successfulCount; i++)
+            {
+                await Task.CompletedTask;
+                yield return new Event
+                {
+                    Payload =
+                    [
+                        new PayloadType
+                        {
+                            Conversational = new Conversational
+                            {
+                                Role = Role.USER,
+                                Content = new Content { Text = $"event-{i}" }
+                            }
+                        }
+                    ]
+                };
+            }
+
+            throw new AmazonBedrockAgentCoreException("Simulated pagination failure");
+        }
     }
 }

@@ -112,7 +112,7 @@ internal sealed class ParameterBindingPlan
         // can access the runtime context without manual StateBag population.
         var runtimeContext = args.OfType<AgentCoreRuntimeContext>().FirstOrDefault()
             ?? AgentCoreRuntimeContext.FromHttpContext(httpContext);
-        AgentCoreRuntimeContextProvider.Current = runtimeContext;
+        AgentCoreRuntimeContextProvider.CurrentContext = runtimeContext;
 
         return args;
     }

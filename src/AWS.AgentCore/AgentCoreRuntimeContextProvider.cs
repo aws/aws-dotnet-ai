@@ -22,7 +22,7 @@ public class AgentCoreRuntimeContextProvider : AIContextProvider
     /// </summary>
     public const string ContextKey = "AgentCore.RuntimeContext";
 
-    private static readonly AsyncLocal<AgentCoreRuntimeContext?> _current = new();
+    private static readonly AsyncLocal<AgentCoreRuntimeContext?> _currentContext = new();
 
     /// <summary>
     /// Gets or sets the <see cref="AgentCoreRuntimeContext"/> for the current async execution context.
@@ -30,9 +30,9 @@ public class AgentCoreRuntimeContextProvider : AIContextProvider
     /// flows through async calls, making it available to the Memory provider without requiring
     /// manual session StateBag population.
     /// </summary>
-    public static AgentCoreRuntimeContext? Current
+    public static AgentCoreRuntimeContext? CurrentContext
     {
-        get => _current.Value;
-        set => _current.Value = value;
+        get => _currentContext.Value;
+        set => _currentContext.Value = value;
     }
 }

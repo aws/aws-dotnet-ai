@@ -18,7 +18,7 @@ namespace AWS.AgentCore;
 /// Operates in pass-through mode (no-op) when MemoryId is not configured.
 /// </para>
 /// </summary>
-public sealed class AgentCoreMemoryProvider(
+internal sealed class AgentCoreMemoryProvider(
     AgentCoreOptions options,
     ILogger<AgentCoreMemoryProvider> logger,
     IAmazonBedrockAgentCore? memoryClient = null)
@@ -55,7 +55,7 @@ public sealed class AgentCoreMemoryProvider(
         }
 
         // Fall back to the ambient AsyncLocal context (set automatically by MapAgentCore endpoints)
-        return AgentCoreRuntimeContextProvider.Current?.SessionId;
+        return AgentCoreRuntimeContextProvider.CurrentContext?.SessionId;
     }
 
     /// <inheritdoc/>
@@ -129,43 +129,31 @@ public sealed class AgentCoreMemoryProvider(
             return [];
 
         var messages = new List<ChatMessage>();
-        string? nextToken = null;
 
-        // AgentCore Memory ListEvents returns events in chronological order (oldest first).
-        // We append them directly — no sorting needed.
-        do
+        var request = new ListEventsRequest
         {
-            ListEventsResponse response;
-            try
-            {
-                response = await memoryClient.ListEventsAsync(new ListEventsRequest
-                {
-                    MemoryId = memoryId,
-                    // ActorId = sessionId: see SaveEventAsync comment for rationale
-                    ActorId = sessionId,
-                    SessionId = sessionId,
-                    IncludePayloads = true,
-                    NextToken = nextToken
-                }, cancellationToken);
-            }
-            catch (Exception ex) when (nextToken is not null)
-            {
-                // Partial pagination failure — return what we have
-                logger.LogWarning(ex, "Error fetching page during pagination. Returning {Count} messages loaded so far.", messages.Count);
-                break;
-            }
+            MemoryId = memoryId,
+            // ActorId = sessionId: see SaveEventAsync comment for rationale
+            ActorId = sessionId,
+            SessionId = sessionId,
+            IncludePayloads = true
+        };
 
-            foreach (var evt in response.Events ?? [])
+        try
+        {
+            await foreach (var evt in memoryClient.Paginators.ListEvents(request).Events.WithCancellation(cancellationToken))
             {
                 if (TryConvertEventToChatMessage(evt, out var chatMessage))
                 {
                     messages.Add(chatMessage);
                 }
             }
-
-            nextToken = response.NextToken;
         }
-        while (!string.IsNullOrEmpty(nextToken));
+        catch (Exception ex) when (messages.Count > 0)
+        {
+            // Partial pagination failure — return what we have
+            logger.LogWarning(ex, "Error during pagination. Returning {Count} messages loaded so far.", messages.Count);
+        }
 
         return messages;
     }

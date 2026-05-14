@@ -27,7 +27,7 @@ public sealed class AgentCoreInvoker : IDisposable
     /// <summary>
     /// Invokes a non-streaming agent and returns the parsed message from the JSON response.
     /// </summary>
-    public async Task<InvocationResult> InvokeAsync(string runtimeArn, string prompt, CancellationToken ct = default)
+    public async Task<InvocationResult> InvokeAsync(string runtimeArn, string prompt, CancellationToken ct = default, string? sessionId = null)
     {
         var payload = JsonSerializer.Serialize(new { prompt });
 
@@ -44,6 +44,11 @@ public sealed class AgentCoreInvoker : IDisposable
                     ContentType = "application/json",
                     Accept = "application/json",
                 };
+
+                if (!string.IsNullOrEmpty(sessionId))
+                {
+                    request.RuntimeSessionId = sessionId;
+                }
 
                 var response = await _client.InvokeAgentRuntimeAsync(request, ct);
 
@@ -99,7 +104,7 @@ public sealed class AgentCoreInvoker : IDisposable
     /// Invokes a streaming agent and collects all SSE chunks into a result.
     /// </summary>
     public async Task<StreamingInvocationResult> InvokeStreamingAsync(
-        string runtimeArn, string prompt, CancellationToken ct = default)
+        string runtimeArn, string prompt, CancellationToken ct = default, string? sessionId = null)
     {
         var payload = JsonSerializer.Serialize(new { prompt });
 
@@ -116,6 +121,11 @@ public sealed class AgentCoreInvoker : IDisposable
                     ContentType = "application/json",
                     Accept = "text/event-stream",
                 };
+
+                if (!string.IsNullOrEmpty(sessionId))
+                {
+                    request.RuntimeSessionId = sessionId;
+                }
 
                 var response = await _client.InvokeAgentRuntimeAsync(request, ct);
 

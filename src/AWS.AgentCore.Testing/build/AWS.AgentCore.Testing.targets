@@ -1,0 +1,12 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- When consumed as a NuGet package, copy wwwroot from the package content to the consumer's output -->
+  <Target Name="CopyAgentCoreTestingWwwroot" AfterTargets="Build">
+    <ItemGroup>
+      <_AgentCoreTestingWwwroot Include="$(MSBuildThisFileDirectory)../content/wwwroot/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AgentCoreTestingWwwroot)"
+          DestinationFolder="$(OutputPath)wwwroot/%(RecursiveDir)"
+          SkipUnchangedFiles="true"
+          Condition="@(_AgentCoreTestingWwwroot) != ''" />
+  </Target>
+</Project>

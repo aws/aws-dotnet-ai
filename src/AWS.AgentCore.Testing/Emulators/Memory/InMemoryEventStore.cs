@@ -1,0 +1,113 @@
+using System.Collections.Concurrent;
+using System.Text;
+using AWS.AgentCore.Testing.Emulators.Memory.Models;
+
+namespace AWS.AgentCore.Testing.Emulators.Memory;
+
+/// <summary>
+/// In-memory implementation of the event store for the Memory Emulator.
+/// Stores conversation events keyed by {memoryId}::{actorId}::{sessionId}.
+/// Thread-safe via ConcurrentDictionary with lock on list append.
+/// </summary>
+public class InMemoryEventStore
+{
+    private readonly ConcurrentDictionary<string, List<StoredEvent>> _events = new();
+    private const int DefaultPageSize = 50;
+
+    /// <summary>
+    /// Stores a new event and returns the created event response.
+    /// </summary>
+    public CreateEventApiResponse CreateEventAsync(string memoryId, CreateEventApiRequest request)
+    {
+        var key = BuildKey(memoryId, request.ActorId, request.SessionId);
+        var storedEvent = new StoredEvent
+        {
+            EventId = Guid.NewGuid().ToString(),
+            MemoryId = memoryId,
+            ActorId = request.ActorId,
+            SessionId = request.SessionId,
+            EventTimestamp = request.EventTimestamp.HasValue
+                ? DateTimeOffset.FromUnixTimeSeconds((long)request.EventTimestamp.Value).UtcDateTime
+                : DateTime.UtcNow,
+            Payload = request.Payload
+        };
+
+        _events.AddOrUpdate(key,
+            _ => new List<StoredEvent> { storedEvent },
+            (_, list) =>
+            {
+                lock (list)
+                {
+                    list.Add(storedEvent);
+                }
+                return list;
+            });
+
+        return new CreateEventApiResponse { Event = ToApiEvent(storedEvent, includePayloads: true) };
+    }
+
+    /// <summary>
+    /// Lists events filtered by memoryId/actorId/sessionId with pagination and optional payload inclusion.
+    /// Returns events in chronological order.
+    /// </summary>
+    public ListEventsApiResponse ListEvents(
+        string memoryId, string actorId, string sessionId,
+        bool? includePayloads, int? maxResults, string? nextToken)
+    {
+        var key = BuildKey(memoryId, actorId, sessionId);
+        if (!_events.TryGetValue(key, out var events))
+            return new ListEventsApiResponse { Events = [], NextToken = null };
+
+        var pageSize = maxResults ?? DefaultPageSize;
+        var startIndex = DecodeNextToken(nextToken);
+
+        List<StoredEvent> snapshot;
+        lock (events)
+        {
+            snapshot = events.OrderBy(e => e.EventTimestamp).ToList();
+        }
+
+        var page = snapshot
+            .Skip(startIndex)
+            .Take(pageSize + 1) // Take one extra to determine if there's a next page
+            .ToList();
+
+        var hasMore = page.Count > pageSize;
+        var resultEvents = page.Take(pageSize).ToList();
+
+        return new ListEventsApiResponse
+        {
+            Events = resultEvents.Select(e => ToApiEvent(e, includePayloads ?? false)).ToList(),
+            NextToken = hasMore ? EncodeNextToken(startIndex + pageSize) : null
+        };
+    }
+
+    private static string BuildKey(string memoryId, string actorId, string sessionId)
+        => $"{memoryId}::{actorId}::{sessionId}";
+
+    private static EventModel ToApiEvent(StoredEvent storedEvent, bool includePayloads)
+    {
+        return new EventModel
+        {
+            EventId = storedEvent.EventId,
+            MemoryId = storedEvent.MemoryId,
+            ActorId = storedEvent.ActorId,
+            SessionId = storedEvent.SessionId,
+            EventTimestamp = new DateTimeOffset(storedEvent.EventTimestamp, TimeSpan.Zero).ToUnixTimeSeconds(),
+            Payload = includePayloads ? storedEvent.Payload : null
+        };
+    }
+
+    private static string EncodeNextToken(int offset)
+        => Convert.ToBase64String(Encoding.UTF8.GetBytes(offset.ToString()));
+
+    private static int DecodeNextToken(string? nextToken)
+    {
+        if (string.IsNullOrEmpty(nextToken))
+            return 0;
+
+        var bytes = Convert.FromBase64String(nextToken);
+        var text = Encoding.UTF8.GetString(bytes);
+        return int.Parse(text);
+    }
+}

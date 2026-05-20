@@ -7,13 +7,18 @@
     <Project Path="sampleapps/AnnotationsStreamingAgent/AnnotationsStreamingAgent.csproj" />
     <Project Path="sampleapps/NativeAotExtensions/NativeAotExtensions.csproj" />
     <Project Path="sampleapps/NativeAotAnnotations/NativeAotAnnotations.csproj" />
+    <Project Path="sampleapps/AspireAppHost/AspireAppHost.csproj" />
+    <Project Path="sampleapps/RemoteMcpAgent/RemoteMcpAgent.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />
     <Project Path="src/AWS.AgentCore/AWS.AgentCore.csproj" />
+    <Project Path="src/AWS.AgentCore.Testing/AWS.AgentCore.Testing.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/AWS.AgentCore.UnitTests/AWS.AgentCore.UnitTests.csproj" />
+    <Project Path="test/AWS.AgentCore.Testing.UnitTests/AWS.AgentCore.Testing.UnitTests.csproj" />
+    <Project Path="test/AWS.AgentCore.Testing.IntegrationTests/AWS.AgentCore.Testing.IntegrationTests.csproj" />
     <Project Path="test/AWS.AgentCore.SourceGenerator.UnitTests/AWS.AgentCore.SourceGenerator.UnitTests.csproj" />
     <Project Path="test/AWS.AgentCore.IntegrationTests/AWS.AgentCore.IntegrationTests.csproj" />
   </Folder>

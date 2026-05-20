@@ -6,10 +6,10 @@ using System.Text.Json;
 using System.Runtime.CompilerServices;
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockAgentCore.Model;
-using ChatBotUI.Models;
+using AWS.AgentCore.Testing.Models;
 using Microsoft.Extensions.Options;
 
-namespace ChatBotUI.Services;
+namespace AWS.AgentCore.Testing.Services;
 
 public class AgentCoreService(
     IAmazonBedrockAgentCore client,
@@ -17,14 +17,13 @@ public class AgentCoreService(
     ILogger<AgentCoreService> logger)
 {
     /// <summary>
-    /// Invokes the AgentCore Runtime agent and returns the full response.
+    /// Invokes the AgentCore Runtime agent with a raw JSON payload and returns the full response.
     /// </summary>
-    public async Task<string> InvokeAgentAsync(string prompt, string? sessionId = null, CancellationToken cancellationToken = default)
+    public async Task<string> InvokeAgentAsync(string jsonPayload, string? sessionId = null, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Invoking AgentCore Runtime: {Arn}", settings.Value.RuntimeArn);
 
-        var payload = JsonSerializer.Serialize(new { prompt });
-        var payloadBytes = Encoding.UTF8.GetBytes(payload);
+        var payloadBytes = Encoding.UTF8.GetBytes(jsonPayload);
 
         var request = new InvokeAgentRuntimeRequest
         {
@@ -70,23 +69,22 @@ public class AgentCoreService(
     }
 
     /// <summary>
-    /// Invokes the AgentCore Runtime streaming agent and yields response chunks as they arrive via SSE.
+    /// Invokes the AgentCore Runtime streaming agent with a raw JSON payload and yields response chunks.
     /// </summary>
     public async IAsyncEnumerable<string> InvokeAgentStreamingAsync(
-        string prompt, string? sessionId = null,
+        string jsonPayload, string? sessionId = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var arn = settings.Value.StreamingRuntimeArn;
+        var arn = settings.Value.RuntimeArn;
         if (string.IsNullOrEmpty(arn))
         {
-            yield return "Error: StreamingRuntimeArn is not configured in appsettings.json";
+            yield return "Error: RuntimeArn is not configured";
             yield break;
         }
 
         logger.LogInformation("Invoking streaming AgentCore Runtime: {Arn}", arn);
 
-        var payload = JsonSerializer.Serialize(new { prompt });
-        var payloadBytes = Encoding.UTF8.GetBytes(payload);
+        var payloadBytes = Encoding.UTF8.GetBytes(jsonPayload);
 
         var request = new InvokeAgentRuntimeRequest
         {
@@ -136,9 +134,6 @@ public class AgentCoreService(
         }
     }
 
-    /// <summary>
-    /// Parses an SSE data payload. Returns the chunk text, empty string for skip, or null for "done".
-    /// </summary>
     private string? ParseSseChunk(string json)
     {
         try

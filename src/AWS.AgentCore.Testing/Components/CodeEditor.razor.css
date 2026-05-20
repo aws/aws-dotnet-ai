@@ -1,0 +1,64 @@
+.code-editor-container {
+    display: flex;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    background: var(--bg-code);
+    overflow: hidden;
+    position: relative;
+}
+
+.code-editor-gutter {
+    display: flex;
+    flex-direction: column;
+    padding: 14px 0;
+    min-width: 40px;
+    text-align: right;
+    background: var(--bg-code);
+    border-right: 1px solid var(--border-primary);
+    user-select: none;
+    overflow: hidden;
+}
+
+.gutter-line {
+    padding: 0 10px 0 8px;
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-tertiary);
+    height: 23.8px;
+}
+
+.gutter-line.active {
+    color: var(--text-secondary);
+    background: rgba(26, 26, 30, 0.6);
+}
+
+.code-editor-textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 14px 14px;
+    resize: vertical;
+    overflow-y: auto;
+    white-space: pre;
+    tab-size: 2;
+    caret-color: var(--accent);
+}
+
+.code-editor-textarea::placeholder {
+    color: var(--text-placeholder);
+}
+
+.code-editor-textarea:focus {
+    outline: none;
+}
+
+.code-editor-container:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}

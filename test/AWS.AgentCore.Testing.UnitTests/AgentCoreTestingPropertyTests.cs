@@ -1,8 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-using FsCheck;
-using FsCheck.Xunit;
 
 namespace AWS.AgentCore.Testing.UnitTests;
 
@@ -18,24 +16,31 @@ public class AgentCoreTestingPropertyTests
     // environment variable SHALL always equal "localdev-memory".
     // ──────────────────────────────────────────────────────────────────
 
-    [Property(MaxTest = 100)]
-    public void WithInMemory_AlwaysSetsConstantMemoryId(PositiveInt _)
+    [Fact]
+    public void WithInMemory_AlwaysSetsConstantMemoryId()
     {
+        // Single builder with multiple agents — validates the memory ID is always "localdev-memory"
         var builder = DistributedApplication.CreateBuilder();
 
-        builder.AddAgentCoreRuntime<FakeAgentProject>("agent-app")
-            .WithInMemory();
+        for (var i = 0; i < 10; i++)
+        {
+            builder.AddAgentCoreRuntime<FakeAgentProject>($"agent-{i}")
+                .WithInMemory();
+        }
 
         var app = builder.Build();
-        var agentResource = app.Services.GetRequiredService<DistributedApplicationModel>()
+        var agentResources = app.Services.GetRequiredService<DistributedApplicationModel>()
             .Resources.OfType<ProjectResource>()
-            .First(r => r.Name == "agent-app");
+            .ToList();
 
-        var envVars = GetEnvironmentVariablesSync(agentResource);
+        foreach (var agentResource in agentResources)
+        {
+            var envVars = GetEnvironmentVariablesSync(agentResource);
 
-        Assert.True(envVars.ContainsKey("AWS_AGENTCORE_MEMORY_ID"),
-            "AWS_AGENTCORE_MEMORY_ID environment variable should be set on the agent app resource");
-        Assert.Equal("localdev-memory", envVars["AWS_AGENTCORE_MEMORY_ID"]?.ToString());
+            Assert.True(envVars.ContainsKey("AWS_AGENTCORE_MEMORY_ID"),
+                $"AWS_AGENTCORE_MEMORY_ID should be set on {agentResource.Name}");
+            Assert.Equal("localdev-memory", envVars["AWS_AGENTCORE_MEMORY_ID"]?.ToString());
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────

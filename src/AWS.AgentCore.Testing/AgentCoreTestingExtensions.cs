@@ -33,7 +33,20 @@ public static class AgentCoreTestingExtensions
             .WithHttpEndpoint(name: "http")
             .WithEnvironment("AWS_AGENTCORE_ASPIRE_MANAGED", "true");
 
-        agentApp.WithUrlForEndpoint("http", url => url.DisplayText = "Agent");
+        // Customize the endpoint URL display and hide the raw localhost URL from summary
+        agentApp.WithUrlForEndpoint("http", url =>
+        {
+            url.DisplayText = "Agent";
+        });
+
+        // Suppress the default https endpoint URL that launch profiles may add
+        agentApp.WithUrls(context =>
+        {
+            context.Urls.RemoveAll(u =>
+                u.Endpoint is not null &&
+                u.DisplayText != "Agent" &&
+                u.DisplayText != "Chat");
+        });
 
         // Store mutable annotation — ports are filled after emulators start
         var annotation = new AgentCoreRuntimeAnnotation();
@@ -58,25 +71,26 @@ public static class AgentCoreTestingExtensions
                     agentEndpointUrl = endpointAnnotation.AllocatedEndpoint.UriString;
                 }
 
-                // Start runtime emulator on port 0 (OS-assigned)
-                var runtimeLoggerProvider = new Services.AspireLoggerProvider(
+                // All emulator logs go to the agent's resource log window in the Aspire Dashboard
+                var loggerProvider = new Services.AspireLoggerProvider(
                     loggerService.GetLogger(agentApp.Resource));
 
-                var runtimeApp = RuntimeEmulatorServer.Create(agentEndpointUrl, port: 0, loggerProvider: runtimeLoggerProvider);
+                // Start runtime emulator on port 0 (OS-assigned)
+                var runtimeApp = RuntimeEmulatorServer.Create(agentEndpointUrl, port: 0, loggerProvider: loggerProvider);
                 await runtimeApp.StartAsync(ct);
                 annotation.RuntimePort = GetBoundPort(runtimeApp);
 
                 var runtimeUrl = $"http://localhost:{annotation.RuntimePort}";
 
                 // Start chat app on port 0 (OS-assigned)
-                var chatApp = ChatAppServer.Create(runtimeUrl, port: 0, streaming: annotation.IsStreaming);
+                var chatApp = ChatAppServer.Create(runtimeUrl, port: 0, streaming: annotation.IsStreaming, loggerProvider: loggerProvider);
                 await chatApp.StartAsync(ct);
                 annotation.ChatAppPort = GetBoundPort(chatApp);
 
                 // Start memory emulator if configured
                 if (annotation.HasMemory)
                 {
-                    var memoryApp = MemoryEmulatorServer.Create(port: 0);
+                    var memoryApp = MemoryEmulatorServer.Create(port: 0, loggerProvider: loggerProvider);
                     await memoryApp.StartAsync(ct);
                     annotation.MemoryPort = GetBoundPort(memoryApp);
                 }

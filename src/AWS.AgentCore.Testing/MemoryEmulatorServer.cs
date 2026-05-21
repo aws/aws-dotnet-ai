@@ -25,13 +25,19 @@ internal static class MemoryEmulatorServer
     /// from <see cref="Services.PortAllocator"/>.
     /// </param>
     /// <returns>A configured but not yet started <see cref="WebApplication"/>.</returns>
-    public static WebApplication Create(int port = 0)
+    public static WebApplication Create(int port = 0, ILoggerProvider? loggerProvider = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
             ApplicationName = typeof(MemoryEmulatorServer).Assembly.GetName().Name!,
             EnvironmentName = "Production"
         });
+
+        if (loggerProvider is not null)
+        {
+            builder.Logging.ClearProviders();
+            builder.Logging.AddProvider(loggerProvider);
+        }
 
         // Prevent ASP.NET from trying to load hosting startup assemblies
         builder.WebHost.UseSetting(WebHostDefaults.PreventHostingStartupKey, "true");

@@ -18,6 +18,7 @@
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.3.3" />
     <PackageReference Include="AWSSDK.BedrockAgentCore" Version="4.0.23.3" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.40" />
+    <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
     <PackageReference Include="Markdig" Version="1.2.0" />
   </ItemGroup>
 

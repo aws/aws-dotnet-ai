@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using System.Collections.Concurrent;
 using AWS.AgentCore.Testing.Models;
 
 namespace AWS.AgentCore.Testing.Services;
@@ -8,10 +9,11 @@ namespace AWS.AgentCore.Testing.Services;
 /// <summary>
 /// In-memory chat session manager. Tracks conversations across the user's browser session.
 /// Scoped per Blazor circuit — each browser tab gets its own instance.
+/// Uses ConcurrentDictionary for thread safety against concurrent async operations.
 /// </summary>
 public class ChatSessionManager
 {
-    private readonly Dictionary<string, ChatSession> _sessions = new();
+    private readonly ConcurrentDictionary<string, ChatSession> _sessions = new();
     private string? _activeSessionId;
 
     /// <summary>
@@ -62,7 +64,7 @@ public class ChatSessionManager
     /// <param name="sessionId">The session to delete.</param>
     public void DeleteSession(string sessionId)
     {
-        _sessions.Remove(sessionId);
+        _sessions.TryRemove(sessionId, out _);
         if (_activeSessionId == sessionId)
         {
             _activeSessionId = _sessions.Keys.FirstOrDefault();

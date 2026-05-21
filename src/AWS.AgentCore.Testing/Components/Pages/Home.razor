@@ -772,7 +772,7 @@
 
             if (UseStreaming)
             {
-                await foreach (var chunk in AgentService.InvokeAgentStreamingAsync(payload, session.Id, _cts.Token))
+                await foreach (var chunk in AgentService.InvokeAgentStreamingAsync(payload, session.Id, cancellationToken: _cts.Token))
                 {
                     assistantMessage.Content += chunk;
                     StateHasChanged();
@@ -781,7 +781,7 @@
             }
             else
             {
-                var response = await AgentService.InvokeAgentAsync(payload, session.Id, _cts.Token);
+                var response = await AgentService.InvokeAgentAsync(payload, session.Id, cancellationToken: _cts.Token);
                 assistantMessage.Content = response;
             }
         }
@@ -809,11 +809,21 @@
         _cts?.Cancel();
     }
 
+    private static readonly Ganss.Xss.HtmlSanitizer HtmlSanitizer = CreateSanitizer();
+
+    private static Ganss.Xss.HtmlSanitizer CreateSanitizer()
+    {
+        var sanitizer = new Ganss.Xss.HtmlSanitizer();
+        sanitizer.AllowedSchemes.Add("data");
+        return sanitizer;
+    }
+
     private static string RenderMarkdown(string? content)
     {
         if (string.IsNullOrEmpty(content))
             return string.Empty;
-        return Markdown.ToHtml(content, MarkdownPipeline);
+        var rawHtml = Markdown.ToHtml(content, MarkdownPipeline);
+        return HtmlSanitizer.Sanitize(rawHtml);
     }
 
     private async Task CopyMessage(string content)

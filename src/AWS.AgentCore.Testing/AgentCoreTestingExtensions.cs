@@ -1,6 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+// TODO: Move these Aspire hosting extensions to the Aspire.Hosting.AWS package.
+// The emulator servers (RuntimeEmulatorServer, ChatAppServer, MemoryEmulatorServer)
+// will remain in AWS.AgentCore.Testing. This file should become part of the
+// Aspire.Hosting.AWS package and call into AWS.AgentCore.Testing to create/start emulators.
+
 using Aspire.Hosting.ApplicationModel;
 
 namespace AWS.AgentCore.Testing;

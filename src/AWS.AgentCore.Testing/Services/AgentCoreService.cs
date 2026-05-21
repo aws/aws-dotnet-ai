@@ -17,9 +17,10 @@ public class AgentCoreService(
     ILogger<AgentCoreService> logger)
 {
     /// <summary>
-    /// Invokes the AgentCore Runtime agent with a raw JSON payload and returns the full response.
+    /// Invokes the AgentCore Runtime agent with a payload and returns the full response.
     /// </summary>
-    public async Task<string> InvokeAgentAsync(string jsonPayload, string? sessionId = null, CancellationToken cancellationToken = default)
+    public async Task<string> InvokeAgentAsync(string jsonPayload, string? sessionId = null,
+        string contentType = "application/json", CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Invoking AgentCore Runtime: {Arn}", settings.Value.RuntimeArn);
 
@@ -29,7 +30,7 @@ public class AgentCoreService(
         {
             AgentRuntimeArn = settings.Value.RuntimeArn,
             Payload = new MemoryStream(payloadBytes),
-            ContentType = "application/json",
+            ContentType = contentType,
             Accept = "application/json"
         };
 
@@ -69,10 +70,11 @@ public class AgentCoreService(
     }
 
     /// <summary>
-    /// Invokes the AgentCore Runtime streaming agent with a raw JSON payload and yields response chunks.
+    /// Invokes the AgentCore Runtime streaming agent with a payload and yields response chunks.
     /// </summary>
     public async IAsyncEnumerable<string> InvokeAgentStreamingAsync(
         string jsonPayload, string? sessionId = null,
+        string contentType = "application/json",
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var arn = settings.Value.RuntimeArn;
@@ -90,7 +92,7 @@ public class AgentCoreService(
         {
             AgentRuntimeArn = arn,
             Payload = new MemoryStream(payloadBytes),
-            ContentType = "application/json",
+            ContentType = contentType,
             Accept = "text/event-stream",
         };
 

@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-using PortAllocator = AWS.AgentCore.Testing.Services.PortAllocator;
+using Aspire.Hosting.ApplicationModel;
 
 namespace AWS.AgentCore.Testing;
 
@@ -29,52 +29,68 @@ public static class AgentCoreTestingExtensions
         var projectName = name ?? typeof(TProject).Name
             .Replace("_", "-");
 
-        var runtimePort = PortAllocator.GetAvailablePort();
-        var chatAppPort = PortAllocator.GetAvailablePort();
-        var runtimeUrl = $"http://localhost:{runtimePort}";
-        var chatAppUrl = $"http://localhost:{chatAppPort}";
-
         var agentApp = builder.AddProject<TProject>(projectName)
             .WithHttpEndpoint(name: "http")
             .WithEnvironment("AWS_AGENTCORE_ASPIRE_MANAGED", "true");
 
         agentApp.WithUrlForEndpoint("http", url => url.DisplayText = "Agent");
-        agentApp.WithUrl(chatAppUrl, "Chat");
 
-        // Store runtime metadata on the resource
-        agentApp.Resource.Annotations.Add(new AgentCoreRuntimeAnnotation(runtimePort, chatAppPort));
+        // Store mutable annotation — ports are filled after emulators start
+        var annotation = new AgentCoreRuntimeAnnotation();
+        agentApp.Resource.Annotations.Add(annotation);
 
-        // Start emulators after all resources are created
-        builder.Eventing.Subscribe<AfterResourcesCreatedEvent>(async (@event, ct) =>
-        {
-            var notificationService = @event.Services.GetRequiredService<ResourceNotificationService>();
-            var loggerService = @event.Services.GetRequiredService<ResourceLoggerService>();
 
-            var agentEndpointUrl = "http://localhost:8080";
-            var endpointAnnotation = agentApp.Resource.Annotations
-                .OfType<EndpointAnnotation>()
-                .FirstOrDefault(e => e.Name == "http");
-
-            if (endpointAnnotation?.AllocatedEndpoint != null)
+        // Start emulators before the agent resource starts.
+        // This guarantees ports are known before env var callbacks fire.
+        builder.Eventing.Subscribe<BeforeResourceStartedEvent>(
+            agentApp.Resource,
+            async (@event, ct) =>
             {
-                agentEndpointUrl = endpointAnnotation.AllocatedEndpoint.UriString;
-            }
+                var loggerService = @event.Services.GetRequiredService<ResourceLoggerService>();
 
-            var annotation = agentApp.Resource.Annotations
-                .OfType<AgentCoreRuntimeAnnotation>()
-                .First();
+                var agentEndpointUrl = "http://localhost:8080";
+                var endpointAnnotation = agentApp.Resource.Annotations
+                    .OfType<EndpointAnnotation>()
+                    .FirstOrDefault(e => e.Name == "http");
 
-            // Start runtime emulator
-            var runtimeLoggerProvider = new Services.AspireLoggerProvider(
-                loggerService.GetLogger(agentApp.Resource));
+                if (endpointAnnotation?.AllocatedEndpoint != null)
+                {
+                    agentEndpointUrl = endpointAnnotation.AllocatedEndpoint.UriString;
+                }
 
-            var runtimeApp = RuntimeEmulatorServer.Create(agentEndpointUrl, port: annotation.RuntimePort, loggerProvider: runtimeLoggerProvider);
-            await runtimeApp.StartAsync(ct);
+                // Start runtime emulator on port 0 (OS-assigned)
+                var runtimeLoggerProvider = new Services.AspireLoggerProvider(
+                    loggerService.GetLogger(agentApp.Resource));
 
-            // Start chat app
-            var chatApp = ChatAppServer.Create(runtimeUrl, port: annotation.ChatAppPort, streaming: annotation.IsStreaming);
-            await chatApp.StartAsync(ct);
-        });
+                var runtimeApp = RuntimeEmulatorServer.Create(agentEndpointUrl, port: 0, loggerProvider: runtimeLoggerProvider);
+                await runtimeApp.StartAsync(ct);
+                annotation.RuntimePort = GetBoundPort(runtimeApp);
+
+                var runtimeUrl = $"http://localhost:{annotation.RuntimePort}";
+
+                // Start chat app on port 0 (OS-assigned)
+                var chatApp = ChatAppServer.Create(runtimeUrl, port: 0, streaming: annotation.IsStreaming);
+                await chatApp.StartAsync(ct);
+                annotation.ChatAppPort = GetBoundPort(chatApp);
+
+                // Start memory emulator if configured
+                if (annotation.HasMemory)
+                {
+                    var memoryApp = MemoryEmulatorServer.Create(port: 0);
+                    await memoryApp.StartAsync(ct);
+                    annotation.MemoryPort = GetBoundPort(memoryApp);
+                }
+
+                // Add Chat URL now that port is known
+                agentApp.Resource.Annotations.Add(new ResourceUrlAnnotation
+                {
+                    Url = $"http://localhost:{annotation.ChatAppPort}",
+                    DisplayText = "Chat"
+                });
+
+                // Signal that ports are resolved
+                annotation.EmulatorStarted.TrySetResult();
+            });
 
         return agentApp;
     }
@@ -99,8 +115,13 @@ public static class AgentCoreTestingExtensions
                 "Use AddAgentCoreRuntime<T>() to create it.");
         }
 
-        var runtimeUrl = $"http://localhost:{annotation.RuntimePort}";
-        project.WithEnvironment("AGENTCORE_SERVICE_ENDPOINT", runtimeUrl);
+        // Deferred: waits for emulators to start before resolving the port
+        project.WithEnvironment(async context =>
+        {
+            await annotation.EmulatorStarted.Task;
+            context.EnvironmentVariables["AGENTCORE_SERVICE_ENDPOINT"] =
+                $"http://localhost:{annotation.RuntimePort}";
+        });
 
         return project;
     }
@@ -133,49 +154,67 @@ public static class AgentCoreTestingExtensions
 
         if (annotation is null) return agentApp;
 
-        const string memoryId = "localdev-memory";
-        var memoryPort = PortAllocator.GetAvailablePort();
-        var endpoint = $"http://localhost:{memoryPort}";
+        annotation.HasMemory = true;
 
-        agentApp
-            .WithEnvironment("AWS_AGENTCORE_MEMORY_ID", memoryId)
-            .WithEnvironment("AWS_AGENTCORE_SERVICE_ENDPOINT", endpoint);
+        agentApp.WithEnvironment("AWS_AGENTCORE_MEMORY_ID", "localdev-memory");
 
-        var appBuilder = agentApp.ApplicationBuilder;
-        appBuilder.Eventing.Subscribe<AfterResourcesCreatedEvent>(async (@event, ct) =>
+        // Deferred: waits for emulators to start before resolving the memory endpoint
+        agentApp.WithEnvironment(async context =>
         {
-            var memoryApp = MemoryEmulatorServer.Create(port: memoryPort);
-            await memoryApp.StartAsync(ct);
+            await annotation.EmulatorStarted.Task;
+            context.EnvironmentVariables["AWS_AGENTCORE_SERVICE_ENDPOINT"] =
+                $"http://localhost:{annotation.MemoryPort}";
         });
 
         return agentApp;
+    }
+
+    private static int GetBoundPort(WebApplication app)
+    {
+        var address = app.Urls.FirstOrDefault()
+            ?? throw new InvalidOperationException("Emulator server did not bind to any address after StartAsync.");
+        return new Uri(address).Port;
     }
 }
 
 /// <summary>
 /// Internal annotation attached to an agent's <see cref="ProjectResource"/> by
 /// <see cref="AgentCoreTestingExtensions.AddAgentCoreRuntime{TProject}"/>.
-/// Stores the pre-allocated ports for the embedded Runtime Emulator and Chat App,
-/// and the streaming mode flag. Used by <c>WithReference</c>, <c>WithStreaming</c>,
-/// and <c>WithInMemory</c> to locate runtime metadata on the resource without
-/// requiring a custom resource type.
+/// Stores the actual bound ports for the embedded emulators (resolved after startup).
+/// Used by <c>WithReference</c>, <c>WithStreaming</c>, and <c>WithInMemory</c>.
 /// </summary>
-internal class AgentCoreRuntimeAnnotation(int runtimePort, int chatAppPort) : IResourceAnnotation
+internal class AgentCoreRuntimeAnnotation : IResourceAnnotation
 {
     /// <summary>
-    /// The pre-allocated TCP port the Runtime Emulator listens on.
-    /// This is the endpoint injected into consuming projects via <c>WithReference</c>.
+    /// The actual TCP port the Runtime Emulator bound to (0 until started).
     /// </summary>
-    public int RuntimePort { get; } = runtimePort;
+    public int RuntimePort { get; set; }
 
     /// <summary>
-    /// The pre-allocated TCP port the embedded Chat App listens on.
+    /// The actual TCP port the embedded Chat App bound to (0 until started).
     /// </summary>
-    public int ChatAppPort { get; } = chatAppPort;
+    public int ChatAppPort { get; set; }
 
     /// <summary>
-    /// Whether the Chat App should use SSE streaming mode for agent responses.
+    /// The actual TCP port the Memory Emulator bound to (0 until started).
+    /// </summary>
+    public int MemoryPort { get; set; }
+
+    /// <summary>
+    /// Whether the Chat App should use SSE streaming mode.
     /// Set by <see cref="AgentCoreTestingExtensions.WithStreaming"/>.
     /// </summary>
     public bool IsStreaming { get; set; }
+
+    /// <summary>
+    /// Whether a memory emulator should be started.
+    /// Set by <see cref="AgentCoreTestingExtensions.WithInMemory"/>.
+    /// </summary>
+    public bool HasMemory { get; set; }
+
+    /// <summary>
+    /// Signals that all emulators are started and ports are known.
+    /// Awaited by deferred environment variable callbacks.
+    /// </summary>
+    public TaskCompletionSource EmulatorStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

@@ -44,27 +44,26 @@ public class AgentCoreTestingPropertyTests
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // Property 2: Port uniqueness across multiple agents
-    // For any N agents registered, all pre-allocated ports SHALL be unique.
+    // Property 2: Multiple agents each get independent annotations
     // ──────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void MultipleAgents_AlwaysGetUniquePorts()
+    public void MultipleAgents_EachGetIndependentAnnotations()
     {
-        // Single builder, many agents — validates port uniqueness without exhausting file descriptors
         var builder = DistributedApplication.CreateBuilder();
-        var ports = new List<int>();
+        var annotations = new List<AgentCoreRuntimeAnnotation>();
 
-        for (var i = 0; i < 20; i++)
+        for (var i = 0; i < 10; i++)
         {
             var result = builder.AddAgentCoreRuntime<FakeAgentProject>($"agent-{i}");
             var annotation = result.Resource.Annotations.OfType<AgentCoreRuntimeAnnotation>().First();
-            ports.Add(annotation.RuntimePort);
-            ports.Add(annotation.ChatAppPort);
+            annotations.Add(annotation);
         }
 
-        // 20 agents × 2 ports = 40 ports, all must be unique
-        Assert.Equal(ports.Count, ports.Distinct().Count());
+        // Each agent gets its own distinct annotation instance
+        Assert.Equal(annotations.Count, annotations.Distinct().Count());
+        // All annotations start with ports at 0 (deferred resolution)
+        Assert.All(annotations, a => Assert.Equal(0, a.RuntimePort));
     }
 
     private static Dictionary<string, object> GetEnvironmentVariablesSync(IResource resource)
@@ -78,7 +77,10 @@ public class AgentCoreTestingPropertyTests
 
         foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
         {
-            annotation.Callback(context).GetAwaiter().GetResult();
+            var task = annotation.Callback(context);
+            if (task.IsCompleted)
+                task.GetAwaiter().GetResult();
+            // Skip deferred async callbacks (they await EmulatorStarted which hasn't fired)
         }
 
         return envVars;

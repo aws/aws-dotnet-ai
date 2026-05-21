@@ -31,7 +31,7 @@ public class EventModel
     /// Event timestamp as Unix epoch seconds (matches AWS SDK wire format).
     /// </summary>
     [JsonPropertyName("eventTimestamp")]
-    public double EventTimestamp { get; set; }
+    public long EventTimestamp { get; set; }
 
     /// <summary>
     /// The event payload. Null when the ListEvents request specifies includePayloads=false.

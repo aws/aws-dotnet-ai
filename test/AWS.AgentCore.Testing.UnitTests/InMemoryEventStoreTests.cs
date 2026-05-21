@@ -50,7 +50,7 @@ public class InMemoryEventStoreTests
             text: "Test message",
             timestamp: timestamp);
 
-        var response = store.CreateEventAsync("memory-123", request);
+        var response = store.CreateEvent("memory-123", request);
 
         // Verify the response contains all fields
         Assert.NotNull(response.Event);
@@ -103,7 +103,7 @@ public class InMemoryEventStoreTests
         var store = new InMemoryEventStore();
 
         // Store an event for one key
-        store.CreateEventAsync("memory-1", CreateRequest(actorId: "actor-1", sessionId: "session-1"));
+        store.CreateEvent("memory-1", CreateRequest(actorId: "actor-1", sessionId: "session-1"));
 
         // Query a different key
         var response = store.ListEvents("memory-2", "actor-1", "session-1",
@@ -122,8 +122,8 @@ public class InMemoryEventStoreTests
     {
         var store = new InMemoryEventStore();
 
-        store.CreateEventAsync("memory-A", CreateRequest(actorId: "actor-1", sessionId: "session-1", text: "Event A"));
-        store.CreateEventAsync("memory-B", CreateRequest(actorId: "actor-1", sessionId: "session-1", text: "Event B"));
+        store.CreateEvent("memory-A", CreateRequest(actorId: "actor-1", sessionId: "session-1", text: "Event A"));
+        store.CreateEvent("memory-B", CreateRequest(actorId: "actor-1", sessionId: "session-1", text: "Event B"));
 
         var responseA = store.ListEvents("memory-A", "actor-1", "session-1",
             includePayloads: true, maxResults: null, nextToken: null);
@@ -142,8 +142,8 @@ public class InMemoryEventStoreTests
     {
         var store = new InMemoryEventStore();
 
-        store.CreateEventAsync("memory-1", CreateRequest(actorId: "actor-1", sessionId: "session-A", text: "Session A event"));
-        store.CreateEventAsync("memory-1", CreateRequest(actorId: "actor-1", sessionId: "session-B", text: "Session B event"));
+        store.CreateEvent("memory-1", CreateRequest(actorId: "actor-1", sessionId: "session-A", text: "Session A event"));
+        store.CreateEvent("memory-1", CreateRequest(actorId: "actor-1", sessionId: "session-B", text: "Session B event"));
 
         var responseA = store.ListEvents("memory-1", "actor-1", "session-A",
             includePayloads: true, maxResults: null, nextToken: null);
@@ -162,8 +162,8 @@ public class InMemoryEventStoreTests
     {
         var store = new InMemoryEventStore();
 
-        store.CreateEventAsync("memory-1", CreateRequest(actorId: "actor-A", sessionId: "session-1", text: "Actor A event"));
-        store.CreateEventAsync("memory-1", CreateRequest(actorId: "actor-B", sessionId: "session-1", text: "Actor B event"));
+        store.CreateEvent("memory-1", CreateRequest(actorId: "actor-A", sessionId: "session-1", text: "Actor A event"));
+        store.CreateEvent("memory-1", CreateRequest(actorId: "actor-B", sessionId: "session-1", text: "Actor B event"));
 
         var responseA = store.ListEvents("memory-1", "actor-A", "session-1",
             includePayloads: true, maxResults: null, nextToken: null);
@@ -183,10 +183,10 @@ public class InMemoryEventStoreTests
         var store = new InMemoryEventStore();
 
         // Store events with different combinations
-        store.CreateEventAsync("mem-1", CreateRequest(actorId: "actor-1", sessionId: "sess-1", text: "Target"));
-        store.CreateEventAsync("mem-1", CreateRequest(actorId: "actor-1", sessionId: "sess-2", text: "Wrong session"));
-        store.CreateEventAsync("mem-1", CreateRequest(actorId: "actor-2", sessionId: "sess-1", text: "Wrong actor"));
-        store.CreateEventAsync("mem-2", CreateRequest(actorId: "actor-1", sessionId: "sess-1", text: "Wrong memory"));
+        store.CreateEvent("mem-1", CreateRequest(actorId: "actor-1", sessionId: "sess-1", text: "Target"));
+        store.CreateEvent("mem-1", CreateRequest(actorId: "actor-1", sessionId: "sess-2", text: "Wrong session"));
+        store.CreateEvent("mem-1", CreateRequest(actorId: "actor-2", sessionId: "sess-1", text: "Wrong actor"));
+        store.CreateEvent("mem-2", CreateRequest(actorId: "actor-1", sessionId: "sess-1", text: "Wrong memory"));
 
         var response = store.ListEvents("mem-1", "actor-1", "sess-1",
             includePayloads: true, maxResults: null, nextToken: null);
@@ -209,9 +209,9 @@ public class InMemoryEventStoreTests
         var t1 = new DateTime(2024, 6, 15, 10, 0, 0, DateTimeKind.Utc);
         var t2 = new DateTime(2024, 6, 15, 11, 0, 0, DateTimeKind.Utc);
 
-        store.CreateEventAsync("memory-1", CreateRequest(timestamp: t3, text: "Third"));
-        store.CreateEventAsync("memory-1", CreateRequest(timestamp: t1, text: "First"));
-        store.CreateEventAsync("memory-1", CreateRequest(timestamp: t2, text: "Second"));
+        store.CreateEvent("memory-1", CreateRequest(timestamp: t3, text: "Third"));
+        store.CreateEvent("memory-1", CreateRequest(timestamp: t1, text: "First"));
+        store.CreateEvent("memory-1", CreateRequest(timestamp: t2, text: "Second"));
 
         var response = store.ListEvents("memory-1", "actor-1", "session-1",
             includePayloads: true, maxResults: null, nextToken: null);
@@ -235,7 +235,7 @@ public class InMemoryEventStoreTests
         // Insert 10 events in reverse chronological order
         for (int i = 9; i >= 0; i--)
         {
-            store.CreateEventAsync("memory-1", CreateRequest(
+            store.CreateEvent("memory-1", CreateRequest(
                 timestamp: baseTime.AddMinutes(i),
                 text: $"Event {i}"));
         }
@@ -265,7 +265,7 @@ public class InMemoryEventStoreTests
         // Insert more events than the page size (use maxResults=3 to keep test small)
         for (int i = 0; i < 5; i++)
         {
-            store.CreateEventAsync("memory-1", CreateRequest(
+            store.CreateEvent("memory-1", CreateRequest(
                 timestamp: baseTime.AddMinutes(i),
                 text: $"Event {i}"));
         }
@@ -290,7 +290,7 @@ public class InMemoryEventStoreTests
         // Insert exactly the page size number of events
         for (int i = 0; i < 3; i++)
         {
-            store.CreateEventAsync("memory-1", CreateRequest(
+            store.CreateEvent("memory-1", CreateRequest(
                 timestamp: baseTime.AddMinutes(i),
                 text: $"Event {i}"));
         }
@@ -311,7 +311,7 @@ public class InMemoryEventStoreTests
         // Insert 5 events, page size 3 — second page should have 2 events and no token
         for (int i = 0; i < 5; i++)
         {
-            store.CreateEventAsync("memory-1", CreateRequest(
+            store.CreateEvent("memory-1", CreateRequest(
                 timestamp: baseTime.AddMinutes(i),
                 text: $"Event {i}"));
         }
@@ -343,7 +343,7 @@ public class InMemoryEventStoreTests
         // Insert events with distinct timestamps
         for (int i = 0; i < totalEvents; i++)
         {
-            store.CreateEventAsync("memory-1", CreateRequest(
+            store.CreateEvent("memory-1", CreateRequest(
                 timestamp: baseTime.AddMinutes(i),
                 text: $"Event {i}"));
         }
@@ -386,7 +386,7 @@ public class InMemoryEventStoreTests
         var store = new InMemoryEventStore();
         var timestamp = new DateTime(2024, 6, 15, 10, 0, 0, DateTimeKind.Utc);
 
-        store.CreateEventAsync("memory-1", CreateRequest(
+        store.CreateEvent("memory-1", CreateRequest(
             timestamp: timestamp,
             role: "USER",
             text: "Hello world"));
@@ -418,7 +418,7 @@ public class InMemoryEventStoreTests
         var store = new InMemoryEventStore();
         var timestamp = new DateTime(2024, 6, 15, 10, 0, 0, DateTimeKind.Utc);
 
-        store.CreateEventAsync("memory-1", CreateRequest(
+        store.CreateEvent("memory-1", CreateRequest(
             timestamp: timestamp,
             role: "ASSISTANT",
             text: "Hi there!"));

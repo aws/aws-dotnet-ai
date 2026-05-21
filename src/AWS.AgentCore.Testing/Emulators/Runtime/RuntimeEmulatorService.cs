@@ -39,7 +39,7 @@ public class RuntimeEmulatorService(HttpClient agentClient, ILogger<RuntimeEmula
         request.Headers.Add("X-Amzn-Bedrock-AgentCore-Runtime-Request-Id", requestId);
         request.Content = new StringContent(submission.Text, Encoding.UTF8, "application/json");
 
-        var response = await agentClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await agentClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
         InvocationResult result;
         if (IsStreamingResponse(response))
@@ -83,7 +83,7 @@ public class RuntimeEmulatorService(HttpClient agentClient, ILogger<RuntimeEmula
 
         UpdateSessionState(sessionId);
 
-        return new StreamThroughResult(sessionId, stream);
+        return new StreamThroughResult(sessionId, response, stream);
     }
 
     /// <summary>
@@ -99,7 +99,7 @@ public class RuntimeEmulatorService(HttpClient agentClient, ILogger<RuntimeEmula
         {
             try
             {
-                var response = await agentClient.GetAsync("/ping");
+                using var response = await agentClient.GetAsync("/ping");
                 if (response.IsSuccessStatusCode)
                 {
                     logger.LogDebug("Agent is ready (ping succeeded on attempt {Attempt})", attempt + 1);
@@ -168,6 +168,7 @@ public class RuntimeEmulatorService(HttpClient agentClient, ILogger<RuntimeEmula
         return new InvocationResult(
             SessionId: sessionId,
             RequestId: requestId,
+            StatusCode: (int)response.StatusCode,
             Response: responseBuilder.ToString(),
             IsStreaming: true,
             Timestamp: DateTime.UtcNow
@@ -213,6 +214,7 @@ public class RuntimeEmulatorService(HttpClient agentClient, ILogger<RuntimeEmula
         return new InvocationResult(
             SessionId: sessionId,
             RequestId: requestId,
+            StatusCode: (int)response.StatusCode,
             Response: responseText,
             IsStreaming: false,
             Timestamp: DateTime.UtcNow

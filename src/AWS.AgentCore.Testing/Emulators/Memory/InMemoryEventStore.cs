@@ -17,7 +17,7 @@ public class InMemoryEventStore
     /// <summary>
     /// Stores a new event and returns the created event response.
     /// </summary>
-    public CreateEventApiResponse CreateEventAsync(string memoryId, CreateEventApiRequest request)
+    public CreateEventApiResponse CreateEvent(string memoryId, CreateEventApiRequest request)
     {
         var key = BuildKey(memoryId, request.ActorId, request.SessionId);
         var storedEvent = new StoredEvent
@@ -27,7 +27,7 @@ public class InMemoryEventStore
             ActorId = request.ActorId,
             SessionId = request.SessionId,
             EventTimestamp = request.EventTimestamp.HasValue
-                ? DateTimeOffset.FromUnixTimeSeconds((long)request.EventTimestamp.Value).UtcDateTime
+                ? DateTimeOffset.FromUnixTimeSeconds(request.EventTimestamp.Value).UtcDateTime
                 : DateTime.UtcNow,
             Payload = request.Payload
         };
@@ -50,6 +50,7 @@ public class InMemoryEventStore
     /// Lists events filtered by memoryId/actorId/sessionId with pagination and optional payload inclusion.
     /// Returns events in chronological order.
     /// </summary>
+    /// <exception cref="InvalidNextTokenException">Thrown when the nextToken is malformed or not a valid pagination token.</exception>
     public ListEventsApiResponse ListEvents(
         string memoryId, string actorId, string sessionId,
         bool? includePayloads, int? maxResults, string? nextToken)
@@ -59,7 +60,9 @@ public class InMemoryEventStore
             return new ListEventsApiResponse { Events = [], NextToken = null };
 
         var pageSize = maxResults ?? DefaultPageSize;
-        var startIndex = DecodeNextToken(nextToken);
+
+        if (!TryDecodeNextToken(nextToken, out var startIndex))
+            throw new InvalidNextTokenException(nextToken);
 
         List<StoredEvent> snapshot;
         lock (events)
@@ -101,13 +104,32 @@ public class InMemoryEventStore
     private static string EncodeNextToken(int offset)
         => Convert.ToBase64String(Encoding.UTF8.GetBytes(offset.ToString()));
 
-    private static int DecodeNextToken(string? nextToken)
+    private static bool TryDecodeNextToken(string? nextToken, out int offset)
     {
+        offset = 0;
         if (string.IsNullOrEmpty(nextToken))
-            return 0;
+            return true;
 
-        var bytes = Convert.FromBase64String(nextToken);
-        var text = Encoding.UTF8.GetString(bytes);
-        return int.Parse(text);
+        try
+        {
+            var bytes = Convert.FromBase64String(nextToken);
+            var text = Encoding.UTF8.GetString(bytes);
+            return int.TryParse(text, out offset) && offset >= 0;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
+}
+
+/// <summary>
+/// Thrown when a pagination NextToken cannot be decoded.
+/// The HTTP layer should translate this into a 400 Bad Request.
+/// </summary>
+public class InvalidNextTokenException(string? token)
+    : Exception($"Invalid NextToken: '{token}' is not a valid pagination token.")
+{
+    /// <summary>The invalid token value that was provided.</summary>
+    public string? Token { get; } = token;
 }

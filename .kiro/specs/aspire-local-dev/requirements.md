@@ -17,7 +17,7 @@ A local development experience for the AWS.AgentCore .NET library using .NET Asp
 - **AgentCore_Runtime**: The real Amazon Bedrock AgentCore Runtime service that hosts agents in production.
 - **SessionId**: The session identifier header (`X-Amzn-Bedrock-AgentCore-Runtime-Session-Id`) that the Runtime sends to scope conversations.
 - **PortAllocator**: A utility that pre-allocates TCP ports for embedded servers before they start.
-- **AGENTCORE_ASPIRE_MANAGED**: Environment variable set to `"true"` that tells `AddAgentCore()` to skip its default port 8080 binding.
+- **AWS_AGENTCORE_ASPIRE_MANAGED**: Environment variable set to `"true"` that tells `AddAgentCore()` to skip its default port 8080 binding.
 - **AGENTCORE_SERVICE_ENDPOINT**: Environment variable injected by `WithReference(agent)` containing the runtime emulator URL. Consuming apps use this as the AWS SDK's `ServiceURL` override.
 - **ChatBotUI_Sample**: A standalone Blazor Server web app (`sampleapps/ChatBotUI/`) that demonstrates how a consumer reads `AGENTCORE_SERVICE_ENDPOINT` and overrides the AWS SDK's `ServiceURL`.
 - **RemoteMcpAgent_Sample**: A sample agent (`sampleapps/RemoteMcpAgent/`) that connects to remote MCP servers and registers their tools with the Microsoft Agent Framework.
@@ -78,7 +78,7 @@ A local development experience for the AWS.AgentCore .NET library using .NET Asp
 2. WHEN the Agent_App is launched by the Aspire_AppHost, THE Testing_Package SHALL set `AWS_AGENTCORE_MEMORY_ID` on the Agent_App so that the AgentCoreMemoryProvider activates automatically.
 3. THE Agent_App SHALL require no source code changes to run under the Aspire_AppHost compared to running in production on AgentCore Runtime.
 4. WHEN the Agent_App uses `builder.AddAgentCore()` with a ModelId, THE Agent_App SHALL still require valid AWS credentials for Bedrock LLM calls unless the developer provides a mock IChatClient.
-5. THE Testing_Package SHALL set `AGENTCORE_ASPIRE_MANAGED=true` on the Agent_App so that `AddAgentCore()` skips its default port 8080 binding, allowing Aspire DCP to allocate the port.
+5. THE Testing_Package SHALL set `AWS_AGENTCORE_ASPIRE_MANAGED=true` on the Agent_App so that `AddAgentCore()` skips its default port 8080 binding, allowing Aspire DCP to allocate the port.
 6. THE Testing_Package SHALL configure the Agent_App with `WithHttpEndpoint(name: "http")` for Aspire DCP port allocation.
 
 ### Requirement 5: Observability via Aspire Dashboard

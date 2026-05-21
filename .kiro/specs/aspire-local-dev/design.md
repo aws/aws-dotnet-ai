@@ -178,6 +178,7 @@ Accepts an optional `ILoggerProvider` to pipe logs to Aspire Dashboard.
 #### 3. RuntimeEmulatorService
 
 Request forwarding logic:
+
 - Passes `submission.Text` as raw `StringContent` (no wrapping in `{"prompt":"..."}`)
 - Adds `X-Amzn-Bedrock-AgentCore-Runtime-Session-Id` and `X-Amzn-Bedrock-AgentCore-Runtime-Request-Id` headers
 - Pings agent for readiness with exponential backoff
@@ -186,6 +187,7 @@ Request forwarding logic:
 #### 4. ChatBot UI (ChatAppServer)
 
 Embedded Blazor Server application with:
+
 - Configurable JSON payload editor with `{{paramName}}` placeholders
 - Dynamic parameters (string, number, boolean, raw JSON) that render as input fields
 - Built-in payload templates
@@ -220,16 +222,17 @@ internal sealed class AspireLoggerProvider(ILogger aspireLogger) : ILoggerProvid
 
 ### Configuration / Environment Variables
 
-| Variable                         | Set On         | Value                     | Purpose                                               |
-| -------------------------------- | -------------- | ------------------------- | ----------------------------------------------------- |
-| `AGENTCORE_ASPIRE_MANAGED`       | Agent App      | `"true"`                  | Tells AddAgentCore() to skip port 8080 binding        |
-| `AWS_AGENTCORE_MEMORY_ID`        | Agent App      | `"localdev-memory"`       | Activates AgentCoreMemoryProvider                     |
-| `AWS_AGENTCORE_SERVICE_ENDPOINT` | Agent App      | `http://localhost:{port}` | Redirects SDK to embedded memory emulator             |
-| `AGENTCORE_SERVICE_ENDPOINT`     | Consumer App   | `http://localhost:{port}` | Injected by WithReference — runtime emulator endpoint |
+| Variable                         | Set On       | Value                     | Purpose                                               |
+| -------------------------------- | ------------ | ------------------------- | ----------------------------------------------------- |
+| `AWS_AGENTCORE_ASPIRE_MANAGED`   | Agent App    | `"true"`                  | Tells AddAgentCore() to skip port 8080 binding        |
+| `AWS_AGENTCORE_MEMORY_ID`        | Agent App    | `"localdev-memory"`       | Activates AgentCoreMemoryProvider                     |
+| `AWS_AGENTCORE_SERVICE_ENDPOINT` | Agent App    | `http://localhost:{port}` | Redirects SDK to embedded memory emulator             |
+| `AGENTCORE_SERVICE_ENDPOINT`     | Consumer App | `http://localhost:{port}` | Injected by WithReference — runtime emulator endpoint |
 
 ### NuGet Package Structure
 
 The `AWS.AgentCore.Testing` package includes:
+
 - `lib/net10.0/` — DLL + runtimeconfig
 - `content/wwwroot/` — Static assets (app.css, AWS logos, scoped CSS, blazor.web.js, collocated JS)
 - `build/AWS.AgentCore.Testing.targets` — Copies wwwroot to consumer's output
@@ -371,31 +374,31 @@ _For any_ submission with a provided SessionId, it is used verbatim; with null S
 
 ### Runtime Emulator
 
-| Scenario                            | Behavior                                                  |
-| ----------------------------------- | --------------------------------------------------------- |
-| Agent not ready (ping fails)        | Retries with exponential backoff up to 30 seconds         |
-| Agent returns HTTP 4xx/5xx          | Passes error response through to the caller               |
-| Agent connection refused            | Throws TimeoutException after max retries                 |
-| SSE stream interrupted              | Partial response returned; stream closed                  |
-| Unmatched route                     | Returns 404 with diagnostic message via MapFallback       |
+| Scenario                     | Behavior                                            |
+| ---------------------------- | --------------------------------------------------- |
+| Agent not ready (ping fails) | Retries with exponential backoff up to 30 seconds   |
+| Agent returns HTTP 4xx/5xx   | Passes error response through to the caller         |
+| Agent connection refused     | Throws TimeoutException after max retries           |
+| SSE stream interrupted       | Partial response returned; stream closed            |
+| Unmatched route              | Returns 404 with diagnostic message via MapFallback |
 
 ### Memory Emulator
 
-| Scenario                     | Behavior                                    |
-| ---------------------------- | ------------------------------------------- |
-| Invalid CreateEvent body     | Returns 400 Bad Request                     |
-| Invalid NextToken            | Returns 400 Bad Request                     |
-| MemoryId not found           | Returns empty event list (not an error)     |
-| Concurrent writes            | Thread-safe via ConcurrentDictionary + lock |
+| Scenario                 | Behavior                                    |
+| ------------------------ | ------------------------------------------- |
+| Invalid CreateEvent body | Returns 400 Bad Request                     |
+| Invalid NextToken        | Returns 400 Bad Request                     |
+| MemoryId not found       | Returns empty event list (not an error)     |
+| Concurrent writes        | Thread-safe via ConcurrentDictionary + lock |
 
 ### Chat App
 
-| Scenario                     | Behavior                                            |
-| ---------------------------- | --------------------------------------------------- |
-| Agent invocation fails       | Displays error message in chat bubble               |
-| Request cancelled by user    | Displays "*Request cancelled.*" message             |
-| Invalid payload template     | Falls back to `{"prompt":"..."}` with error banner  |
-| Static assets not found      | PhysicalFileProvider serves from wwwroot             |
+| Scenario                  | Behavior                                           |
+| ------------------------- | -------------------------------------------------- |
+| Agent invocation fails    | Displays error message in chat bubble              |
+| Request cancelled by user | Displays "_Request cancelled._" message            |
+| Invalid payload template  | Falls back to `{"prompt":"..."}` with error banner |
+| Static assets not found   | PhysicalFileProvider serves from wwwroot           |
 
 ## Testing Strategy
 

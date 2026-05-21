@@ -78,11 +78,13 @@ internal static class ChatAppServer
         });
 
         builder.Services.AddSingleton<IAmazonBedrockAgentCore>(_ =>
-            new AmazonBedrockAgentCoreClient(new AmazonBedrockAgentCoreConfig
-            {
-                ServiceURL = serviceEndpoint,
-                AuthenticationRegion = "us-east-1"
-            }));
+            new AmazonBedrockAgentCoreClient(
+                new Amazon.Runtime.AnonymousAWSCredentials(),
+                new AmazonBedrockAgentCoreConfig
+                {
+                    ServiceURL = serviceEndpoint,
+                    AuthenticationRegion = "us-east-1"
+                }));
 
         builder.Services.AddSingleton<AgentCoreService>();
         builder.Services.AddScoped<ChatSessionManager>();

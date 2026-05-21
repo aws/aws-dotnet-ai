@@ -37,12 +37,14 @@ builder.Services.AddSingleton<IAmazonBedrockAgentCore>(sp =>
 
     if (!string.IsNullOrEmpty(serviceEndpoint))
     {
-        // Aspire-injected — point the SDK at the local runtime emulator
-        return new AmazonBedrockAgentCoreClient(new AmazonBedrockAgentCoreConfig
-        {
-            ServiceURL = serviceEndpoint,
-            AuthenticationRegion = settings.Region
-        });
+        // Aspire-injected — point the SDK at the local runtime emulator with anonymous credentials
+        return new AmazonBedrockAgentCoreClient(
+            new Amazon.Runtime.AnonymousAWSCredentials(),
+            new AmazonBedrockAgentCoreConfig
+            {
+                ServiceURL = serviceEndpoint,
+                AuthenticationRegion = settings.Region
+            });
     }
 
     // Standard production — use real AWS credentials and region

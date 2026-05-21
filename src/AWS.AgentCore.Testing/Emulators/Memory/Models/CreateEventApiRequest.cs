@@ -19,7 +19,7 @@ public class CreateEventApiRequest
     /// <summary>
     /// Event timestamp as Unix epoch seconds. When null, the server uses the current time.
     /// </summary>
-    public double? EventTimestamp { get; set; }
+    public long? EventTimestamp { get; set; }
 
     /// <summary>
     /// The event payload containing conversational data.

@@ -130,11 +130,13 @@ public static class AgentCoreBuilderExtensions
         if (!string.IsNullOrEmpty(serviceEndpoint))
         {
             builder.Services.TryAddSingleton<IAmazonBedrockAgentCore>(_ =>
-                new AmazonBedrockAgentCoreClient(new AmazonBedrockAgentCoreConfig
-                {
-                    ServiceURL = serviceEndpoint,
-                    AuthenticationRegion = "us-east-1"
-                }));
+                new AmazonBedrockAgentCoreClient(
+                    new Amazon.Runtime.AnonymousAWSCredentials(),
+                    new AmazonBedrockAgentCoreConfig
+                    {
+                        ServiceURL = serviceEndpoint,
+                        AuthenticationRegion = "us-east-1"
+                    }));
         }
         else
         {

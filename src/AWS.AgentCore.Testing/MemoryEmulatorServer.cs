@@ -51,7 +51,7 @@ internal static class MemoryEmulatorServer
             [FromBody] CreateEventApiRequest body,
             InMemoryEventStore store) =>
         {
-            return Results.Ok(store.CreateEventAsync(memoryId, body));
+            return Results.Ok(store.CreateEvent(memoryId, body));
         });
 
         // ListEvents: POST /memories/{memoryId}/actor/{actorId}/sessions/{sessionId}
@@ -79,7 +79,14 @@ internal static class MemoryEmulatorServer
             }
             catch { /* empty or invalid body — use defaults */ }
 
-            return Results.Ok(store.ListEvents(memoryId, actorId, sessionId, includePayloads, maxResults, nextToken));
+            try
+            {
+                return Results.Ok(store.ListEvents(memoryId, actorId, sessionId, includePayloads, maxResults, nextToken));
+            }
+            catch (InvalidNextTokenException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         });
 
         // GET variant for direct testing and debugging
@@ -92,7 +99,14 @@ internal static class MemoryEmulatorServer
             [FromQuery] string? nextToken,
             InMemoryEventStore store) =>
         {
-            return Results.Ok(store.ListEvents(memoryId, actorId, sessionId, includePayloads, maxResults, nextToken));
+            try
+            {
+                return Results.Ok(store.ListEvents(memoryId, actorId, sessionId, includePayloads, maxResults, nextToken));
+            }
+            catch (InvalidNextTokenException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         });
 
         app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));

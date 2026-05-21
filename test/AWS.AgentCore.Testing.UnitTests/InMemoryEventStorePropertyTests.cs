@@ -63,7 +63,7 @@ public class InMemoryEventStorePropertyTests
         };
 
         // Store the event
-        var createResponse = store.CreateEventAsync(memoryId, request);
+        var createResponse = store.CreateEvent(memoryId, request);
 
         // Retrieve the event
         var listResponse = store.ListEvents(memoryId, actorId, sessionId,
@@ -142,7 +142,7 @@ public class InMemoryEventStorePropertyTests
                 ]
             };
 
-            store.CreateEventAsync(memoryId, request);
+            store.CreateEvent(memoryId, request);
         }
 
         // Retrieve all events (use maxResults large enough to get all in one page)
@@ -213,7 +213,7 @@ public class InMemoryEventStorePropertyTests
                 ]
             };
 
-            store.CreateEventAsync(memoryId, request);
+            store.CreateEvent(memoryId, request);
         }
 
         // Iterate all pages via NextToken
@@ -307,7 +307,7 @@ public class InMemoryEventStorePropertyTests
                     }
                 ]
             };
-            store.CreateEventAsync(memoryId1, request);
+            store.CreateEvent(memoryId1, request);
         }
 
         // Store events for tuple 2
@@ -330,7 +330,7 @@ public class InMemoryEventStorePropertyTests
                     }
                 ]
             };
-            store.CreateEventAsync(memoryId2, request);
+            store.CreateEvent(memoryId2, request);
         }
 
         // List events for tuple 1 — should only contain tuple 1 events
@@ -415,7 +415,7 @@ public class InMemoryEventStorePropertyTests
                 ]
             };
 
-            store.CreateEventAsync(memoryId, request);
+            store.CreateEvent(memoryId, request);
         }
 
         // Call ListEvents with includePayloads=true

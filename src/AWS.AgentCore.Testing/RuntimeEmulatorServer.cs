@@ -86,11 +86,11 @@ internal static class RuntimeEmulatorServer
 
             if (wantsStreaming)
             {
-                var streamResult = await service.InvokeAgentStreamThroughAsync(submission, httpContext.RequestAborted);
+                await using var streamResult = await service.InvokeAgentStreamThroughAsync(submission, httpContext.RequestAborted);
 
-                httpContext.Response.StatusCode = 200;
+                httpContext.Response.StatusCode = streamResult.StatusCode;
                 httpContext.Response.Headers["X-Amzn-Bedrock-AgentCore-Runtime-Session-Id"] = streamResult.SessionId;
-                httpContext.Response.ContentType = "text/event-stream";
+                httpContext.Response.ContentType = streamResult.ContentType ?? "text/event-stream";
 
                 await streamResult.ResponseStream.CopyToAsync(httpContext.Response.Body, httpContext.RequestAborted);
             }
@@ -98,7 +98,7 @@ internal static class RuntimeEmulatorServer
             {
                 var result = await service.InvokeAgentAsync(submission);
 
-                httpContext.Response.StatusCode = 200;
+                httpContext.Response.StatusCode = result.StatusCode;
                 httpContext.Response.Headers["X-Amzn-Bedrock-AgentCore-Runtime-Session-Id"] = result.SessionId;
                 httpContext.Response.ContentType = "application/json";
                 await httpContext.Response.WriteAsync(result.Response);

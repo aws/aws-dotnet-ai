@@ -40,9 +40,11 @@
           DestinationFolder="$(OutputPath)wwwroot"
           SkipUnchangedFiles="true"
           Condition="Exists('$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css')" />
-    <!-- Blazor framework -->
+    <!-- Blazor framework — resolve from SDK's static web assets or NuGet cache -->
     <ItemGroup>
-      <_BlazorFrameworkFiles Include="$(NuGetPackageRoot)microsoft.aspnetcore.app.internal.assets/*/_framework/blazor.web.js" />
+      <_BlazorFrameworkFiles Include="@(StaticWebAsset)" Condition="'%(StaticWebAsset.RelativePath)' == '_framework/blazor.web.js'" />
+      <_BlazorFrameworkFiles Include="$(NuGetPackageRoot)microsoft.aspnetcore.app.internal.assets/*/_framework/blazor.web.js"
+                             Condition="@(_BlazorFrameworkFiles) == ''" />
     </ItemGroup>
     <MakeDir Directories="$(OutputPath)wwwroot/_framework" Condition="@(_BlazorFrameworkFiles) != ''" />
     <Copy SourceFiles="@(_BlazorFrameworkFiles)"

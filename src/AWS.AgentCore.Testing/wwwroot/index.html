@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgentCore Testing</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="app.css" />
+    <script src="vendor/marked.min.js"></script>
+    <script src="vendor/purify.min.js"></script>
+</head>
+<body>
+    <div id="app" class="app-layout">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <button id="new-session-btn" class="new-session-btn" title="New chat">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    <span>New Chat</span>
+                </button>
+            </div>
+            <div id="sessions-list" class="sessions-list"></div>
+            <div class="sidebar-footer">
+                <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="Collapse sidebar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="9" y1="3" x2="9" y2="21"/>
+                    </svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Chat Header -->
+            <header class="chat-header">
+                <div class="chat-header-inner">
+                    <button id="sidebar-open-btn" class="icon-btn sidebar-open-btn hidden" title="Open sidebar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
+                    <img id="header-logo" class="chat-header-logo" src="aws-light.svg" width="24" height="24" alt="AWS" />
+                    <span class="chat-header-title">Amazon Bedrock AgentCore</span>
+                    <span id="streaming-badge" class="badge badge-streaming hidden">Streaming</span>
+                    <span id="session-title-badge" class="chat-header-session hidden"></span>
+                    <div class="header-actions">
+                        <button id="payload-toggle-btn" class="icon-btn" title="Configure request payload">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="16 18 22 12 16 6"/>
+                                <polyline points="8 6 2 12 8 18"/>
+                            </svg>
+                        </button>
+                        <button id="theme-toggle-btn" class="icon-btn" title="Toggle light/dark mode">
+                            <svg id="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                            </svg>
+                            <svg id="theme-icon-moon" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Chat Body -->
+            <div class="chat-body">
+                <div class="chat-main">
+                    <!-- Welcome Screen (shown when no messages) -->
+                    <div id="welcome-screen" class="welcome-container">
+                        <div class="welcome-content">
+                            <div class="welcome-icon">
+                                <img id="welcome-logo" src="aws-light.svg" width="48" height="48" alt="AWS" />
+                            </div>
+                            <h1 class="welcome-title">Test Your Agent</h1>
+                            <p class="welcome-subtitle">Send requests to your AgentCore runtime and see responses in real time.</p>
+
+                            <div class="quick-actions">
+                                <button id="send-default-btn" class="quick-action">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                    </svg>
+                                    <span>Send test message</span>
+                                </button>
+                                <button id="open-payload-btn" class="quick-action">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                                    </svg>
+                                    <span>Configure payload</span>
+                                </button>
+                            </div>
+
+                            <div class="welcome-payload-preview">
+                                <div class="welcome-payload-header">
+                                    <span class="welcome-payload-label">Current payload</span>
+                                    <div id="welcome-params" class="welcome-params"></div>
+                                </div>
+                                <pre id="welcome-payload-code" class="welcome-payload-code"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Messages Container (shown when messages exist) -->
+                    <div id="messages-container" class="messages-container hidden">
+                        <div id="messages-inner" class="messages-inner"></div>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="input-area">
+                        <div id="param-inputs" class="param-inputs hidden"></div>
+                        <div id="input-wrapper" class="input-wrapper">
+                            <textarea
+                                id="chat-input"
+                                class="chat-input"
+                                placeholder="Type a message..."
+                                rows="1"></textarea>
+                            <div class="input-actions">
+                                <button id="send-btn" class="send-btn disabled" title="Send (Enter)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                    </svg>
+                                </button>
+                                <button id="stop-btn" class="stop-btn hidden" title="Stop generating">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                        <rect x="6" y="6" width="12" height="12" rx="2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="input-hint">
+                            <span>Enter to send &middot; Shift+Enter for new line</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payload Editor Panel -->
+                <aside id="payload-panel" class="payload-panel hidden">
+                    <div class="panel-header">
+                        <div class="panel-header-left">
+                            <h3>Payload Editor</h3>
+                            <span class="panel-badge">JSON</span>
+                        </div>
+                        <div class="panel-header-actions">
+                            <button id="reset-config-btn" class="text-btn" title="Reset to defaults">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                </svg>
+                                Reset
+                            </button>
+                            <button id="payload-close-btn" class="icon-btn" title="Close (Esc)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Template Section -->
+                        <div class="panel-section">
+                            <div class="section-header">
+                                <h4>Request Template</h4>
+                                <button id="format-json-btn" class="text-btn" title="Format JSON">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
+                                    </svg>
+                                    Format
+                                </button>
+                            </div>
+                            <p class="panel-description">
+                                Define the JSON body sent to your agent. Use <code>{{paramName}}</code> placeholders for dynamic values.
+                                The placeholder <code>{{input}}</code> maps to the chat input box.
+                            </p>
+                            <div class="code-editor-container">
+                                <div id="editor-gutter" class="code-editor-gutter"></div>
+                                <textarea
+                                    id="payload-editor"
+                                    class="code-editor-textarea"
+                                    spellcheck="false"
+                                    autocomplete="off"
+                                    autocorrect="off"
+                                    autocapitalize="off"
+                                    placeholder="Enter your JSON payload template..."></textarea>
+                            </div>
+                            <div id="editor-error" class="editor-error hidden"></div>
+                        </div>
+
+                        <!-- Parameters Section -->
+                        <div class="panel-section">
+                            <div id="params-section-header" class="section-header clickable">
+                                <div class="section-header-left">
+                                    <svg id="params-chevron" class="collapse-chevron expanded" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="9 18 15 12 9 6"/>
+                                    </svg>
+                                    <h4>Parameters</h4>
+                                    <span id="params-count" class="section-count hidden">0</span>
+                                </div>
+                                <button id="add-param-btn" class="text-btn accent">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                    </svg>
+                                    Add
+                                </button>
+                            </div>
+                            <div id="params-body" class="params-body">
+                                <p class="panel-description">
+                                    Parameters become input fields in the chat area. Use them in your template as <code>{{name}}</code>.
+                                    The built-in <code>{{input}}</code> is always the main chat text box.
+                                </p>
+                                <div id="params-list" class="params-list">
+                                    <div id="params-empty" class="params-empty">
+                                        <span>No custom parameters defined.</span>
+                                        <span>Use <code>{{input}}</code> in your template for the chat message.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Templates Section -->
+                        <div class="panel-section">
+                            <div class="section-header">
+                                <h4>Templates</h4>
+                            </div>
+                            <div id="template-list" class="template-list"></div>
+                        </div>
+
+                        <!-- Live Preview Section -->
+                        <div class="panel-section">
+                            <div class="section-header">
+                                <h4>Live Preview</h4>
+                            </div>
+                            <pre id="live-preview" class="live-preview"></pre>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

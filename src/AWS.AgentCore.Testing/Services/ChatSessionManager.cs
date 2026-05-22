@@ -7,19 +7,13 @@ using AWS.AgentCore.Testing.Models;
 namespace AWS.AgentCore.Testing.Services;
 
 /// <summary>
-/// In-memory chat session manager. Tracks conversations across the user's browser session.
-/// Scoped per Blazor circuit — each browser tab gets its own instance.
+/// In-memory chat session manager. Tracks conversations across the application lifetime.
+/// Registered as a singleton — all requests share the same instance.
 /// Uses ConcurrentDictionary for thread safety against concurrent async operations.
 /// </summary>
 public class ChatSessionManager
 {
     private readonly ConcurrentDictionary<string, ChatSession> _sessions = new();
-    private string? _activeSessionId;
-
-    /// <summary>
-    /// Fired whenever sessions or messages change, triggering UI re-render.
-    /// </summary>
-    public event Action? OnChange;
 
     /// <summary>
     /// All sessions ordered by most recent activity.
@@ -28,48 +22,44 @@ public class ChatSessionManager
         _sessions.Values.OrderByDescending(s => s.LastMessageAt).ToList();
 
     /// <summary>
-    /// The currently selected session, or null if none is active.
+    /// Returns a session by ID, or null if not found.
     /// </summary>
-    public ChatSession? ActiveSession =>
-        _activeSessionId != null && _sessions.TryGetValue(_activeSessionId, out var session) ? session : null;
+    /// <param name="id">The session ID to look up.</param>
+    public ChatSession? GetSession(string id)
+    {
+        return _sessions.TryGetValue(id, out var session) ? session : null;
+    }
 
     /// <summary>
-    /// Creates a new empty session and sets it as active.
+    /// Returns an existing session by ID, or creates a new one if the ID is null or not found.
+    /// </summary>
+    /// <param name="id">The session ID to look up, or null to create a new session.</param>
+    public ChatSession GetOrCreateSession(string? id)
+    {
+        if (!string.IsNullOrEmpty(id) && _sessions.TryGetValue(id, out var existing))
+        {
+            return existing;
+        }
+        return CreateSession();
+    }
+
+    /// <summary>
+    /// Creates a new empty session.
     /// </summary>
     public ChatSession CreateSession()
     {
         var session = new ChatSession();
         _sessions[session.Id] = session;
-        _activeSessionId = session.Id;
-        OnChange?.Invoke();
         return session;
     }
 
     /// <summary>
-    /// Switches the active session to the specified session ID.
-    /// </summary>
-    /// <param name="sessionId">The session to activate.</param>
-    public void SetActiveSession(string sessionId)
-    {
-        if (_sessions.ContainsKey(sessionId))
-        {
-            _activeSessionId = sessionId;
-            OnChange?.Invoke();
-        }
-    }
-
-    /// <summary>
-    /// Deletes a session and selects the next available session as active.
+    /// Deletes a session by ID.
     /// </summary>
     /// <param name="sessionId">The session to delete.</param>
     public void DeleteSession(string sessionId)
     {
         _sessions.TryRemove(sessionId, out _);
-        if (_activeSessionId == sessionId)
-        {
-            _activeSessionId = _sessions.Keys.FirstOrDefault();
-        }
-        OnChange?.Invoke();
     }
 
     /// <summary>
@@ -90,35 +80,7 @@ public class ChatSessionManager
                     ? message.Content[..40] + "..."
                     : message.Content;
             }
-
-            OnChange?.Invoke();
         }
     }
 
-    /// <summary>
-    /// Updates the content of an existing message (e.g., for streaming or error updates).
-    /// </summary>
-    /// <param name="sessionId">The session containing the message.</param>
-    /// <param name="messageId">The ID of the message to update.</param>
-    /// <param name="content">The new content.</param>
-    public void UpdateMessage(string sessionId, string messageId, string content)
-    {
-        if (_sessions.TryGetValue(sessionId, out var session))
-        {
-            var msg = session.Messages.FirstOrDefault(m => m.Id == messageId);
-            if (msg != null)
-            {
-                msg.Content = content;
-                OnChange?.Invoke();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Returns the active session, creating a new one if none exists.
-    /// </summary>
-    public ChatSession GetOrCreateActiveSession()
-    {
-        return ActiveSession ?? CreateSession();
-    }
 }

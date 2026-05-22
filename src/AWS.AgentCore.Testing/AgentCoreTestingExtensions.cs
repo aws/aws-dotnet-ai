@@ -6,8 +6,6 @@
 // will remain in AWS.AgentCore.Testing. This file should become part of the
 // Aspire.Hosting.AWS package and call into AWS.AgentCore.Testing to create/start emulators.
 
-using Aspire.Hosting.ApplicationModel;
-
 namespace AWS.AgentCore.Testing;
 
 /// <summary>
@@ -88,7 +86,7 @@ public static class AgentCoreTestingExtensions
                 var runtimeUrl = $"http://localhost:{annotation.RuntimePort}";
 
                 // Start chat app on port 0 (OS-assigned)
-                var chatApp = ChatAppServer.Create(runtimeUrl, port: 0, streaming: annotation.IsStreaming, loggerProvider: loggerProvider);
+                var chatApp = ChatAppServer.Create(runtimeUrl, port: 0, streaming: annotation.IsStreaming, agentName: projectName, loggerProvider: loggerProvider);
                 await chatApp.StartAsync(ct);
                 annotation.ChatAppPort = GetBoundPort(chatApp);
 

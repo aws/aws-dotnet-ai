@@ -8,6 +8,7 @@
     <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
     <IsPackable>true</IsPackable>
     <PackageId>AWS.AgentCore.Testing</PackageId>
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,77 +19,13 @@
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.3.3" />
     <PackageReference Include="AWSSDK.BedrockAgentCore" Version="4.0.23.3" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.40" />
-    <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
-    <PackageReference Include="Markdig" Version="1.2.0" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.8" />
   </ItemGroup>
 
+  <!-- Embed wwwroot files as resources so they're self-contained in the DLL.
+       Works identically via project reference and NuGet. -->
   <ItemGroup>
-    <None Include="build/AWS.AgentCore.Testing.targets" Pack="true" PackagePath="build/" />
-    <None Include="build/AWS.AgentCore.Testing.targets" Pack="true" PackagePath="buildTransitive/" />
+    <EmbeddedResource Include="wwwroot/**/*" Exclude="wwwroot/**/*.gz" />
   </ItemGroup>
-
-  <!-- Copy wwwroot/app.css to output -->
-  <ItemGroup>
-    <Content Update="wwwroot/**/*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <!-- After build, assemble the full wwwroot in the output directory -->
-  <Target Name="AssembleWwwrootInOutput" AfterTargets="Build">
-    <!-- Scoped CSS bundle -->
-    <Copy SourceFiles="$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css"
-          DestinationFolder="$(OutputPath)wwwroot"
-          SkipUnchangedFiles="true"
-          Condition="Exists('$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css')" />
-    <!-- Blazor framework — resolve from SDK's static web assets or NuGet cache -->
-    <ItemGroup>
-      <_BlazorFrameworkFiles Include="@(StaticWebAsset)" Condition="'%(StaticWebAsset.RelativePath)' == '_framework/blazor.web.js'" />
-      <_BlazorFrameworkFiles Include="$(NuGetPackageRoot)microsoft.aspnetcore.app.internal.assets/*/_framework/blazor.web.js"
-                             Condition="@(_BlazorFrameworkFiles) == ''" />
-    </ItemGroup>
-    <MakeDir Directories="$(OutputPath)wwwroot/_framework" Condition="@(_BlazorFrameworkFiles) != ''" />
-    <Copy SourceFiles="@(_BlazorFrameworkFiles)"
-          DestinationFolder="$(OutputPath)wwwroot/_framework"
-          SkipUnchangedFiles="true" />
-    <!-- Collocated JS -->
-    <ItemGroup>
-      <_CollocatedJs Include="Components/**/*.razor.js" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_CollocatedJs)"
-          DestinationFolder="$(OutputPath)wwwroot/Components/%(RecursiveDir)"
-          SkipUnchangedFiles="true" />
-  </Target>
-
-  <!--
-    When this project is referenced via ProjectReference, expose the assembled wwwroot files
-    to the referencing project's copy-to-output pipeline.
-  -->
-  <Target Name="GetWwwrootCopyItems"
-          AfterTargets="AssembleWwwrootInOutput"
-          BeforeTargets="GetCopyToOutputDirectoryItems">
-    <ItemGroup>
-      <_WwwrootItems Remove="@(_WwwrootItems)" />
-      <_WwwrootItems Include="$(OutputPath)wwwroot/**/*" Exclude="$(OutputPath)wwwroot/**/*.gz" />
-    </ItemGroup>
-    <ItemGroup>
-      <AllItemsFullPathWithTargetPath Include="@(_WwwrootItems->'$(MSBuildProjectDirectory)/%(Identity)')">
-        <TargetPath>wwwroot/%(_WwwrootItems.RecursiveDir)%(_WwwrootItems.Filename)%(_WwwrootItems.Extension)</TargetPath>
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </AllItemsFullPathWithTargetPath>
-    </ItemGroup>
-  </Target>
-
-  <!-- Include the assembled wwwroot in the NuGet package for the .targets file to use -->
-  <PropertyGroup>
-    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeWwwrootInPackage</TargetsForTfmSpecificContentInPackage>
-  </PropertyGroup>
-  <Target Name="IncludeWwwrootInPackage" DependsOnTargets="Build">
-    <ItemGroup>
-      <TfmSpecificPackageFile Include="$(OutputPath)wwwroot/**/*" Exclude="$(OutputPath)wwwroot/**/*.gz">
-        <PackagePath>content/wwwroot/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
-      </TfmSpecificPackageFile>
-    </ItemGroup>
-  </Target>
 
 </Project>

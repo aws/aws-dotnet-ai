@@ -1,15 +1,8 @@
 ** AWSSDK.BedrockAgentCore; version 4.0.23.3 -- https://www.nuget.org/packages/AWSSDK.BedrockAgentCore
 ** AWSSDK.BedrockRuntime; version 4.0.17.5 -- https://www.nuget.org/packages/AWSSDK.BedrockRuntime
-** AWSSDK.CloudFormation; version 4.0.8.21 -- https://www.nuget.org/packages/AWSSDK.CloudFormation
-** AWSSDK.CloudWatchLogs; version 4.0.9 -- https://www.nuget.org/packages/AWSSDK.CloudWatchLogs
-** AWSSDK.ECR; version 4.0.13.3 -- https://www.nuget.org/packages/AWSSDK.ECR
 ** AWSSDK.Extensions.Bedrock.MEAI; version 4.0.6.12 -- https://www.nuget.org/packages/AWSSDK.Extensions.Bedrock.MEAI
 ** AWSSDK.Extensions.NETCore.Setup; version 4.0.3.40 -- https://www.nuget.org/packages/AWSSDK.Extensions.NETCore.Setup
-** AWSSDK.S3; version 4.0.14 -- https://www.nuget.org/packages/AWSSDK.S3
-** AWSSDK.SecurityToken; version 4.0.6.6 -- https://www.nuget.org/packages/AWSSDK.SecurityToken
-** Aspire.Hosting; version 13.3.3 -- https://www.nuget.org/packages/Aspire.Hosting
 ** Aspire.Hosting.AppHost; version 13.3.3 -- https://www.nuget.org/packages/Aspire.Hosting.AppHost
-** Aspire.Hosting.Testing; version 13.3.3 -- https://www.nuget.org/packages/Aspire.Hosting.Testing
 ** Microsoft.Agents.AI; version 1.3.0 -- https://www.nuget.org/packages/Microsoft.Agents.AI
  
 Apache License
@@ -199,55 +192,25 @@ limitations under the License.
     Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 * For AWSSDK.BedrockRuntime see also this required NOTICE:
     Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-* For AWSSDK.CloudFormation see also this required NOTICE:
-    Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-* For AWSSDK.CloudWatchLogs see also this required NOTICE:
-    Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-* For AWSSDK.ECR see also this required NOTICE:
-    Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 * For AWSSDK.Extensions.Bedrock.MEAI see also this required NOTICE:
     Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 * For AWSSDK.Extensions.NETCore.Setup see also this required NOTICE:
     Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-* For AWSSDK.S3 see also this required NOTICE:
-    Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-* For AWSSDK.SecurityToken see also this required NOTICE:
-    Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-* For Aspire.Hosting see also this required NOTICE:
-    Copyright (c) .NET Foundation and Contributors. All Rights Reserved.
 * For Aspire.Hosting.AppHost see also this required NOTICE:
-    Copyright (c) .NET Foundation and Contributors. All Rights Reserved.
-* For Aspire.Hosting.Testing see also this required NOTICE:
     Copyright (c) .NET Foundation and Contributors. All Rights Reserved.
 * For Microsoft.Agents.AI see also this required NOTICE:
     Copyright (c) Microsoft Corporation. All Rights Reserved.
 
 ------
 
-** HtmlSanitizer; version 8.1.870 -- https://www.nuget.org/packages/HtmlSanitizer
-Copyright (c) 2013-2024 Michael Ganss
-** Markdig; version 1.2.0 -- https://www.nuget.org/packages/Markdig
-Copyright (c) 2018 Alexandre Mutel
-** ModelContextProtocol; version 1.3.0 -- https://www.nuget.org/packages/ModelContextProtocol
-Copyright (c) .NET Foundation and Contributors
-** FsCheck.Xunit.v3; version 3.3.3 -- https://www.nuget.org/packages/FsCheck.Xunit.v3
-Copyright (c) 2008-2023 Kurt Schelfthout and contributors
-** xunit.v3; version 3.2.2 -- https://www.nuget.org/packages/xunit.v3
-Copyright (c) .NET Foundation and Contributors
-** xunit.runner.visualstudio; version 3.1.5 -- https://www.nuget.org/packages/xunit.runner.visualstudio
-Copyright (c) .NET Foundation and Contributors
-** xunit.v3.runner.inproc.console; version 3.2.2 -- https://www.nuget.org/packages/xunit.v3.runner.inproc.console
-Copyright (c) .NET Foundation and Contributors
-** Microsoft.NET.Test.Sdk; version 18.5.1 -- https://www.nuget.org/packages/Microsoft.NET.Test.Sdk
-Copyright (c) .NET Foundation and Contributors
-** Microsoft.AspNetCore.Mvc.Testing; version 10.0.7 -- https://www.nuget.org/packages/Microsoft.AspNetCore.Mvc.Testing
-Copyright (c) .NET Foundation and Contributors
 ** Microsoft.CodeAnalysis.CSharp; version 5.3.0 -- https://www.nuget.org/packages/Microsoft.CodeAnalysis.CSharp
 Copyright (c) .NET Foundation and Contributors
 ** Microsoft.CodeAnalysis.Analyzers; version 5.3.0 -- https://www.nuget.org/packages/Microsoft.CodeAnalysis.Analyzers
 Copyright (c) .NET Foundation and Contributors
-** Moq; version 4.20.72 -- https://www.nuget.org/packages/Moq
-Copyright (c) 2007-2023 Moq contributors
+** marked.js; version 12 -- https://github.com/markedjs/marked
+Copyright (c) 2018+, MarkedJS (https://github.com/markedjs)
+** DOMPurify; version 3 -- https://github.com/cure53/DOMPurify
+Copyright (c) 2015 Mario Heiderich (Licensed under Apache-2.0 OR MPL-2.0; used here under Apache-2.0)
  
 MIT License
 

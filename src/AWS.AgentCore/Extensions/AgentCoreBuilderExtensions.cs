@@ -92,7 +92,15 @@ public static class AgentCoreBuilderExtensions
 
         builder.Services.AddSingleton(options);
 
-        builder.WebHost.UseUrls($"http://0.0.0.0:{options.Port}");
+        // Only set the port explicitly if ASPNETCORE_URLS is not already configured
+        // (e.g., by Aspire or another orchestrator) AND we're not running under Aspire's
+        // managed mode. In production on AgentCore Runtime, neither will be set, so we
+        // default to port 8080 per the service contract.
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS"))
+            && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.AspireManagedEnvironmentVariable)))
+        {
+            builder.WebHost.UseUrls($"http://0.0.0.0:{options.Port}");
+        }
 
         // IChatClient registration (priority order)
         if (options.ChatClient is not null)
@@ -115,8 +123,25 @@ public static class AgentCoreBuilderExtensions
         // Register AgentCoreRuntimeContextProvider (AIContextProvider)
         builder.Services.AddSingleton<AgentCoreRuntimeContextProvider>();
 
-        // Register IAmazonBedrockAgentCore for Memory operations
-        builder.Services.TryAddAWSService<IAmazonBedrockAgentCore>();
+        // Register IAmazonBedrockAgentCore for Memory operations.
+        // When the service endpoint is set via environment variables, route all AgentCore SDK calls
+        // to the specified endpoint (e.g., a local Memory Emulator).
+        var serviceEndpoint = Environment.GetEnvironmentVariable(Constants.ServiceEndpointEnvironmentVariable);
+        if (!string.IsNullOrEmpty(serviceEndpoint))
+        {
+            builder.Services.TryAddSingleton<IAmazonBedrockAgentCore>(_ =>
+                new AmazonBedrockAgentCoreClient(
+                    new Amazon.Runtime.AnonymousAWSCredentials(),
+                    new AmazonBedrockAgentCoreConfig
+                    {
+                        ServiceURL = serviceEndpoint,
+                        AuthenticationRegion = "us-east-1"
+                    }));
+        }
+        else
+        {
+            builder.Services.TryAddAWSService<IAmazonBedrockAgentCore>();
+        }
 
         // Register AgentCoreMemoryProvider
         builder.Services.AddSingleton<AgentCoreMemoryProvider>();

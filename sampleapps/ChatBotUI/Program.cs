@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using Amazon.BedrockAgentCore;
 using ChatBotUI.Components;
 using ChatBotUI.Models;
 using ChatBotUI.Services;
@@ -9,6 +10,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure AgentCore settings from appsettings.json
 builder.Services.Configure<AgentCoreSettings>(builder.Configuration.GetSection("AgentCore"));
+
+// Register the AWS SDK client.
+// When AWS_ENDPOINT_URL_BEDROCK_AGENTCORE is set (by Aspire's WithReference), the SDK
+// automatically routes requests to the local runtime emulator — no manual config needed.
+builder.Services.TryAddAWSService<IAmazonBedrockAgentCore>();
 
 // Register services
 builder.Services.AddSingleton<AgentCoreService>();

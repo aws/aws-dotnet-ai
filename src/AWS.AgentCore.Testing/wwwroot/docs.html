@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Documentation — AgentCore Chat</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="app.css" />
+    <style>
+        /* Override body overflow from app.css — docs uses its own scroll container */
+        html, body {
+            overflow: hidden;
+            height: 100%;
+        }
+
+        /* Sidebar back button — inherit .new-session-btn from app.css exactly */
+        a.new-session-btn {
+            text-decoration: none;
+            cursor: pointer;
+            line-height: normal;
+        }
+
+        /* ─── Docs Layout ─── */
+
+        .docs-page {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .docs-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ─── Sidebar Navigation ─── */
+
+        .docs-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-primary);
+            padding: 0 0 2rem;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-input) transparent;
+            z-index: 10;
+        }
+
+        /* ─── Main Column ─── */
+
+        .docs-main {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .docs-main > .chat-header {
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+        }
+
+        .docs-scroll {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .nav-group {
+            margin-top: 1.5rem;
+            padding: 0 0.75rem;
+        }
+        .nav-group:first-child { margin-top: 0.5rem; }
+
+        .nav-group-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-tertiary);
+            padding: 0 0.75rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .nav-group ul { list-style: none; }
+
+        .nav-group li a {
+            display: block;
+            padding: 0.35rem 0.75rem;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 450;
+            transition: all var(--duration-fast) ease;
+        }
+        .nav-group li a:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        /* ─── Content Area ─── */
+
+        .docs-content {
+            flex: 1;
+            min-width: 0;
+            padding: 3rem 3.5rem 6rem;
+            max-width: 780px;
+        }
+
+        /* ─── Typography ─── */
+
+        .docs-content h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.4rem;
+            line-height: 1.2;
+            color: var(--text-primary);
+        }
+
+        .docs-subtitle {
+            color: var(--text-secondary);
+            font-size: 15px;
+            margin-bottom: 3rem;
+            line-height: 1.65;
+        }
+
+        .docs-content h2 {
+            font-size: 20px;
+            font-weight: 650;
+            letter-spacing: -0.02em;
+            margin-top: 3.5rem;
+            margin-bottom: 0.85rem;
+            padding-top: 1.75rem;
+            border-top: 1px solid var(--border-primary);
+            line-height: 1.3;
+            color: var(--text-primary);
+        }
+        .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+
+        .docs-content h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-top: 1.75rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+        }
+
+        .docs-content p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.75;
+        }
+
+        .docs-content ul, .docs-content ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+            line-height: 1.75;
+        }
+        .docs-content li { margin-bottom: 0.45rem; }
+        .docs-content li strong { color: var(--text-primary); }
+
+        /* ─── Inline Code ─── */
+
+        .docs-content code {
+            font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+            background: var(--bg-code);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xs);
+            padding: 0.12rem 0.4rem;
+            font-size: 0.84em;
+            font-weight: 450;
+        }
+
+        /* ─── Code Blocks ─── */
+
+        .docs-content pre {
+            background: var(--bg-code);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            padding: 1.1rem 1.4rem;
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+            box-shadow: var(--shadow-sm);
+        }
+        .docs-content pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 13px;
+            font-weight: 400;
+        }
+
+        /* ─── Callouts ─── */
+
+        .callout {
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0 1.5rem;
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+        .callout strong {
+            display: block;
+            margin-bottom: 0.15rem;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .callout-info {
+            background: var(--accent-light);
+            border-left: 3px solid var(--accent);
+        }
+        .callout-info strong { color: var(--accent); }
+        .callout-tip {
+            background: rgba(34, 197, 94, 0.06);
+            border-left: 3px solid var(--success);
+        }
+        .callout-tip strong { color: var(--success); }
+        .callout-warning {
+            background: rgba(234, 179, 8, 0.06);
+            border-left: 3px solid #eab308;
+        }
+        .callout-warning strong { color: #eab308; }
+
+        /* ─── Tables ─── */
+
+        .docs-content table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-bottom: 1.5rem;
+            font-size: 13px;
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        .docs-content th, .docs-content td {
+            padding: 0.6rem 0.9rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-primary);
+        }
+        .docs-content tr:last-child td { border-bottom: none; }
+        .docs-content th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-tertiary);
+        }
+        .docs-content td { color: var(--text-secondary); }
+
+        /* ─── Keyboard Shortcuts ─── */
+
+        .kbd {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border: 1px solid var(--border-input);
+            border-radius: var(--radius-xs);
+            background: var(--bg-tertiary);
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 550;
+            color: var(--text-secondary);
+            box-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+        }
+
+        /* ─── Responsive ─── */
+
+        @media (max-width: 900px) {
+            .docs-content { padding: 2.5rem 2rem 5rem; }
+        }
+        @media (max-width: 768px) {
+            .docs-page { height: auto; }
+            .docs-body { flex-direction: column; overflow: visible; }
+            .docs-nav {
+                position: static;
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border-primary);
+                padding: 0 0 1rem;
+            }
+            .docs-main {
+                margin-left: 0;
+                height: auto;
+                overflow: visible;
+            }
+            .docs-scroll { overflow: visible; }
+            .docs-content { padding: 2rem 1.25rem 4rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="docs-page">
+        <div class="docs-body">
+            <!-- Sidebar Navigation -->
+            <nav class="docs-nav">
+                <div class="sidebar-header">
+                    <a href="/" class="new-session-btn" title="Back to Chat">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+                        </svg>
+                        <span>Back to Chat</span>
+                    </a>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">Getting Started</div>
+                    <ul>
+                        <li><a href="#overview">Overview</a></li>
+                        <li><a href="#quick-start">Quick Start</a></li>
+                    </ul>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">Features</div>
+                    <ul>
+                        <li><a href="#sending-messages">Sending Messages</a></li>
+                        <li><a href="#sessions">Sessions</a></li>
+                        <li><a href="#payload-editor">Payload Editor</a></li>
+                        <li><a href="#parameters">Parameters</a></li>
+                        <li><a href="#templates">Templates</a></li>
+                        <li><a href="#streaming">Streaming</a></li>
+                    </ul>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">Configuration</div>
+                    <ul>
+                        <li><a href="#payload-structure">Payload Structure</a></li>
+                        <li><a href="#persistence">Persistence</a></li>
+                        <li><a href="#theme">Theme</a></li>
+                    </ul>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">Reference</div>
+                    <ul>
+                        <li><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
+                        <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main column: header + content -->
+            <div class="docs-main">
+                <header class="chat-header">
+                    <div class="chat-header-inner">
+                        <img id="header-logo" class="chat-header-logo" src="aws-light.svg" width="24" height="24" alt="AWS" />
+                        <span class="chat-header-title">Amazon Bedrock AgentCore</span>
+                        <span class="badge" style="background: var(--bg-tertiary); color: var(--text-tertiary); border: 1px solid var(--border-primary);">Docs</span>
+                        <div class="header-actions">
+                            <a href="/" class="icon-btn" title="Back to Chat">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                            </a>
+                            <button id="theme-toggle-btn" class="icon-btn" title="Toggle light/dark mode">
+                                <svg id="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                                </svg>
+                                <svg id="theme-icon-moon" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </header>
+                <div class="docs-scroll">
+                <main class="docs-content">
+                <h1>Chat App Documentation</h1>
+                <p class="docs-subtitle">A web-based testing interface for interacting with your AWS Bedrock AgentCore agent during local development.</p>
+
+                <h2 id="overview">Overview</h2>
+                <p>
+                    The Chat App provides a conversational UI for testing your AgentCore agent without writing client code.
+                    It communicates with the Runtime Emulator via the AWS SDK, simulating how real clients will invoke your agent in production.
+                </p>
+                <p>Key capabilities:</p>
+                <ul>
+                    <li>Send messages and receive agent responses (with streaming support)</li>
+                    <li>Customize the JSON payload structure your agent receives</li>
+                    <li>Define reusable parameters that appear as input fields</li>
+                    <li>Manage multiple chat sessions</li>
+                    <li>Render Markdown responses with syntax highlighting</li>
+                    <li>Persist your payload configuration across restarts</li>
+                </ul>
+
+                <h2 id="quick-start">Quick Start</h2>
+                <ol>
+                    <li>Your Aspire app host starts the Chat App automatically when you call <code>AddAgentCoreRuntime&lt;T&gt;()</code>.</li>
+                    <li>Click the <strong>"Chat"</strong> link in the Aspire Dashboard to open the Chat App.</li>
+                    <li>Type a message and press <strong>Enter</strong> to send it to your agent.</li>
+                    <li>If your agent expects a different JSON shape, open the <strong>Payload Editor</strong> (code icon in the header) to configure it.</li>
+                </ol>
+
+                <div class="callout callout-tip">
+                    <strong>Tip</strong>
+                    Click "Send test message" on the welcome screen to quickly verify your agent is responding.
+                </div>
+
+                <h2 id="sending-messages">Sending Messages</h2>
+                <p>
+                    Type your message in the input box at the bottom and press <strong>Enter</strong> to send.
+                    The message text is injected into your payload template at the <code>{{input}}</code> placeholder,
+                    and the resulting JSON is sent to the Runtime Emulator which forwards it to your agent's <code>/invocations</code> endpoint.
+                </p>
+                <p>
+                    If your agent supports streaming, responses appear incrementally as tokens arrive.
+                    A typing animation indicates the agent is processing your request.
+                </p>
+
+                <h3>Stop Generation</h3>
+                <p>
+                    While the agent is responding, a stop button appears next to the input. Click it (or press <strong>Escape</strong>)
+                    to cancel the in-flight request. The partial response received so far is preserved in the chat.
+                </p>
+
+                <h2 id="sessions">Sessions</h2>
+                <p>
+                    The sidebar on the left shows your chat sessions. Each session maintains its own message history.
+                </p>
+                <ul>
+                    <li><strong>New Chat</strong> — Click the "+" button to start a fresh session.</li>
+                    <li><strong>Switch sessions</strong> — Click any session in the sidebar to view its messages.</li>
+                    <li><strong>Delete a session</strong> — Hover over a session and click the trash icon.</li>
+                    <li><strong>Auto-titling</strong> — Sessions are automatically titled from your first message.</li>
+                </ul>
+                <p>
+                    Sessions are stored in-memory on the server. They persist as long as the app host is running
+                    but are lost on restart.
+                </p>
+
+                <div class="callout callout-info">
+                    <strong>Note</strong>
+                    The session ID is passed as a header to the Runtime Emulator. Your agent can use it to maintain
+                    conversational context across multiple turns.
+                </div>
+
+                <h2 id="payload-editor">Payload Editor</h2>
+                <p>
+                    The Payload Editor lets you define the exact JSON structure your agent expects. Open it by clicking the
+                    <strong>code icon</strong> (<code>&lt;/&gt;</code>) in the header bar, or click "Configure payload" on the welcome screen.
+                </p>
+                <p>The editor supports:</p>
+                <ul>
+                    <li>Full JSON editing with line numbers</li>
+                    <li>Real-time validation (invalid JSON shows an error below the editor)</li>
+                    <li>Auto-formatting (click "Format" to prettify)</li>
+                    <li>Placeholder substitution with <code>{{paramName}}</code> syntax</li>
+                    <li>A live preview showing the resolved payload</li>
+                </ul>
+
+                <h3>Default Payload</h3>
+                <p>By default, the Chat App sends:</p>
+<pre><code>{
+  "prompt": "{{input}}"
+}</code></pre>
+                <p>
+                    Where <code>{{input}}</code> is replaced by whatever you type in the chat box. If your agent expects
+                    a different shape, edit the template to match.
+                </p>
+
+                <h3>Example: Custom Agent Payload</h3>
+                <p>If your agent handler expects this structure:</p>
+<pre><code>public record MyRequest(string UserMessage, string Model, int MaxTokens);</code></pre>
+                <p>Configure your payload template as:</p>
+<pre><code>{
+  "userMessage": "{{input}}",
+  "model": "{{model}}",
+  "maxTokens": {{maxTokens}}
+}</code></pre>
+                <p>Then add <code>model</code> and <code>maxTokens</code> as parameters (see below).</p>
+
+                <h2 id="parameters">Parameters</h2>
+                <p>
+                    Parameters are named placeholders in your template that become input fields in the chat area.
+                    They appear as small text boxes above the main chat input.
+                </p>
+
+                <h3>Adding Parameters</h3>
+                <ol>
+                    <li>Open the Payload Editor.</li>
+                    <li>In the <strong>Parameters</strong> section, click <strong>Add</strong>.</li>
+                    <li>Enter a name (must match a <code>{{name}}</code> in your template).</li>
+                    <li>Set a default value.</li>
+                    <li>Choose a type: <code>string</code>, <code>number</code>, <code>boolean</code>, or <code>raw</code>.</li>
+                </ol>
+
+                <h3>Parameter Types</h3>
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Behavior</th><th>Example Output</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>string</code></td>
+                            <td>Value is wrapped in quotes</td>
+                            <td><code>"hello"</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>number</code></td>
+                            <td>Value inserted without quotes</td>
+                            <td><code>42</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>boolean</code></td>
+                            <td>Value inserted without quotes</td>
+                            <td><code>true</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>raw</code></td>
+                            <td>Value inserted as-is (for objects/arrays)</td>
+                            <td><code>{"key": "val"}</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="callout callout-info">
+                    <strong>Note</strong>
+                    The <code>{{input}}</code> placeholder is always available and maps to the main chat text box. You don't need to define it as a parameter.
+                </div>
+
+                <h2 id="templates">Templates</h2>
+                <p>
+                    The Payload Editor includes built-in templates for common agent patterns.
+                    Click a template to load its payload structure and parameters instantly.
+                </p>
+                <table>
+                    <thead>
+                        <tr><th>Template</th><th>Description</th><th>Parameters</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Simple Prompt</td>
+                            <td>Single <code>prompt</code> field</td>
+                            <td>None</td>
+                        </tr>
+                        <tr>
+                            <td>Message + Role</td>
+                            <td>Chat-style with role</td>
+                            <td><code>role</code></td>
+                        </tr>
+                        <tr>
+                            <td>Query + Parameters</td>
+                            <td>With model tuning</td>
+                            <td><code>temperature</code>, <code>maxTokens</code></td>
+                        </tr>
+                        <tr>
+                            <td>Structured Input</td>
+                            <td>Nested input with metadata</td>
+                            <td><code>messageType</code>, <code>source</code>, <code>userId</code></td>
+                        </tr>
+                        <tr>
+                            <td>RAG Query</td>
+                            <td>Retrieval-augmented generation</td>
+                            <td><code>knowledgeBaseId</code>, <code>maxResults</code>, <code>filters</code></td>
+                        </tr>
+                        <tr>
+                            <td>Multi-turn Chat</td>
+                            <td>Conversational with history</td>
+                            <td><code>includeHistory</code>, <code>systemPrompt</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="callout callout-tip">
+                    <strong>Tip</strong>
+                    Use templates as a starting point, then customize the payload and parameters to match your agent's exact schema.
+                </div>
+
+                <h2 id="streaming">Streaming</h2>
+                <p>
+                    When your agent is configured with <code>.WithStreaming()</code>, the Chat App uses
+                    Server-Sent Events (SSE) to receive responses incrementally. A <strong>"Streaming"</strong> badge
+                    appears in the header when this mode is active.
+                </p>
+                <p>In streaming mode:</p>
+                <ul>
+                    <li>Responses render token-by-token as they arrive</li>
+                    <li>You can stop generation mid-response</li>
+                    <li>Markdown is rendered progressively</li>
+                </ul>
+                <p>
+                    Non-streaming mode waits for the full response before displaying it. Both modes support full Markdown rendering.
+                </p>
+
+                <h2 id="payload-structure">Payload Structure</h2>
+                <p>
+                    Understanding how the Chat App builds the final request helps you configure it correctly.
+                    When you send a message, here's what happens:
+                </p>
+                <ol>
+                    <li>Your <strong>template</strong> is taken as a string (e.g., <code>{"prompt": "{{input}}"}</code>).</li>
+                    <li>Each <code>{{paramName}}</code> is replaced with the corresponding parameter value:
+                        <ul>
+                            <li><code>{{input}}</code> — the text you typed in the chat box</li>
+                            <li><code>{{otherParam}}</code> — the value from the parameter input field</li>
+                        </ul>
+                    </li>
+                    <li>The substituted string is sent as the request payload.</li>
+                    <li>The Runtime Emulator passes this payload directly to your agent's <code>/invocations</code> body.</li>
+                </ol>
+
+                <div class="callout callout-warning">
+                    <strong>Important</strong>
+                    String-type parameters are automatically quoted. If your template already has quotes around the placeholder
+                    (e.g., <code>"field": "{{param}}"</code>), make sure the parameter type is <code>string</code>.
+                    For numeric or boolean values, omit the quotes in the template and use the appropriate type.
+                </div>
+
+                <h2 id="persistence">Persistence</h2>
+                <p>
+                    Your payload configuration (template + parameters) is automatically saved and restored across sessions.
+                    Changes are persisted after a 1-second debounce to avoid excessive writes.
+                </p>
+                <ul>
+                    <li><strong>Storage location</strong> — <code>~/.agentcore/testing/{agentName}/payload-config.json</code></li>
+                    <li><strong>Per-agent</strong> — Each agent has its own config, so switching between agents preserves each one.</li>
+                    <li><strong>Reset</strong> — Click the "Reset" button in the Payload Editor header to restore the default template.</li>
+                </ul>
+                <p>Theme preference (light/dark) is stored as a browser cookie and applies globally across all agents.</p>
+
+                <h2 id="theme">Theme</h2>
+                <p>
+                    Click the sun/moon icon in the header to toggle between dark and light mode.
+                    The preference is stored in a cookie and remembered across browser sessions.
+                </p>
+
+                <h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
+                <table>
+                    <thead>
+                        <tr><th>Shortcut</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><span class="kbd">Enter</span></td><td>Send message</td></tr>
+                        <tr><td><span class="kbd">Shift</span> + <span class="kbd">Enter</span></td><td>New line in message</td></tr>
+                        <tr><td><span class="kbd">Escape</span></td><td>Stop generation / Close payload editor</td></tr>
+                    </tbody>
+                </table>
+
+                <h2 id="troubleshooting">Troubleshooting</h2>
+
+                <h3>Agent returns an error</h3>
+                <p>
+                    If your agent throws an exception or returns a non-200 status code, the error message
+                    will appear in the chat as a system message. Check the Aspire Dashboard logs for the
+                    full stack trace.
+                </p>
+
+                <h3>Messages not appearing</h3>
+                <p>
+                    Ensure your agent is running and responding on its HTTP endpoint. You can verify by clicking
+                    the "Agent Instance" link in Aspire — it should show the agent info page with a healthy <code>/ping</code> endpoint.
+                </p>
+
+                <h3>Payload format mismatch</h3>
+                <p>
+                    If your agent returns a deserialization error, the JSON payload shape likely doesn't match
+                    your agent's request model. Open the Payload Editor, check the <strong>Live Preview</strong> to see
+                    the exact JSON being sent, and compare it to your agent's <code>TRequest</code> type.
+                </p>
+
+                <h3>Streaming not working</h3>
+                <p>
+                    Streaming requires your agent to be registered with <code>.WithStreaming()</code> in the Aspire app host.
+                    If the "Streaming" badge is not visible in the header, streaming is not enabled for this agent.
+                </p>
+
+                <h3>Configuration not persisting</h3>
+                <p>
+                    Payload configuration is saved to disk at <code>~/.agentcore/testing/{agentName}/</code>.
+                    Ensure the process has write access to your home directory. If the agent name changes between runs,
+                    a fresh configuration will be created.
+                </p>
+            </main>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme: read from cookie and apply
+        function getTheme() {
+            const match = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('agentcore-theme='));
+            return match ? match.split('=')[1] : 'dark';
+        }
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            const sun = document.getElementById('theme-icon-sun');
+            const moon = document.getElementById('theme-icon-moon');
+            if (sun && moon) {
+                sun.classList.toggle('hidden', theme === 'light');
+                moon.classList.toggle('hidden', theme === 'dark');
+            }
+            // Swap logo
+            const logo = document.getElementById('header-logo');
+            if (logo) logo.src = theme === 'dark' ? 'aws-light.svg' : 'aws.svg';
+        }
+        function setThemeCookie(theme) {
+            document.cookie = `agentcore-theme=${theme};path=/;max-age=31536000;SameSite=Lax`;
+        }
+
+        let currentTheme = getTheme();
+        applyTheme(currentTheme);
+
+        document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            applyTheme(currentTheme);
+            setThemeCookie(currentTheme);
+        });
+    </script>
+</body>
+</html>

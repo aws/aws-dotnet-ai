@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+    <IsPackable>true</IsPackable>
+    <PackageId>AWS.AgentCore.Testing</PackageId>
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <Version>0.0.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AWS.AgentCore.Testing.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.BedrockAgentCore" Version="4.0.23.3" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.40" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.8" />
+  </ItemGroup>
+
+  <!-- Embed wwwroot files as resources so they're self-contained in the DLL.
+       Works identically via project reference and NuGet. -->
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot/**/*" Exclude="wwwroot/**/*.gz" />
+  </ItemGroup>
+
+</Project>

@@ -5,7 +5,13 @@
       "Paths": [
         "src/AWS.AgentCore/AWS.AgentCore.csproj",
         "src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj"
-      ]
+      ],
+      "PrereleaseLabel": "preview"
+    },
+    {
+      "Name": "AWS.AgentCore.Testing",
+      "Path": "src/AWS.AgentCore.Testing/AWS.AgentCore.Testing.csproj",
+      "PrereleaseLabel": "preview"
     }
   ],
   "UseCommitsForChangelog": false,

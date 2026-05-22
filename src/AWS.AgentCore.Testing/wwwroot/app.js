@@ -1046,11 +1046,19 @@
     }
 
     function toggleSidebar() {
-        state.sidebarCollapsed = !state.sidebarCollapsed;
         const sidebar = $('#sidebar');
         const openBtn = $('#sidebar-open-btn');
-        if (sidebar) sidebar.classList.toggle('collapsed', state.sidebarCollapsed);
-        if (openBtn) openBtn.classList.toggle('hidden', !state.sidebarCollapsed);
+        const isNarrow = window.matchMedia('(max-width: 768px)').matches;
+
+        if (isNarrow) {
+            const isOpen = sidebar.classList.contains('force-open');
+            sidebar.classList.toggle('force-open', !isOpen);
+            if (openBtn) openBtn.classList.toggle('hidden', !isOpen);
+        } else {
+            state.sidebarCollapsed = !state.sidebarCollapsed;
+            if (sidebar) sidebar.classList.toggle('collapsed', state.sidebarCollapsed);
+            if (openBtn) openBtn.classList.toggle('hidden', !state.sidebarCollapsed);
+        }
     }
 
     function updateSendBtnState() {

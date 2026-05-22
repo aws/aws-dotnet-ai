@@ -7,7 +7,7 @@ namespace AWS.AgentCore.Testing.Services;
 /// An ILoggerProvider that forwards all log messages to an Aspire ResourceLoggerService ILogger.
 /// This bridges the embedded server's logging into the Aspire dashboard.
 /// </summary>
-internal sealed class AspireLoggerProvider(ILogger aspireLogger) : ILoggerProvider
+public sealed class AspireLoggerProvider(ILogger aspireLogger) : ILoggerProvider
 {
     public ILogger CreateLogger(string categoryName) => new ForwardingLogger(aspireLogger, categoryName);
 

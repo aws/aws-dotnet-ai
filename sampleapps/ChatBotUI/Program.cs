@@ -1,7 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-using Amazon;
 using Amazon.BedrockAgentCore;
 using ChatBotUI.Components;
 using ChatBotUI.Models;
@@ -10,47 +9,12 @@ using ChatBotUI.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure AgentCore settings from appsettings.json
-builder.Services.Configure<AgentCoreSettings>(settings =>
-{
-    builder.Configuration.GetSection("AgentCore").Bind(settings);
-
-    // When running locally via Aspire, use a placeholder ARN
-    var serviceEndpoint = builder.Configuration["AGENTCORE_SERVICE_ENDPOINT"];
-    if (!string.IsNullOrEmpty(serviceEndpoint))
-    {
-        if (string.IsNullOrEmpty(settings.RuntimeArn) || settings.RuntimeArn.StartsWith("<"))
-            settings.RuntimeArn = "local-agent";
-        if (string.IsNullOrEmpty(settings.StreamingRuntimeArn) || settings.StreamingRuntimeArn.StartsWith("<"))
-            settings.StreamingRuntimeArn = "local-agent";
-    }
-});
+builder.Services.Configure<AgentCoreSettings>(builder.Configuration.GetSection("AgentCore"));
 
 // Register the AWS SDK client.
-// When running under Aspire with .WithReference(agent), the runtime emulator endpoint
-// is injected as the AGENTCORE_SERVICE_ENDPOINT environment variable.
-builder.Services.AddSingleton<IAmazonBedrockAgentCore>(sp =>
-{
-    var config = sp.GetRequiredService<IConfiguration>();
-    var settings = config.GetSection("AgentCore").Get<AgentCoreSettings>()!;
-
-    var serviceEndpoint = config["AGENTCORE_SERVICE_ENDPOINT"];
-
-    if (!string.IsNullOrEmpty(serviceEndpoint))
-    {
-        // Aspire-injected — point the SDK at the local runtime emulator with anonymous credentials
-        return new AmazonBedrockAgentCoreClient(
-            new Amazon.Runtime.AnonymousAWSCredentials(),
-            new AmazonBedrockAgentCoreConfig
-            {
-                ServiceURL = serviceEndpoint,
-                AuthenticationRegion = settings.Region
-            });
-    }
-
-    // Standard production — use real AWS credentials and region
-    var region = RegionEndpoint.GetBySystemName(settings.Region);
-    return new AmazonBedrockAgentCoreClient(region);
-});
+// When AWS_ENDPOINT_URL_BEDROCK_AGENTCORE is set (by Aspire's WithReference), the SDK
+// automatically routes requests to the local runtime emulator — no manual config needed.
+builder.Services.TryAddAWSService<IAmazonBedrockAgentCore>();
 
 // Register services
 builder.Services.AddSingleton<AgentCoreService>();

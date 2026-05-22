@@ -19,6 +19,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\AWS.AgentCore.Testing\AWS.AgentCore.Testing.csproj" />
+        <ProjectReference Include="..\..\sampleapps\AspireAppHost\AspireAppHost.csproj" />
     </ItemGroup>
 
 </Project>

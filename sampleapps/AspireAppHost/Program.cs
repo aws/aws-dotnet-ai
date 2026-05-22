@@ -1,4 +1,4 @@
-using AWS.AgentCore.Testing;
+using AspireAppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 

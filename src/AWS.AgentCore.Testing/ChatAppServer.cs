@@ -18,7 +18,7 @@ namespace AWS.AgentCore.Testing;
 /// providing a web-based interface for interactive testing of AgentCore agents.
 /// Static assets are served from the <c>wwwroot</c> directory adjacent to the assembly.
 /// </summary>
-internal static class ChatAppServer
+public static class ChatAppServer
 {
     /// <summary>
     /// Creates and configures the Chat App web application.

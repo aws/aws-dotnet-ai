@@ -19,7 +19,7 @@ namespace AWS.AgentCore.Testing;
 /// <c>X-Amzn-Bedrock-AgentCore-Runtime-Request-Id</c> headers, and supports both
 /// standard JSON and SSE streaming response modes.
 /// </summary>
-internal static class RuntimeEmulatorServer
+public static class RuntimeEmulatorServer
 {
     /// <summary>
     /// Creates and configures the Runtime Emulator web application.
@@ -120,6 +120,12 @@ internal static class RuntimeEmulatorServer
 
         app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
+        app.MapGet("/", (HttpContext httpContext) =>
+        {
+            httpContext.Response.ContentType = "text/html; charset=utf-8";
+            return httpContext.Response.WriteAsync(InfoPageHtml);
+        });
+
         // Diagnostic fallback for unmatched routes
         app.MapFallback(async context =>
         {
@@ -132,4 +138,54 @@ internal static class RuntimeEmulatorServer
 
         return app;
     }
+
+    private const string InfoPageHtml = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>AWS Bedrock AgentCore — Runtime Emulator</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1a1a2e; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+                .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); max-width: 700px; width: 100%; padding: 2.5rem; }
+                h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+                .subtitle { color: #6c757d; margin-bottom: 1.5rem; line-height: 1.5; }
+                h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #495057; }
+                .code-block { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; font-family: 'SF Mono', Menlo, monospace; font-size: 0.82rem; line-height: 1.6; overflow-x: auto; margin-bottom: 1.5rem; }
+                .code-block .comment { color: #6c757d; }
+                .code-block .keyword { color: #0d6efd; }
+                .code-block .string { color: #198754; }
+                .note { background: #fff3cd; border-radius: 6px; padding: 0.75rem 1rem; font-size: 0.85rem; color: #664d03; line-height: 1.5; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>AWS Bedrock AgentCore — Runtime Emulator</h1>
+                <p class="subtitle">This local emulator stands in for the AWS Bedrock AgentCore Runtime service. Point your <code>AmazonBedrockAgentCoreClient</code> at this URL to invoke your agent locally without deploying to AWS.</p>
+                <h2>Usage</h2>
+                <div class="code-block">
+                    <span class="keyword">var</span> client = <span class="keyword">new</span> AmazonBedrockAgentCoreClient(<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">new</span> AnonymousAWSCredentials(),<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">new</span> AmazonBedrockAgentCoreConfig<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ServiceURL = <span class="string">"<span id="emulator-url"></span>"</span><br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;});<br/><br/>
+                    <span class="comment">// Invoke your agent the same way you would in production</span><br/>
+                    <span class="keyword">var</span> response = <span class="keyword">await</span> client.InvokeAgentRuntimeAsync(<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">new</span> InvokeAgentRuntimeRequest<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AgentRuntimeArn = <span class="string">"local-agent"</span>,<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Payload = <span class="string">"{ \"prompt\": \"Hello\" }"</span><br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;});
+                </div>
+                <div class="note">
+                    <strong>No AWS credentials required.</strong> The emulator accepts anonymous credentials and does not communicate with AWS. Your agent runs entirely on your local machine.
+                </div>
+            </div>
+            <script>document.getElementById('emulator-url').textContent = window.location.origin;</script>
+        </body>
+        </html>
+        """;
 }

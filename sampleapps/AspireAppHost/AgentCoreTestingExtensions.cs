@@ -1,12 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO: Move these Aspire hosting extensions to the Aspire.Hosting.AWS package.
-// The emulator servers (RuntimeEmulatorServer, ChatAppServer, MemoryEmulatorServer)
-// will remain in AWS.AgentCore.Testing. This file should become part of the
-// Aspire.Hosting.AWS package and call into AWS.AgentCore.Testing to create/start emulators.
+using AWS.AgentCore.Testing;
+using AWS.AgentCore.Testing.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
-namespace AWS.AgentCore.Testing;
+namespace AspireAppHost;
 
 /// <summary>
 /// Aspire hosting extension methods for adding AgentCore local testing components.
@@ -24,10 +25,14 @@ public static class AgentCoreTestingExtensions
     /// </summary>
     public static IResourceBuilder<ProjectResource> AddAgentCoreRuntime<TProject>(
         this IDistributedApplicationBuilder builder,
-        string? name = null)
+        string? name = null,
+        Action<AgentCoreTestingOptions>? configure = null)
         where TProject : IProjectMetadata, new()
     {
         ArgumentNullException.ThrowIfNull(builder);
+
+        var options = new AgentCoreTestingOptions();
+        configure?.Invoke(options);
 
         var projectName = name ?? typeof(TProject).Name
             .Replace("_", "-");
@@ -36,23 +41,21 @@ public static class AgentCoreTestingExtensions
             .WithHttpEndpoint(name: "http")
             .WithEnvironment("AWS_AGENTCORE_ASPIRE_MANAGED", "true");
 
-        // Customize the endpoint URL display and hide the raw localhost URL from summary
-        agentApp.WithUrlForEndpoint("http", url =>
-        {
-            url.DisplayText = "Agent";
-        });
-
-        // Suppress the default https endpoint URL that launch profiles may add
+        // Suppress all default endpoint URLs — we add our own in the desired order
         agentApp.WithUrls(context =>
         {
             context.Urls.RemoveAll(u =>
                 u.Endpoint is not null &&
-                u.DisplayText != "Agent" &&
-                u.DisplayText != "Chat");
+                u.DisplayText != "Chat" &&
+                u.DisplayText != "Runtime Emulator" &&
+                u.DisplayText != "Agent Instance");
         });
 
         // Store mutable annotation — ports are filled after emulators start
-        var annotation = new AgentCoreRuntimeAnnotation();
+        var annotation = new AgentCoreRuntimeAnnotation
+        {
+            IncludeEmulatorLogs = options.IncludeEmulatorLogs
+        };
         agentApp.Resource.Annotations.Add(annotation);
 
 
@@ -74,9 +77,12 @@ public static class AgentCoreTestingExtensions
                     agentEndpointUrl = endpointAnnotation.AllocatedEndpoint.UriString;
                 }
 
-                // All emulator logs go to the agent's resource log window in the Aspire Dashboard
-                var loggerProvider = new Services.AspireLoggerProvider(
-                    loggerService.GetLogger(agentApp.Resource));
+                ILoggerProvider? loggerProvider = null;
+                if (annotation.IncludeEmulatorLogs)
+                {
+                    loggerProvider = new AspireLoggerProvider(
+                        loggerService.GetLogger(agentApp.Resource));
+                }
 
                 // Start runtime emulator on port 0 (OS-assigned)
                 var runtimeApp = RuntimeEmulatorServer.Create(agentEndpointUrl, port: 0, loggerProvider: loggerProvider);
@@ -98,11 +104,21 @@ public static class AgentCoreTestingExtensions
                     annotation.MemoryPort = GetBoundPort(memoryApp);
                 }
 
-                // Add Chat URL now that port is known
+                // Add URLs now that ports are known (order: Chat, Runtime Emulator, Agent Instance)
                 agentApp.Resource.Annotations.Add(new ResourceUrlAnnotation
                 {
                     Url = $"http://localhost:{annotation.ChatAppPort}",
                     DisplayText = "Chat"
+                });
+                agentApp.Resource.Annotations.Add(new ResourceUrlAnnotation
+                {
+                    Url = $"http://localhost:{annotation.RuntimePort}",
+                    DisplayText = "Runtime Emulator"
+                });
+                agentApp.Resource.Annotations.Add(new ResourceUrlAnnotation
+                {
+                    Url = agentEndpointUrl,
+                    DisplayText = "Agent Instance"
                 });
 
                 // Signal that ports are resolved
@@ -114,8 +130,9 @@ public static class AgentCoreTestingExtensions
 
     /// <summary>
     /// Wires a project to an AgentCore agent by injecting the runtime emulator endpoint
-    /// as the <c>AGENTCORE_SERVICE_ENDPOINT</c> environment variable.
-    /// The consuming project can use this as the AWS SDK's ServiceURL override.
+    /// as the <c>AWS_ENDPOINT_URL_BEDROCK_AGENTCORE</c> environment variable.
+    /// This is the standard AWS SDK service-specific endpoint override — the SDK picks it up
+    /// automatically without additional configuration in the consuming project.
     /// </summary>
     public static IResourceBuilder<ProjectResource> WithReference(
         this IResourceBuilder<ProjectResource> project,
@@ -132,11 +149,27 @@ public static class AgentCoreTestingExtensions
                 "Use AddAgentCoreRuntime<T>() to create it.");
         }
 
+        // Only one agent reference per project is supported — the SDK endpoint override
+        // (AWS_ENDPOINT_URL_BEDROCK_AGENTCORE) is a single value and cannot point to multiple runtimes.
+        var hasExistingReference = project.Resource.Annotations
+            .OfType<AgentCoreReferenceAnnotation>()
+            .Any();
+
+        if (hasExistingReference)
+        {
+            throw new InvalidOperationException(
+                $"Project '{project.Resource.Name}' already has a WithReference to an AgentCore agent. " +
+                "Only one AgentCore runtime reference is supported per project because the " +
+                "AWS_ENDPOINT_URL_BEDROCK_AGENTCORE environment variable can only point to a single endpoint.");
+        }
+
+        project.Resource.Annotations.Add(new AgentCoreReferenceAnnotation());
+
         // Deferred: waits for emulators to start before resolving the port
         project.WithEnvironment(async context =>
         {
             await annotation.EmulatorStarted.Task;
-            context.EnvironmentVariables["AGENTCORE_SERVICE_ENDPOINT"] =
+            context.EnvironmentVariables["AWS_ENDPOINT_URL_BEDROCK_AGENTCORE"] =
                 $"http://localhost:{annotation.RuntimePort}";
         });
 
@@ -202,36 +235,13 @@ public static class AgentCoreTestingExtensions
 /// </summary>
 internal class AgentCoreRuntimeAnnotation : IResourceAnnotation
 {
-    /// <summary>
-    /// The actual TCP port the Runtime Emulator bound to (0 until started).
-    /// </summary>
     public int RuntimePort { get; set; }
-
-    /// <summary>
-    /// The actual TCP port the embedded Chat App bound to (0 until started).
-    /// </summary>
     public int ChatAppPort { get; set; }
-
-    /// <summary>
-    /// The actual TCP port the Memory Emulator bound to (0 until started).
-    /// </summary>
     public int MemoryPort { get; set; }
-
-    /// <summary>
-    /// Whether the Chat App should use SSE streaming mode.
-    /// Set by <see cref="AgentCoreTestingExtensions.WithStreaming"/>.
-    /// </summary>
     public bool IsStreaming { get; set; }
-
-    /// <summary>
-    /// Whether a memory emulator should be started.
-    /// Set by <see cref="AgentCoreTestingExtensions.WithInMemory"/>.
-    /// </summary>
     public bool HasMemory { get; set; }
-
-    /// <summary>
-    /// Signals that all emulators are started and ports are known.
-    /// Awaited by deferred environment variable callbacks.
-    /// </summary>
+    public bool IncludeEmulatorLogs { get; set; }
     public TaskCompletionSource EmulatorStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
+
+internal class AgentCoreReferenceAnnotation : IResourceAnnotation;

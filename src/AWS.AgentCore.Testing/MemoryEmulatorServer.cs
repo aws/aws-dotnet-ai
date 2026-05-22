@@ -15,7 +15,7 @@ namespace AWS.AgentCore.Testing;
 /// without connecting to AWS. The API surface matches the wire format of the
 /// <c>IAmazonBedrockAgentCore</c> SDK client for ListEvents and CreateEvent operations.
 /// </summary>
-internal static class MemoryEmulatorServer
+public static class MemoryEmulatorServer
 {
     /// <summary>
     /// Creates and configures the Memory Emulator web application.

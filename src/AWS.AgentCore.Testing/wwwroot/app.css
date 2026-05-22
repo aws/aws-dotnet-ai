@@ -353,6 +353,19 @@ button {
   background: var(--bg-primary);
   z-index: 20;
   backdrop-filter: blur(12px);
+  position: relative;
+}
+
+.chat-header::after {
+  content: '';
+  position: absolute;
+  bottom: -24px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(to bottom, var(--bg-primary), transparent);
+  pointer-events: none;
+  z-index: 19;
 }
 
 .chat-header-inner {
@@ -1525,6 +1538,27 @@ button {
     z-index: 50;
     height: 100%;
     box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar:not(.force-open) {
+    width: 0;
+    min-width: 0;
+    border-right-color: transparent;
+    opacity: 0;
+    transform: translateX(-8px);
+    pointer-events: none;
+  }
+
+  .sidebar.force-open {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .sidebar-open-btn {
+    display: flex !important;
   }
 
   .quick-actions {

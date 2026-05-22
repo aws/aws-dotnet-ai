@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <PackageReference Include="AWSSDK.BedrockAgentCore" Version="4.0.18" />
+        <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.4" />
         <PackageReference Include="Markdig" Version="1.1.2" />
     </ItemGroup>
 

@@ -174,6 +174,8 @@ public static class AgentCoreEndpointExtensions
                 AgentCoreJsonContext.Default.PingResponse));
         }
 
+        MapInfoEndpoint(app);
+
         return app;
     }
 
@@ -217,6 +219,7 @@ public static class AgentCoreEndpointExtensions
         });
 
         MapPingEndpoint(app, pingHandler);
+        MapInfoEndpoint(app);
 
         return app;
     }
@@ -278,6 +281,7 @@ public static class AgentCoreEndpointExtensions
         });
 
         MapPingEndpoint(app, pingHandler);
+        MapInfoEndpoint(app);
 
         return app;
     }
@@ -320,6 +324,7 @@ public static class AgentCoreEndpointExtensions
         });
 
         MapPingEndpoint(app, pingHandler);
+        MapInfoEndpoint(app);
 
         return app;
     }
@@ -379,9 +384,72 @@ public static class AgentCoreEndpointExtensions
         });
 
         MapPingEndpoint(app, pingHandler);
+        MapInfoEndpoint(app);
 
         return app;
     }
+
+    private static void MapInfoEndpoint(IEndpointRouteBuilder app)
+    {
+        app.MapGet("/", (HttpContext httpContext) =>
+        {
+            httpContext.Response.ContentType = "text/html; charset=utf-8";
+            return httpContext.Response.WriteAsync(InfoPageHtml);
+        });
+    }
+
+    private const string InfoPageHtml = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>AWS Bedrock AgentCore — Agent Instance</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1a1a2e; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+                .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); max-width: 640px; width: 100%; padding: 2.5rem; }
+                h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+                .subtitle { color: #6c757d; margin-bottom: 1.5rem; }
+                h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #495057; }
+                .endpoints { list-style: none; margin-bottom: 1.5rem; }
+                .endpoints li { padding: 0.6rem 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: baseline; gap: 0.75rem; }
+                .endpoints li:last-child { border-bottom: none; }
+                .method { font-weight: 600; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; text-transform: uppercase; }
+                .method-get { background: #d4edda; color: #155724; }
+                .method-post { background: #cce5ff; color: #004085; }
+                code { font-family: 'SF Mono', Menlo, monospace; font-size: 0.9rem; }
+                .desc { color: #6c757d; font-size: 0.85rem; margin-left: 0.5rem; }
+                .footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #f0f0f0; font-size: 0.8rem; color: #adb5bd; }
+                a { color: #0d6efd; text-decoration: none; }
+                a:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>AWS Bedrock AgentCore — Agent Instance</h1>
+                <p class="subtitle">This is a running AgentCore agent. It responds to the AgentCore Runtime service contract.</p>
+                <h2>Available Endpoints</h2>
+                <ul class="endpoints">
+                    <li>
+                        <span class="method method-post">POST</span>
+                        <code>/invocations</code>
+                        <span class="desc">Invoke the agent with a JSON payload</span>
+                    </li>
+                    <li>
+                        <span class="method method-get">GET</span>
+                        <code>/ping</code>
+                        <span class="desc">Health check — returns status and last update time</span>
+                    </li>
+                </ul>
+                <h2>Try It</h2>
+                <p style="font-size:0.9rem; color:#495057; margin-bottom:0.5rem;">Check the agent's health:</p>
+                <code style="display:block; background:#f8f9fa; padding:0.75rem; border-radius:6px; font-size:0.85rem;">curl <span id="ping-url"></span>/ping</code>
+            </div>
+            <script>document.getElementById('ping-url').textContent = window.location.origin;</script>
+        </body>
+        </html>
+        """;
 
     /// <summary>
     /// Registers the <c>GET /ping</c> endpoint with either a custom or default handler.

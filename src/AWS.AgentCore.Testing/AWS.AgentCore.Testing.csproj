@@ -9,6 +9,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>AWS.AgentCore.Testing</PackageId>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <Version>0.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,7 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.3.3" />
     <PackageReference Include="AWSSDK.BedrockAgentCore" Version="4.0.23.3" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.40" />
     <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.8" />

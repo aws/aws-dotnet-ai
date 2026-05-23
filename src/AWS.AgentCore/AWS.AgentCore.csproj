@@ -18,6 +18,25 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\AWS.AgentCore.SourceGenerator\AWS.AgentCore.SourceGenerator.csproj"
+                          PrivateAssets="all"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="Analyzer"
+                          SetTargetFramework="TargetFramework=netstandard2.0" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_PackSourceGenerator</TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+
+    <Target Name="_PackSourceGenerator">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="$(MSBuildThisFileDirectory)..\AWS.AgentCore.SourceGenerator\bin\$(Configuration)\netstandard2.0\AWS.AgentCore.SourceGenerator.dll"
+                                    PackagePath="analyzers/dotnet/cs" />
+        </ItemGroup>
+    </Target>
+
+    <ItemGroup>
         <InternalsVisibleTo Include="AWS.AgentCore.UnitTests" />
     </ItemGroup>
 

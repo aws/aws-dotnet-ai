@@ -6,7 +6,7 @@ namespace AWS.AgentCore;
 /// <summary>
 /// Provides typed access to the AgentCore Runtime HTTP headers injected into each
 /// <c>/invocations</c> request. When included as a parameter in a
-/// <see cref="Extensions.AgentCoreEndpointExtensions.MapAgentCore{TRequest}"/> handler,
+/// <c>MapAgentCore</c> handler,
 /// it is automatically populated from the incoming request headers.
 /// </summary>
 public class AgentCoreRuntimeContext

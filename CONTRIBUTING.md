@@ -75,6 +75,7 @@ Note: Make sure to run the command from the root of the repository.
 You can update the command to specify which project you are updating.
 The available projects are:
 * AWS.AgentCore
+* AWS.AgentCore.Testing
 
 The possible increment types are:
 * Patch

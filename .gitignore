@@ -488,3 +488,7 @@ $RECYCLE.BIN/
 
 # Visual Studio
 *.Development.json
+
+# DocFx
+docs/_site/
+docs/api/

@@ -11,6 +11,9 @@ using Microsoft.Extensions.Options;
 
 namespace AWS.AgentCore.Testing.Services;
 
+/// <summary>
+/// Service that invokes the AgentCore Runtime using the AWS SDK.
+/// </summary>
 public class AgentCoreService(
     IAmazonBedrockAgentCore client,
     IOptions<AgentCoreSettings> settings,

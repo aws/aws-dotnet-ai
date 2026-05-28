@@ -21,8 +21,11 @@ public static class MemoryEmulatorServer
     /// Creates and configures the Memory Emulator web application.
     /// </summary>
     /// <param name="port">
-    /// The TCP port to listen on. Defaults to 0 (OS-assigned), but typically a pre-allocated port
-    /// from <see cref="Services.PortAllocator"/>.
+    /// The TCP port to listen on. Defaults to 0 (OS-assigned); the actual bound port
+    /// can be read from <see cref="WebApplication.Urls"/> after startup.
+    /// </param>
+    /// <param name="loggerProvider">
+    /// Optional logger provider to redirect logs to an external sink.
     /// </param>
     /// <returns>A configured but not yet started <see cref="WebApplication"/>.</returns>
     public static WebApplication Create(int port = 0, ILoggerProvider? loggerProvider = null)

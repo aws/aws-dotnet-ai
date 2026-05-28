@@ -12,7 +12,7 @@ namespace AWS.AgentCore;
 /// Registered automatically by <see cref="Extensions.AgentCoreBuilderExtensions.AddAgentCore"/>.
 /// Downstream middleware and context providers can access the runtime context (session ID,
 /// request ID, access tokens, custom headers) via the session's state bag using <see cref="ContextKey"/>,
-/// or via the ambient <see cref="Current"/> property which is set automatically by the endpoint handlers.
+/// or via the ambient <see cref="CurrentContext"/> property which is set automatically by the endpoint handlers.
 /// </para>
 /// </summary>
 public class AgentCoreRuntimeContextProvider : AIContextProvider

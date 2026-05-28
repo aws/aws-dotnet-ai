@@ -61,7 +61,7 @@ public static class AgentCoreBuilderExtensions
     ///   </item>
     /// </list>
     /// <para>
-    /// After calling this method, use <see cref="AgentCoreEndpointExtensions.MapAgentCore{TRequest}"/>
+    /// After calling this method, use <c>MapAgentCore</c>
     /// to map the <c>/invocations</c> and <c>/ping</c> endpoints that the AgentCore Runtime expects.
     /// </para>
     /// <para>

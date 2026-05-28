@@ -22,6 +22,7 @@ public class AgentCoreStartupGenerator : IIncrementalGenerator
     private const string HandlerAttributeName = "AWS.AgentCore.AgentCoreHandlerAttribute";
     private const string PingAttributeName = "AWS.AgentCore.AgentCorePingAttribute";
 
+    /// <inheritdoc/>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Find all classes with any of our attributes

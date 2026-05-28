@@ -29,8 +29,8 @@ public static class RuntimeEmulatorServer
     /// The emulator forwards invocation requests to <c>{agentEndpointUrl}/invocations</c>.
     /// </param>
     /// <param name="port">
-    /// The TCP port to listen on. Defaults to 0 (OS-assigned), but typically a pre-allocated port
-    /// from <see cref="Services.PortAllocator"/>.
+    /// The TCP port to listen on. Defaults to 0 (OS-assigned); the actual bound port
+    /// can be read from <see cref="WebApplication.Urls"/> after startup.
     /// </param>
     /// <param name="loggerProvider">
     /// Optional logger provider to redirect all ASP.NET Core logs (requests, errors, etc.)

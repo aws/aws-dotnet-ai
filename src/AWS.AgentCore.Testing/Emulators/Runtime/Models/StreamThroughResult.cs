@@ -22,6 +22,7 @@ public sealed class StreamThroughResult : IAsyncDisposable
 
     private readonly HttpResponseMessage _response;
 
+    /// <inheritdoc cref="StreamThroughResult"/>
     public StreamThroughResult(string sessionId, HttpResponseMessage response, Stream responseStream)
     {
         SessionId = sessionId;
@@ -31,6 +32,7 @@ public sealed class StreamThroughResult : IAsyncDisposable
         _response = response;
     }
 
+    /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         await ResponseStream.DisposeAsync();

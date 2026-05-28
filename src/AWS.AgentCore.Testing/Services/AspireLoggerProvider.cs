@@ -9,8 +9,10 @@ namespace AWS.AgentCore.Testing.Services;
 /// </summary>
 public sealed class AspireLoggerProvider(ILogger aspireLogger) : ILoggerProvider
 {
+    /// <inheritdoc/>
     public ILogger CreateLogger(string categoryName) => new ForwardingLogger(aspireLogger, categoryName);
 
+    /// <inheritdoc/>
     public void Dispose() { }
 
     private sealed class ForwardingLogger(ILogger target, string category) : ILogger

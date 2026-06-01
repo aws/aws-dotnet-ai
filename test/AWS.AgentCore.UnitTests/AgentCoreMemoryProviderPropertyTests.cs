@@ -6,6 +6,8 @@
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockAgentCore.Model;
 using AWS.AgentCore;
+using AWS.AgentCore.Internal;
+using Microsoft.Extensions.DependencyInjection;
 using FsCheck;
 using FsCheck.Xunit;
 using Microsoft.Agents.AI;
@@ -205,7 +207,7 @@ public class AgentCoreMemoryProviderPropertyTests
         mockClient.Setup(c => c.Paginators).Returns(mockPaginatorFactory.Object);
 
         var options = new AgentCoreOptions { MemoryId = "test-memory" };
-        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, mockClient.Object);
+        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, new AWSClientProvider(new ServiceCollection().AddSingleton(mockClient.Object).BuildServiceProvider()));
 
         var session = CreateSessionWithRuntimeContext("test-session");
         var context = CreateInvokingContext(provider, session);
@@ -241,7 +243,7 @@ public class AgentCoreMemoryProviderPropertyTests
         mockClient.Setup(c => c.Paginators).Returns(mockPaginatorFactory.Object);
 
         var options = new AgentCoreOptions { MemoryId = "test-memory" };
-        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, mockClient.Object);
+        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, new AWSClientProvider(new ServiceCollection().AddSingleton(mockClient.Object).BuildServiceProvider()));
 
         var session = CreateSessionWithRuntimeContext("test-session");
         var context = CreateInvokingContext(provider, session);
@@ -263,7 +265,7 @@ public class AgentCoreMemoryProviderPropertyTests
             .ThrowsAsync(new InvalidOperationException(exceptionMessage.Get));
 
         var options = new AgentCoreOptions { MemoryId = "test-memory" };
-        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, mockClient.Object);
+        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, new AWSClientProvider(new ServiceCollection().AddSingleton(mockClient.Object).BuildServiceProvider()));
 
         var session = CreateSessionWithRuntimeContext("test-session");
         var context = CreateInvokedContext(
@@ -298,7 +300,7 @@ public class AgentCoreMemoryProviderPropertyTests
         mockClient.Setup(c => c.Paginators).Returns(mockPaginatorFactory.Object);
 
         var options = new AgentCoreOptions { MemoryId = "test-memory" };
-        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, mockClient.Object);
+        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, new AWSClientProvider(new ServiceCollection().AddSingleton(mockClient.Object).BuildServiceProvider()));
 
         var session = CreateSessionWithRuntimeContext("test-session");
         var context = CreateInvokingContext(provider, session);

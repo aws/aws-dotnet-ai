@@ -1,10 +1,13 @@
-# Amazon Bedrock AgentCore for .NET
+# AWS AI Integrations for .NET
 
-[![nuget](https://img.shields.io/nuget/v/AWS.AgentCore.svg)](https://www.nuget.org/packages/AWS.AgentCore/)
+[![nuget](https://img.shields.io/nuget/v/AWS.AgentCore.Hosting.svg) ![downloads](https://img.shields.io/nuget/dt/AWS.AgentCore.Hosting.svg)](https://www.nuget.org/packages/AWS.AgentCore.Hosting/)
+[![build status](https://img.shields.io/github/actions/workflow/status/aws/aws-dotnet-ai/aws-ci.yml?branch=dev)](https://github.com/aws/aws-dotnet-ai/actions/workflows/aws-ci.yml)
 
-**Amazon Bedrock AgentCore for .NET** is a .NET library for building AI agents that deploy to [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/). It provides the runtime integration layer between your .NET agent code and the AgentCore service — handling the HTTP contract, streaming, session management, memory, and observability — so you can focus on your agent's logic.
+> **Developer Preview** — This library is in early preview and under active development. APIs may change between releases. Not recommended for production use.
 
-Built on top of [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/), Amazon Bedrock AgentCore for .NET gives you access to the full .NET AI ecosystem (tool calling, middleware, multi-agent workflows, MCP) while providing a zero-friction path to production on AWS.
+**AWS AI Integrations for .NET** is a .NET library for building AI agents that deploy to [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/). It provides the runtime integration layer between your .NET agent code and the AgentCore service — handling the HTTP contract, streaming, session management, memory, and observability — so you can focus on your agent's logic.
+
+Built on top of [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/), AWS AI Integrations for .NET give you access to the full .NET AI ecosystem (tool calling, middleware, multi-agent workflows, MCP) while providing a zero-friction path to production on AWS.
 
 ## Key Features
 
@@ -22,7 +25,7 @@ Built on top of [Microsoft Agent Framework](https://learn.microsoft.com/en-us/ag
 Add the NuGet package to your project:
 
 ```
-dotnet add package AWS.AgentCore
+dotnet add package AWS.AgentCore.Hosting
 ```
 
 ### Option 1: Source Generator

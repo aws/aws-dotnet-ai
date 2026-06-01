@@ -21,9 +21,13 @@ namespace AWS.AgentCore;
 internal sealed class AgentCoreMemoryProvider(
     AgentCoreOptions options,
     ILogger<AgentCoreMemoryProvider> logger,
-    IAmazonBedrockAgentCore? memoryClient = null)
+    Internal.AWSClientProvider awsClientProvider)
     : ChatHistoryProvider
 {
+    private IAmazonBedrockAgentCore? _memoryClient;
+    private IAmazonBedrockAgentCore MemoryClient =>
+        _memoryClient ??= awsClientProvider.GetServiceClient<IAmazonBedrockAgentCore>();
+
     /// <inheritdoc/>
     public override IReadOnlyList<string> StateKeys => ["AgentCore.Memory"];
 
@@ -67,11 +71,6 @@ internal sealed class AgentCoreMemoryProvider(
         if (memoryId is null)
             return [];
 
-        if (memoryClient is null)
-        {
-            logger.LogError("MemoryId is configured but IAmazonBedrockAgentCore is not registered in DI. Memory operations will be skipped.");
-            return [];
-        }
 
         var sessionId = GetSessionId(context.Session);
         if (sessionId is null)
@@ -100,8 +99,6 @@ internal sealed class AgentCoreMemoryProvider(
         if (memoryId is null)
             return;
 
-        if (memoryClient is null)
-            return;
 
         var sessionId = GetSessionId(context.Session);
         if (sessionId is null)
@@ -125,8 +122,6 @@ internal sealed class AgentCoreMemoryProvider(
     private async Task<IEnumerable<ChatMessage>> LoadHistoryAsync(
         string memoryId, string sessionId, CancellationToken cancellationToken)
     {
-        if (memoryClient is null)
-            return [];
 
         var messages = new List<ChatMessage>();
 
@@ -141,7 +136,7 @@ internal sealed class AgentCoreMemoryProvider(
 
         try
         {
-            await foreach (var evt in memoryClient.Paginators.ListEvents(request).Events.WithCancellation(cancellationToken))
+            await foreach (var evt in MemoryClient.Paginators.ListEvents(request).Events.WithCancellation(cancellationToken))
             {
                 if (TryConvertEventToChatMessage(evt, out var chatMessage))
                 {
@@ -191,10 +186,8 @@ internal sealed class AgentCoreMemoryProvider(
         string memoryId, string sessionId, Role role, string text,
         CancellationToken cancellationToken)
     {
-        if (memoryClient is null)
-            return;
 
-        await memoryClient.CreateEventAsync(new CreateEventRequest
+        await MemoryClient.CreateEventAsync(new CreateEventRequest
         {
             MemoryId = memoryId,
             SessionId = sessionId,

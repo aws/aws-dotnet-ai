@@ -1,7 +1,7 @@
 {
   "Projects": [
     {
-      "Name": "AWS.AgentCore",
+      "Name": "AWS.AgentCore.Hosting",
       "Paths": [
         "src/AWS.AgentCore/AWS.AgentCore.csproj",
         "src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj"

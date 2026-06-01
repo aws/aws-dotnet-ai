@@ -3,6 +3,7 @@
 
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockRuntime;
+using AWS.AgentCore.Internal;
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -142,6 +143,9 @@ public static class AgentCoreBuilderExtensions
         {
             builder.Services.TryAddAWSService<IAmazonBedrockAgentCore>();
         }
+
+        // Register the AWS client provider
+        builder.Services.AddSingleton<AWSClientProvider>();
 
         // Register AgentCoreMemoryProvider
         builder.Services.AddSingleton<AgentCoreMemoryProvider>();

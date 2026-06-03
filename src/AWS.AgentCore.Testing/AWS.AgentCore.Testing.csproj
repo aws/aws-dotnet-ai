@@ -10,7 +10,7 @@
     <PackageId>AWS.AgentCore.Testing</PackageId>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <Version>0.0.1</Version>
-    <Product>Amazon Bedrock AgentCore for .NET - Testing Framework</Product>
+    <Product>AWS AI Integrations for .NET - Testing Framework</Product>
     <Authors>Amazon Web Services</Authors>
     <Company>Amazon Web Services</Company>
     <Description>Test your agents locally with support for local AgentCore Runtime and Memory emulation</Description>

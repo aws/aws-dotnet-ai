@@ -27,7 +27,7 @@
     "template": ["default", "modern", "template"],
     "globalMetadata": {
       "_appName": "",
-      "_appTitle": "Amazon Bedrock AgentCore for .NET",
+      "_appTitle": "AWS AI Integrations for .NET",
       "_appLogoPath": "assets/images/aws-logo.svg",
       "_appFaviconPath": "assets/images/favicon.ico",
       "_enableSearch": true,

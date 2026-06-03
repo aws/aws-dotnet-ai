@@ -8,10 +8,10 @@
         <Version>0.0.1</Version>
         <IsPackable>true</IsPackable>
         <PackageId>AWS.AgentCore.Hosting</PackageId>
-        <Product>Amazon Bedrock AgentCore for .NET</Product>
+        <Product>AWS AI Integrations for .NET</Product>
         <Authors>Amazon Web Services</Authors>
         <Company>Amazon Web Services</Company>
-        <Description>Amazon Bedrock AgentCore for .NET is a .NET library for building AI agents that deploy to Amazon Bedrock AgentCore</Description>
+        <Description>AWS AI Integrations for .NET is a .NET library for building AI agents that deploy to Amazon Bedrock AgentCore</Description>
         <PackageProjectUrl>https://github.com/aws/aws-dotnet-ai</PackageProjectUrl>
         <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
         <PackageIcon>icon.png</PackageIcon>
@@ -49,6 +49,18 @@
     <PropertyGroup>
         <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_PackSourceGenerator</TargetsForTfmSpecificContentInPackage>
     </PropertyGroup>
+
+    <Target Name="_GenerateAssemblyVersionConstant" BeforeTargets="CoreCompile">
+        <PropertyGroup>
+            <_AgentCoreVersion>$(Version)</_AgentCoreVersion>
+        </PropertyGroup>
+        <WriteLinesToFile File="$(IntermediateOutputPath)AssemblyVersion.g.cs"
+                         Lines="namespace AWS.AgentCore.Internal { internal static partial class UserAgentTelemetry { internal const string AssemblyVersion = &quot;$(_AgentCoreVersion)&quot;%3B } }"
+                         Overwrite="true" />
+        <ItemGroup>
+            <Compile Include="$(IntermediateOutputPath)AssemblyVersion.g.cs" />
+        </ItemGroup>
+    </Target>
 
     <Target Name="_PackSourceGenerator">
         <ItemGroup>

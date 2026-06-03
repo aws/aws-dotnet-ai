@@ -127,7 +127,7 @@ internal sealed class AgentCoreMemoryProvider(
     {
         if (memoryClient is null)
             return [];
-
+        
         var messages = new List<ChatMessage>();
 
         var request = new ListEventsRequest

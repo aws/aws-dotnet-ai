@@ -8,36 +8,62 @@ namespace AWS.AgentCore.Internal;
 
 /// <summary>
 /// Appends a custom user-agent component to all outgoing AWS SDK requests
-/// made through AgentCore-registered service clients. This enables tracking
-/// of library adoption and feature usage via AWS service-side telemetry.
+/// made by any service client in the process. Uses the global
+/// <see cref="RuntimePipelineCustomizerRegistry"/> so it applies to all clients —
+/// including those registered by the user — without requiring per-client instrumentation.
 /// </summary>
 internal static partial class UserAgentTelemetry
 {
     internal static readonly string UserAgentString =
         $"lib/aws-dotnet-ai#{AssemblyVersion}";
 
-    private static readonly HashSet<int> _registeredClients = new();
+    private static volatile bool _initialized;
 
     /// <summary>
-    /// Registers the user-agent handler on a specific client instance.
-    /// Safe to call multiple times for the same client — only attaches once.
+    /// Registers the user-agent pipeline customizer globally. All AWS SDK clients
+    /// created after this call will include the AgentCore user-agent component.
+    /// Safe to call multiple times — only registers once.
     /// </summary>
-    internal static void RegisterWith(AmazonServiceClient client)
+    internal static void Initialize()
     {
-        var id = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(client);
-        if (!_registeredClients.Add(id))
-            return;
+        if (_initialized) return;
+        _initialized = true;
 
-        client.BeforeRequestEvent += BeforeRequestHandler;
+        RuntimePipelineCustomizerRegistry.Instance.Register(new UserAgentPipelineCustomizer());
     }
 
-    private static void BeforeRequestHandler(object sender, RequestEventArgs e)
+    private sealed class UserAgentPipelineCustomizer : IRuntimePipelineCustomizer
     {
-        if (e is WebServiceRequestEventArgs { Request: IAmazonWebServiceRequest internalRequest })
+        public string UniqueName => "AWSAgentCoreUserAgent";
+
+        public void Customize(Type serviceClientType, RuntimePipeline pipeline)
         {
-            if (!internalRequest.UserAgentDetails.GetCustomUserAgentComponents().Contains(UserAgentString))
+            pipeline.AddHandlerAfter<Marshaller>(new UserAgentHandler());
+        }
+    }
+
+    private sealed class UserAgentHandler : PipelineHandler
+    {
+        public override void InvokeSync(IExecutionContext executionContext)
+        {
+            AddUserAgent(executionContext);
+            base.InvokeSync(executionContext);
+        }
+
+        public override async Task<T> InvokeAsync<T>(IExecutionContext executionContext)
+        {
+            AddUserAgent(executionContext);
+            return await base.InvokeAsync<T>(executionContext);
+        }
+
+        private static void AddUserAgent(IExecutionContext executionContext)
+        {
+            if (executionContext.RequestContext.OriginalRequest is IAmazonWebServiceRequest request)
             {
-                internalRequest.UserAgentDetails.AddUserAgentComponent(UserAgentString);
+                if (!request.UserAgentDetails.GetCustomUserAgentComponents().Contains(UserAgentString))
+                {
+                    request.UserAgentDetails.AddUserAgentComponent(UserAgentString);
+                }
             }
         }
     }

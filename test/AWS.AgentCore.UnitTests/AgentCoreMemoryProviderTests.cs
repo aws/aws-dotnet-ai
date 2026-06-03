@@ -21,16 +21,10 @@ public class AgentCoreMemoryProviderTests
         IAmazonBedrockAgentCore? memoryClient = null,
         ILogger<AgentCoreMemoryProvider>? logger = null)
     {
-        var services = new ServiceCollection();
-        if (memoryClient != null)
-            services.AddSingleton(memoryClient);
-        var sp = services.BuildServiceProvider();
-        var clientProvider = new AWS.AgentCore.Internal.AWSClientProvider(sp);
-
         return new AgentCoreMemoryProvider(
             options ?? new AgentCoreOptions(),
             logger ?? NullLogger<AgentCoreMemoryProvider>.Instance,
-            clientProvider);
+            memoryClient);
     }
 
     // ──────────────────────────────────────────────────────────────────

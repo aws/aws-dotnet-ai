@@ -93,6 +93,10 @@ public static class AgentCoreBuilderExtensions
 
         builder.Services.AddSingleton(options);
 
+        // Register user-agent telemetry globally — applies to ALL AWS SDK clients in the process,
+        // including those the user registers independently.
+        UserAgentTelemetry.Initialize();
+
         // Only set the port explicitly if ASPNETCORE_URLS is not already configured
         // (e.g., by Aspire or another orchestrator) AND we're not running under Aspire's
         // managed mode. In production on AgentCore Runtime, neither will be set, so we
@@ -144,8 +148,6 @@ public static class AgentCoreBuilderExtensions
             builder.Services.TryAddAWSService<IAmazonBedrockAgentCore>();
         }
 
-        // Register the AWS client provider
-        builder.Services.AddSingleton<AWSClientProvider>();
 
         // Register AgentCoreMemoryProvider
         builder.Services.AddSingleton<AgentCoreMemoryProvider>();

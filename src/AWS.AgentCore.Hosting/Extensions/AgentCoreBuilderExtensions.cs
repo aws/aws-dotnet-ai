@@ -3,9 +3,9 @@
 
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockRuntime;
+using AWS.AgentCore.Hosting;
 using AWS.AgentCore.Hosting.Internal;
 using Microsoft.Agents.AI;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,7 +13,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace AWS.AgentCore.Hosting.Extensions;
+namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
 /// Extension methods for configuring AgentCore services on <see cref="WebApplicationBuilder"/>.
@@ -113,7 +113,7 @@ public static class AgentCoreBuilderExtensions
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS"))
             && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.AspireManagedEnvironmentVariable)))
         {
-            logger.LogDebug("Configuring listen URL: http://0.0.0.0:{Port}", options.Port);
+            logger.LogDebug("Configuring default listen port");
             builder.WebHost.UseUrls($"http://0.0.0.0:{options.Port}");
         }
         else
@@ -129,7 +129,7 @@ public static class AgentCoreBuilderExtensions
         }
         else if (!string.IsNullOrWhiteSpace(options.ModelId))
         {
-            logger.LogDebug("IChatClient: using Bedrock model {ModelId}", options.ModelId);
+            logger.LogDebug("IChatClient: using Bedrock model via ModelId option");
             builder.Services.TryAddAWSService<IAmazonBedrockRuntime>();
             builder.Services.TryAddSingleton<IChatClient>(sp =>
             {
@@ -151,7 +151,7 @@ public static class AgentCoreBuilderExtensions
         var serviceEndpoint = Environment.GetEnvironmentVariable(Constants.ServiceEndpointEnvironmentVariable);
         if (!string.IsNullOrEmpty(serviceEndpoint))
         {
-            logger.LogDebug("AgentCore SDK client: routing to local endpoint {ServiceEndpoint}", serviceEndpoint);
+            logger.LogDebug("AgentCore SDK client: routing to local endpoint via {EnvVar} environment variable", Constants.ServiceEndpointEnvironmentVariable);
             builder.Services.TryAddSingleton<IAmazonBedrockAgentCore>(_ =>
                 new AmazonBedrockAgentCoreClient(
                     new Amazon.Runtime.AnonymousAWSCredentials(),

@@ -35,7 +35,7 @@ internal static class GeneratorTestHelper
         // Add our attribute types from the runtime library
         // We create stub types since we can't reference the full ASP.NET assembly in a unit test
         var attributeStubs = CSharpSyntaxTree.ParseText(@"
-namespace AWS.AgentCore
+namespace AWS.AgentCore.Hosting
 {
     [System.AttributeUsage(System.AttributeTargets.Class)]
     public class AgentCoreStartupAttribute : System.Attribute { }

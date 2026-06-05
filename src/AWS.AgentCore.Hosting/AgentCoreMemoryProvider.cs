@@ -83,7 +83,7 @@ internal sealed class AgentCoreMemoryProvider(
             return [];
         }
 
-        logger.LogDebug("Loading conversation history — MemoryId={MemoryId}, SessionId={SessionId}", memoryId, sessionId);
+        logger.LogDebug("Loading conversation history for session");
 
         try
         {

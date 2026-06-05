@@ -36,7 +36,6 @@ Define a startup class and a handler — the source generator produces the `Prog
 
 ```csharp
 using AWS.AgentCore.Hosting;
-using AWS.AgentCore.Hosting.Extensions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -87,7 +86,6 @@ Use familiar ASP.NET Core Minimal API patterns:
 
 ```csharp
 using AWS.AgentCore.Hosting;
-using AWS.AgentCore.Hosting.Extensions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 

@@ -1,14 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using AWS.AgentCore.Hosting;
 using AWS.AgentCore.Hosting.Internal;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization.Metadata;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace AWS.AgentCore.Hosting.Extensions;
+namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
 /// Extension methods for mapping AgentCore endpoints on <see cref="IEndpointRouteBuilder"/>.

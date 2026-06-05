@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using AWS.AgentCore.Hosting;
-using AWS.AgentCore.Hosting.Extensions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 

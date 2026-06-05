@@ -3,7 +3,7 @@
 
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockAgentCore.Model;
-using AWS.AgentCore.Hosting.Extensions;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;

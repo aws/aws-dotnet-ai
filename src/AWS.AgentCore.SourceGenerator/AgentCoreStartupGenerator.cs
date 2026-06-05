@@ -216,7 +216,7 @@ public class AgentCoreStartupGenerator : IIncrementalGenerator
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
         sb.AppendLine("using AWS.AgentCore.Hosting;");
-        sb.AppendLine("using AWS.AgentCore.Hosting.Extensions;");
+        sb.AppendLine("using Microsoft.AspNetCore.Builder;");
         sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
         sb.AppendLine();
         sb.AppendLine("var builder = WebApplication.CreateBuilder(args);");

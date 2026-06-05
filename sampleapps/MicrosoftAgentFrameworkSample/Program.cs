@@ -11,7 +11,6 @@
 
 using System.ComponentModel;
 using AWS.AgentCore.Hosting;
-using AWS.AgentCore.Hosting.Extensions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using MicrosoftAgentFrameworkSample;

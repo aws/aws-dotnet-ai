@@ -9,7 +9,7 @@ public class AgentCoreStartupGeneratorTests
     public async Task Generator_WithStartupAndAgent_EmitsProgram()
     {
         var source = @"
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -44,7 +44,7 @@ namespace TestApp
     public async Task Generator_WithPingHandler_EmitsPingDelegate()
     {
         var source = @"
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -76,7 +76,7 @@ namespace TestApp
     public async Task Generator_WithoutStartup_SkipsConfigureServices()
     {
         var source = @"
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -105,7 +105,7 @@ namespace TestApp
     public void Generator_WithoutHandler_EmitsNothing()
     {
         var source = @"
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 
 namespace TestApp
 {
@@ -125,7 +125,7 @@ namespace TestApp
     public async Task Generator_StreamingHandler_DetectsReturnType()
     {
         var source = @"
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using System.Collections.Generic;
 using System.Threading;
 
@@ -154,7 +154,7 @@ namespace TestApp
     public async Task Generator_RequestOnlyParameter_IdentifiesRequestType()
     {
         var source = @"
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using System.Threading.Tasks;
 
 namespace TestApp
@@ -182,7 +182,7 @@ namespace TestApp
     public async Task Generator_GlobalNamespace_HandlesCorrectly()
     {
         var source = @"
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using System.Threading.Tasks;
 
 public record PromptRequest(string? Prompt);
@@ -207,7 +207,7 @@ public class MyAgent
     public async Task Generator_WithJsonContext_EmitsJsonTypeInfo()
     {
         var source = @"
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;

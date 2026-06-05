@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using RemoteMcpAgent.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;

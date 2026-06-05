@@ -3,7 +3,7 @@
     {
       "Name": "AWS.AgentCore.Hosting",
       "Paths": [
-        "src/AWS.AgentCore/AWS.AgentCore.csproj",
+        "src/AWS.AgentCore.Hosting/AWS.AgentCore.Hosting.csproj",
         "src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj"
       ],
       "PrereleaseLabel": "preview"

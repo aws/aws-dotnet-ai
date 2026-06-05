@@ -23,9 +23,9 @@ public static class ChatAppServer
     /// <summary>
     /// Creates and configures the Chat App web application.
     /// </summary>
-    /// <param name="serviceEndpoint">
+    /// <param name="emulatorEndpointUrl">
     /// The Runtime Emulator's HTTP endpoint URL (e.g., <c>http://localhost:12345</c>).
-    /// Used as the AWS SDK's <c>ServiceURL</c> override so requests route to the emulator.
+    /// The Chat App sends agent invocations to this URL.
     /// </param>
     /// <param name="port">
     /// The TCP port to listen on. Defaults to 0 (OS-assigned); the actual bound port
@@ -44,7 +44,7 @@ public static class ChatAppServer
     /// to Aspire's <c>ResourceLoggerService</c> for dashboard visibility.
     /// </param>
     /// <returns>A configured but not yet started <see cref="WebApplication"/>.</returns>
-    public static WebApplication Create(string serviceEndpoint, int port = 0, bool streaming = false, string? agentName = null, ILoggerProvider? loggerProvider = null)
+    public static WebApplication Create(string emulatorEndpointUrl, int port = 0, bool streaming = false, string? agentName = null, ILoggerProvider? loggerProvider = null)
     {
         var assembly = typeof(ChatAppServer).Assembly;
         var embeddedFileProvider = new ManifestEmbeddedFileProvider(assembly, "wwwroot");
@@ -81,8 +81,7 @@ public static class ChatAppServer
                 new Amazon.Runtime.AnonymousAWSCredentials(),
                 new AmazonBedrockAgentCoreConfig
                 {
-                    ServiceURL = serviceEndpoint,
-                    AuthenticationRegion = "us-east-1"
+                    ServiceURL = emulatorEndpointUrl
                 }));
 
         builder.Services.AddSingleton<AgentCoreService>();

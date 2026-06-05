@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using AnnotationsStreamingAgent.Models;
 using Microsoft.Agents.AI;
 

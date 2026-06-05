@@ -5,7 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using Microsoft.Agents.AI;
 using NativeAotAnnotations.Models;
 

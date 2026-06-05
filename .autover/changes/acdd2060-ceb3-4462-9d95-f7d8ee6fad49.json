@@ -1,0 +1,26 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore.Hosting",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "AgentCore Runtime endpoint mapping (POST /invocations, GET /ping) with Minimal API-style parameter binding",
+        "Source generator for zero-boilerplate agent development ([AgentCoreStartup], [AgentCoreHandler], [AgentCorePing])",
+        "SSE streaming support via IAsyncEnumerable<string>",
+        "Microsoft Agent Framework integration (IChatClient, ChatClientAgent, agent middleware pipeline)",
+        "AgentCore Memory integration for session-scoped conversation history",
+        "NativeAOT support with JsonSerializerContext overloads"
+      ]
+    },
+    {
+      "Name": "AWS.AgentCore.Testing",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Runtime Emulator server for local AgentCore SDK request handling",
+        "Memory Emulator server with in-memory conversation event storage",
+        "Chat App web UI with payload editor, session management, and markdown rendering",
+        "Payload configuration persistence across restarts"
+      ]
+    }
+  ]
+}

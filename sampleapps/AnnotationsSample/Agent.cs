@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Amazon.S3;
-using AWS.AgentCore;
+using AWS.AgentCore.Hosting;
 using AnnotationsSample.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;

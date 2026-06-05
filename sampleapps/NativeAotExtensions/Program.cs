@@ -6,7 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AWS.AgentCore.Extensions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using NativeAotExtensions.Models;
@@ -39,7 +38,7 @@ app.MapAgentCore<PromptRequest>(
 
         return response.ToString();
     },
-    AppJsonContext.Default.PromptRequest);
+    AppJsonContext.Default);
 
 app.Run();
 

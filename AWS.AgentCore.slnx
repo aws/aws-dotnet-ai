@@ -12,14 +12,14 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />
-    <Project Path="src/AWS.AgentCore/AWS.AgentCore.csproj" />
+    <Project Path="src/AWS.AgentCore.Hosting/AWS.AgentCore.Hosting.csproj" />
     <Project Path="src/AWS.AgentCore.Testing/AWS.AgentCore.Testing.csproj" />
   </Folder>
   <Folder Name="/test/">
-    <Project Path="test/AWS.AgentCore.UnitTests/AWS.AgentCore.UnitTests.csproj" />
+    <Project Path="test/AWS.AgentCore.Hosting.UnitTests/AWS.AgentCore.Hosting.UnitTests.csproj" />
     <Project Path="test/AWS.AgentCore.Testing.UnitTests/AWS.AgentCore.Testing.UnitTests.csproj" />
     <Project Path="test/AWS.AgentCore.Testing.IntegrationTests/AWS.AgentCore.Testing.IntegrationTests.csproj" />
     <Project Path="test/AWS.AgentCore.SourceGenerator.UnitTests/AWS.AgentCore.SourceGenerator.UnitTests.csproj" />
-    <Project Path="test/AWS.AgentCore.IntegrationTests/AWS.AgentCore.IntegrationTests.csproj" />
+    <Project Path="test/AWS.AgentCore.Hosting.IntegrationTests/AWS.AgentCore.Hosting.IntegrationTests.csproj" />
   </Folder>
 </Solution>

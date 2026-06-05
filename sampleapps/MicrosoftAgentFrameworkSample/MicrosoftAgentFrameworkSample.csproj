@@ -7,7 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\AWS.AgentCore\AWS.AgentCore.csproj" />
+        <ProjectReference Include="..\..\src\AWS.AgentCore.Hosting\AWS.AgentCore.Hosting.csproj" />
     </ItemGroup>
 
 </Project>

@@ -12,7 +12,7 @@ Built on top of [Microsoft Agent Framework](https://learn.microsoft.com/en-us/ag
 - **Streaming support**: SSE via `IAsyncEnumerable<string>` with proper AgentCore wire format
 - **Microsoft Agent Framework integration**: `IChatClient`, `ChatClientAgent`, tool calling, agent middleware pipeline
 - **AgentCore Memory**: Session-scoped short-term conversation history via `AgentCoreMemoryProvider`
-- **NativeAOT support**: Source-generated JSON, `JsonTypeInfo<T>` overloads — deploy as a single self-contained binary
+- **NativeAOT support**: Source-generated JSON, `JsonSerializerContext` overloads — deploy as a single self-contained binary
 - **Model flexibility**: Bedrock models by default, or bring your own `IChatClient` (OpenAI, Anthropic, Ollama, etc.)
 
 ## Getting Started
@@ -184,7 +184,7 @@ builder.AddAgentCore(options =>
 
 ## NativeAOT
 
-For minimal cold-start times, deploy as a NativeAOT binary. Use the `JsonTypeInfo<T>` overload:
+For minimal cold-start times, deploy as a NativeAOT binary. Use the `JsonSerializerContext` overload:
 
 ```csharp
 app.MapAgentCore<PromptRequest>(

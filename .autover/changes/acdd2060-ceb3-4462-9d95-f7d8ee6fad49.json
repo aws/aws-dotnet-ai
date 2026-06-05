@@ -9,7 +9,7 @@
         "SSE streaming support via IAsyncEnumerable<string>",
         "Microsoft Agent Framework integration (IChatClient, ChatClientAgent, agent middleware pipeline)",
         "AgentCore Memory integration for session-scoped conversation history",
-        "NativeAOT support with JsonTypeInfo<T> overloads"
+        "NativeAOT support with JsonSerializerContext overloads"
       ]
     },
     {

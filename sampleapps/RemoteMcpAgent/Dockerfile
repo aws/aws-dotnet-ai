@@ -8,7 +8,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["sampleapps/RemoteMcpAgent/RemoteMcpAgent.csproj", "sampleapps/RemoteMcpAgent/"]
-COPY ["src/AWS.AgentCore/AWS.AgentCore.csproj", "src/AWS.AgentCore/"]
+COPY ["src/AWS.AgentCore.Hosting/AWS.AgentCore.Hosting.csproj", "src/AWS.AgentCore.Hosting/"]
 COPY ["src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj", "src/AWS.AgentCore.SourceGenerator/"]
 RUN dotnet restore "sampleapps/RemoteMcpAgent/RemoteMcpAgent.csproj"
 COPY . .

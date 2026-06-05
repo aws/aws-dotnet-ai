@@ -10,8 +10,8 @@
 // - ConfigureAgent callback for pipeline decoration
 
 using System.ComponentModel;
-using AWS.AgentCore;
-using AWS.AgentCore.Extensions;
+using AWS.AgentCore.Hosting;
+using AWS.AgentCore.Hosting.Extensions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using MicrosoftAgentFrameworkSample;

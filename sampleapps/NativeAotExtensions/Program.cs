@@ -38,7 +38,7 @@ app.MapAgentCore<PromptRequest>(
 
         return response.ToString();
     },
-    AppJsonContext.Default.PromptRequest);
+    AppJsonContext.Default);
 
 app.Run();
 

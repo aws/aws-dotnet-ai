@@ -4,6 +4,8 @@
 using AWS.AgentCore.Hosting;
 using AWS.AgentCore.Hosting.Internal;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -120,8 +122,8 @@ public static class AgentCoreEndpointExtensions
     ///     pingHandler: () => new { status = "Healthy", time_of_last_update = DateTimeOffset.UtcNow.ToUnixTimeSeconds() });
     /// </code>
     /// </example>
-    [RequiresUnreferencedCode("This overload uses reflection-based parameter binding and DynamicInvoke. For NativeAOT, use the strongly-typed overload with JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
-    [RequiresDynamicCode("This overload uses reflection-based parameter binding and DynamicInvoke. For NativeAOT, use the strongly-typed overload with JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
+    [RequiresUnreferencedCode("This overload uses reflection-based parameter binding and DynamicInvoke. For NativeAOT, use the strongly-typed overload with JsonSerializerContext, or the [AgentCoreHandler] source generator.")]
+    [RequiresDynamicCode("This overload uses reflection-based parameter binding and DynamicInvoke. For NativeAOT, use the strongly-typed overload with JsonSerializerContext, or the [AgentCoreHandler] source generator.")]
     public static IEndpointRouteBuilder MapAgentCore<TRequest>(
         this IEndpointRouteBuilder app,
         Delegate handler,
@@ -182,7 +184,7 @@ public static class AgentCoreEndpointExtensions
     /// <summary>
     /// Maps the required AgentCore Runtime endpoints with a strongly-typed handler signature.
     /// This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload
-    /// that accepts <see cref="JsonTypeInfo{TRequest}"/>.
+    /// that accepts <see cref="JsonSerializerContext"/>.
     /// </summary>
     /// <typeparam name="TRequest">The type to deserialize the request body into.</typeparam>
     /// <param name="app">The endpoint route builder.</param>
@@ -191,8 +193,8 @@ public static class AgentCoreEndpointExtensions
     /// </param>
     /// <param name="pingHandler">Optional custom ping handler. When <c>null</c>, returns the default healthy response.</param>
     /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
-    [RequiresUnreferencedCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
-    [RequiresDynamicCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
+    [RequiresUnreferencedCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonSerializerContext, or the [AgentCoreHandler] source generator.")]
+    [RequiresDynamicCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonSerializerContext, or the [AgentCoreHandler] source generator.")]
     public static IEndpointRouteBuilder MapAgentCore<TRequest>(
         this IEndpointRouteBuilder app,
         Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, Task<string>> handler,
@@ -236,10 +238,9 @@ public static class AgentCoreEndpointExtensions
     /// A strongly-typed handler that receives the request, runtime context, service provider, and cancellation token.
     /// Use <c>services.GetRequiredService&lt;T&gt;()</c> to resolve dependencies.
     /// </param>
-    /// <param name="requestTypeInfo">
-    /// Source-generated JSON type info for <typeparamref name="TRequest"/>.
-    /// Obtain from a <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> annotated with
-    /// <c>[JsonSerializable(typeof(TRequest))]</c>.
+    /// <param name="jsonContext">
+    /// A source-generated <see cref="JsonSerializerContext"/> annotated with
+    /// <c>[JsonSerializable(typeof(TRequest))]</c>. Used for NativeAOT-compatible JSON deserialization.
     /// </param>
     /// <param name="pingHandler">Optional custom ping handler that writes the response directly. When <c>null</c>, returns the default healthy response.</param>
     /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
@@ -251,15 +252,17 @@ public static class AgentCoreEndpointExtensions
     ///         var chatClient = services.GetRequiredService&lt;IChatClient&gt;();
     ///         return "response";
     ///     },
-    ///     AppJsonContext.Default.PromptRequest);
+    ///     AppJsonContext.Default);
     /// </code>
     /// </example>
     public static IEndpointRouteBuilder MapAgentCore<TRequest>(
         this IEndpointRouteBuilder app,
         Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, Task<string>> handler,
-        JsonTypeInfo<TRequest> requestTypeInfo,
+        JsonSerializerContext jsonContext,
         Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
     {
+        var requestTypeInfo = (JsonTypeInfo<TRequest>)jsonContext.GetTypeInfo(typeof(TRequest))!;
+
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
             var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
@@ -289,7 +292,7 @@ public static class AgentCoreEndpointExtensions
     /// <summary>
     /// Maps the required AgentCore Runtime endpoints with a strongly-typed streaming handler.
     /// This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload
-    /// that accepts <see cref="JsonTypeInfo{TRequest}"/>.
+    /// that accepts <see cref="JsonSerializerContext"/>.
     /// </summary>
     /// <typeparam name="TRequest">The type to deserialize the request body into.</typeparam>
     /// <param name="app">The endpoint route builder.</param>
@@ -298,8 +301,8 @@ public static class AgentCoreEndpointExtensions
     /// </param>
     /// <param name="pingHandler">Optional custom ping handler. When <c>null</c>, returns the default healthy response.</param>
     /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
-    [RequiresUnreferencedCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
-    [RequiresDynamicCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonTypeInfo<TRequest>, or the [AgentCoreHandler] source generator.")]
+    [RequiresUnreferencedCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonSerializerContext, or the [AgentCoreHandler] source generator.")]
+    [RequiresDynamicCode("This overload uses reflection-based JSON deserialization. For NativeAOT, use the overload that accepts JsonSerializerContext, or the [AgentCoreHandler] source generator.")]
     public static IEndpointRouteBuilder MapAgentCoreStreaming<TRequest>(
         this IEndpointRouteBuilder app,
         Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, IAsyncEnumerable<string>> handler,
@@ -341,10 +344,9 @@ public static class AgentCoreEndpointExtensions
     /// A strongly-typed handler that returns <see cref="IAsyncEnumerable{String}"/> for SSE streaming.
     /// Use <c>services.GetRequiredService&lt;T&gt;()</c> to resolve dependencies.
     /// </param>
-    /// <param name="requestTypeInfo">
-    /// Source-generated JSON type info for <typeparamref name="TRequest"/>.
-    /// Obtain from a <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> annotated with
-    /// <c>[JsonSerializable(typeof(TRequest))]</c>.
+    /// <param name="jsonContext">
+    /// A source-generated <see cref="JsonSerializerContext"/> annotated with
+    /// <c>[JsonSerializable(typeof(TRequest))]</c>. Used for NativeAOT-compatible JSON deserialization.
     /// </param>
     /// <param name="pingHandler">Optional custom ping handler. When <c>null</c>, returns the default healthy response.</param>
     /// <returns>The <see cref="IEndpointRouteBuilder"/> for further chaining.</returns>
@@ -356,15 +358,17 @@ public static class AgentCoreEndpointExtensions
     ///         var chatClient = services.GetRequiredService&lt;IChatClient&gt;();
     ///         return StreamChunks(chatClient, request.Prompt, ct);
     ///     },
-    ///     AppJsonContext.Default.PromptRequest);
+    ///     AppJsonContext.Default);
     /// </code>
     /// </example>
     public static IEndpointRouteBuilder MapAgentCoreStreaming<TRequest>(
         this IEndpointRouteBuilder app,
         Func<TRequest, AgentCoreRuntimeContext, IServiceProvider, CancellationToken, IAsyncEnumerable<string>> handler,
-        JsonTypeInfo<TRequest> requestTypeInfo,
+        JsonSerializerContext jsonContext,
         Func<IServiceProvider, CancellationToken, Task<object?>>? pingHandler = null)
     {
+        var requestTypeInfo = (JsonTypeInfo<TRequest>)jsonContext.GetTypeInfo(typeof(TRequest))!;
+
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
             var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);

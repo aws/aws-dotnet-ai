@@ -255,11 +255,7 @@ public class AgentCoreStartupGenerator : IIncrementalGenerator
         string? jsonTypeInfoExpr = null;
         if (agentClass.JsonContextType is not null)
         {
-            var requestTypeShortName = requestType;
-            var lastDot = requestType.LastIndexOf('.');
-            if (lastDot >= 0)
-                requestTypeShortName = requestType.Substring(lastDot + 1);
-            jsonTypeInfoExpr = $"{agentClass.JsonContextType}.Default.{requestTypeShortName}";
+            jsonTypeInfoExpr = $"{agentClass.JsonContextType}.Default";
         }
 
         if (invocation.IsStreaming)

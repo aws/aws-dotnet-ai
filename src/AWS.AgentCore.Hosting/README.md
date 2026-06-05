@@ -195,7 +195,7 @@ app.MapAgentCore<PromptRequest>(
         var response = await agent.RunAsync(request.Prompt ?? "Hello!", session: session, cancellationToken: ct);
         return response.ToString();
     },
-    AppJsonContext.Default.PromptRequest);
+    AppJsonContext.Default);
 ```
 
 ## License

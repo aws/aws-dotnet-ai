@@ -26,11 +26,11 @@ using AWS.AgentCore.Testing;
 // Your agent is running on http://localhost:8080 (the AgentCore default port)
 
 // Start the runtime emulator — it accepts AWS SDK requests and forwards to your agent
-var runtimeApp = RuntimeEmulatorServer.Create("http://localhost:8080", port: 5100);
+var runtimeApp = RuntimeEmulatorServer.Create(agentEndpointUrl: "http://localhost:8080", port: 5100);
 await runtimeApp.StartAsync();
 
 // Start the chat app — a web UI for interacting with your agent
-var chatApp = ChatAppServer.Create("http://localhost:5100", port: 5200);
+var chatApp = ChatAppServer.Create(emulatorEndpointUrl: "http://localhost:5100", port: 5200);
 await chatApp.StartAsync();
 
 // Start the memory emulator — provides in-memory conversation storage

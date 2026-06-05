@@ -1,11 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsAotCompatible>true</IsAotCompatible>
-        <Version>0.0.1</Version>
+        <Version>0.0.1-preview</Version>
         <IsPackable>true</IsPackable>
         <PackageId>AWS.AgentCore.Hosting</PackageId>
         <Product>AI Integrations on AWS for .NET</Product>
@@ -39,11 +39,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\AWS.AgentCore.SourceGenerator\AWS.AgentCore.SourceGenerator.csproj"
-                          PrivateAssets="all"
-                          ReferenceOutputAssembly="false"
-                          OutputItemType="Analyzer"
-                          SetTargetFramework="TargetFramework=netstandard2.0" />
+        <ProjectReference Include="..\AWS.AgentCore.SourceGenerator\AWS.AgentCore.SourceGenerator.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" OutputItemType="Analyzer" SetTargetFramework="TargetFramework=netstandard2.0" />
     </ItemGroup>
 
     <PropertyGroup>
@@ -54,9 +50,7 @@
         <PropertyGroup>
             <_AgentCoreVersion>$(Version)</_AgentCoreVersion>
         </PropertyGroup>
-        <WriteLinesToFile File="$(IntermediateOutputPath)AssemblyVersion.g.cs"
-                         Lines="namespace AWS.AgentCore.Hosting.Internal { internal static partial class UserAgentTelemetry { internal const string AssemblyVersion = &quot;$(_AgentCoreVersion)&quot;%3B } }"
-                         Overwrite="true" />
+        <WriteLinesToFile File="$(IntermediateOutputPath)AssemblyVersion.g.cs" Lines="namespace AWS.AgentCore.Hosting.Internal { internal static partial class UserAgentTelemetry { internal const string AssemblyVersion = &quot;$(_AgentCoreVersion)&quot;%3B } }" Overwrite="true" />
         <ItemGroup>
             <Compile Include="$(IntermediateOutputPath)AssemblyVersion.g.cs" />
         </ItemGroup>
@@ -64,8 +58,7 @@
 
     <Target Name="_PackSourceGenerator">
         <ItemGroup>
-            <TfmSpecificPackageFile Include="$(MSBuildThisFileDirectory)..\AWS.AgentCore.SourceGenerator\bin\$(Configuration)\netstandard2.0\AWS.AgentCore.SourceGenerator.dll"
-                                    PackagePath="analyzers/dotnet/cs" />
+            <TfmSpecificPackageFile Include="$(MSBuildThisFileDirectory)..\AWS.AgentCore.SourceGenerator\bin\$(Configuration)\netstandard2.0\AWS.AgentCore.SourceGenerator.dll" PackagePath="analyzers/dotnet/cs" />
         </ItemGroup>
     </Target>
 

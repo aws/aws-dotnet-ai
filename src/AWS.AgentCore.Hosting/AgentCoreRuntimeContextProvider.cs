@@ -9,7 +9,7 @@ namespace AWS.AgentCore.Hosting;
 /// An <see cref="AIContextProvider"/> that makes <see cref="AgentCoreRuntimeContext"/> data
 /// available within the Microsoft Agent Framework pipeline.
 /// <para>
-/// Registered automatically by <see cref="Extensions.AgentCoreBuilderExtensions.AddAgentCore"/>.
+/// Registered automatically by <c>AddAgentCore</c>.
 /// Downstream middleware and context providers can access the runtime context (session ID,
 /// request ID, access tokens, custom headers) via the session's state bag using <see cref="ContextKey"/>,
 /// or via the ambient <see cref="CurrentContext"/> property which is set automatically by the endpoint handlers.

@@ -14,7 +14,7 @@ namespace AWS.AgentCore.Hosting;
 /// Amazon Bedrock AgentCore Memory. Loads history before each agent run via ListEvents
 /// and saves new messages after via CreateEvent.
 /// <para>
-/// Registered automatically by <see cref="Extensions.AgentCoreBuilderExtensions.AddAgentCore"/>.
+/// Registered automatically by <c>AddAgentCore</c>.
 /// Operates in pass-through mode (no-op) when MemoryId is not configured.
 /// </para>
 /// </summary>

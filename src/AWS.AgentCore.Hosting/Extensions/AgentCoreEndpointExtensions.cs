@@ -72,7 +72,7 @@ public static class AgentCoreEndpointExtensions
     /// Parameters can appear in any order and are all optional — include only what you need.
     /// </para>
     /// <para>
-    /// Pair this method with <see cref="AgentCoreBuilderExtensions.AddAgentCore"/> which registers
+    /// Pair this method with <c>AddAgentCore</c> which registers
     /// the required services (<see cref="AgentCoreOptions"/>) and configures the listening port.
     /// </para>
     /// <para>

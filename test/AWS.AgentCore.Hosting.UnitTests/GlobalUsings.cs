@@ -2,3 +2,4 @@
 // SPDX-License-Identifier: Apache-2.0
 
 global using Xunit;
+global using Microsoft.AspNetCore.Builder;

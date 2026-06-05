@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using Amazon.BedrockRuntime;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 

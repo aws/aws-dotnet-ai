@@ -2,6 +2,7 @@ name: Generate Documentation and API Reference
 
 # Trigger the action on push to main
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -32,7 +33,7 @@ jobs:
         with:
           dotnet-version: 10.x
 
-      - run: dotnet tool update -g docfx --version 2.78.3
+      - run: dotnet tool update -g docfx --version 2.78.5
       - run: docfx docs/docfx.json
 
       - name: Setup Pages

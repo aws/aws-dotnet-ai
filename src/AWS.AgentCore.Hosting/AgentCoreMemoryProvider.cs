@@ -3,6 +3,7 @@
 
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockAgentCore.Model;
+using AWS.AgentCore.Hosting.Internal;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -134,7 +135,9 @@ internal sealed class AgentCoreMemoryProvider(
     {
         if (memoryClient is null)
             return [];
-        
+
+        AgentCoreMetrics.RecordMemoryLoad();
+
         var messages = new List<ChatMessage>();
 
         var request = new ListEventsRequest
@@ -200,6 +203,8 @@ internal sealed class AgentCoreMemoryProvider(
     {
         if (memoryClient is null)
             return;
+
+        AgentCoreMetrics.RecordMemorySave();
 
         await memoryClient.CreateEventAsync(new CreateEventRequest
         {

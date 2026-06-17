@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore.Hosting",
+      "Type": "Minor",
+      "ChangelogMessages": [
+        "Added OpenTelemetry instrumentation for traces, metrics, and logs. Wraps IChatClient and AIAgent with Microsoft Agent Framework\u0027s OpenTelemetry decorators and exports via OTLP. Configurable via the AgentCoreOptions.ConfigureTracing/ConfigureMetrics/ConfigureLogging callbacks; opt out via DisableObservability."
+      ]
+    }
+  ]
+}

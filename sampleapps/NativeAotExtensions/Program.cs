@@ -27,7 +27,7 @@ var app = builder.Build();
 app.MapAgentCore<PromptRequest>(
     async (request, context, services, ct) =>
     {
-        var agent = services.GetRequiredService<ChatClientAgent>();
+        var agent = services.GetRequiredService<AIAgent>();
         var logger = services.GetRequiredService<ILogger<Program>>();
 
         logger.LogInformation("Invocation — SessionId={SessionId}, RequestId={RequestId}",

@@ -24,7 +24,7 @@ builder.AddAgentCore(options =>
 var app = builder.Build();
 
 app.MapAgentCore<PromptRequest>(
-    (PromptRequest request, ChatClientAgent agent, AgentCoreRuntimeContext context,
+    (PromptRequest request, AIAgent agent, AgentCoreRuntimeContext context,
         ILogger<Program> logger, CancellationToken cancellationToken) =>
     {
         logger.LogInformation("Streaming invocation — SessionId={SessionId}, RequestId={RequestId}",

@@ -3,6 +3,9 @@
 
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 namespace AWS.AgentCore.Hosting;
 
@@ -49,4 +52,37 @@ public class AgentCoreOptions
     /// When neither is configured, the agent operates statelessly.
     /// </summary>
     public string? MemoryId { get; set; }
+
+    /// <summary>
+    /// When true, skips all OpenTelemetry registration. Default: false.
+    /// </summary>
+    public bool DisableObservability { get; set; }
+
+    /// <summary>
+    /// When true, the OpenTelemetry instrumentation on the wrapped <c>IChatClient</c> and
+    /// <c>AIAgent</c> will include sensitive data such as prompts, responses, function arguments,
+    /// and function results in span attributes and metrics. Default: false.
+    /// </summary>
+    /// <remarks>
+    /// Enable only in development and test environments. Sensitive data may include user input,
+    /// model output, and tool invocation parameters that should not be exposed in production logs.
+    /// </remarks>
+    public bool EnableSensitiveTelemetryData { get; set; }
+
+    /// <summary>
+    /// Optional callback to customize the TracerProviderBuilder after defaults are applied.
+    /// Use this to add custom activity sources, additional instrumentation, or samplers.
+    /// </summary>
+    public Action<TracerProviderBuilder>? ConfigureTracing { get; set; }
+
+    /// <summary>
+    /// Optional callback to customize the MeterProviderBuilder after defaults are applied.
+    /// Use this to add custom meters or views.
+    /// </summary>
+    public Action<MeterProviderBuilder>? ConfigureMetrics { get; set; }
+
+    /// <summary>
+    /// Optional callback to customize the OpenTelemetry logging configuration after defaults are applied.
+    /// </summary>
+    public Action<OpenTelemetryLoggerOptions>? ConfigureLogging { get; set; }
 }

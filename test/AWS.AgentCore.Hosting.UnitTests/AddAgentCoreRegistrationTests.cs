@@ -28,7 +28,7 @@ public class AddAgentCoreRegistrationTests
     }
 
     [Fact]
-    public void AddAgentCore_WithChatClient_RegistersExplicitClient()
+    public void AddAgentCore_WithChatClient_WrapsExplicitClientWithOpenTelemetry()
     {
         var builder = WebApplication.CreateBuilder();
         var mockClient = new Mock<IChatClient>();
@@ -41,8 +41,10 @@ public class AddAgentCoreRegistrationTests
         var sp = builder.Build().Services;
         var resolved = sp.GetService<IChatClient>();
 
+        // The resolved client is wrapped with the OpenTelemetry chat client decorator,
+        // which delegates to the explicit client provided in options.
         Assert.NotNull(resolved);
-        Assert.Same(mockClient.Object, resolved);
+        Assert.Equal("OpenTelemetryChatClient", resolved.GetType().Name);
     }
 
     [Fact]
@@ -60,8 +62,9 @@ public class AddAgentCoreRegistrationTests
         var sp = builder.Build().Services;
         var resolved = sp.GetService<IChatClient>();
 
+        // Wrapped by OpenTelemetry but the explicit ChatClient wins over ModelId.
         Assert.NotNull(resolved);
-        Assert.Same(mockClient.Object, resolved);
+        Assert.Equal("OpenTelemetryChatClient", resolved.GetType().Name);
         // Bedrock runtime should NOT be registered when ChatClient is provided
         var bedrockClient = sp.GetService<IAmazonBedrockRuntime>();
         Assert.Null(bedrockClient);
@@ -142,7 +145,9 @@ public class AddAgentCoreRegistrationTests
         });
 
         var sp = builder.Build().Services;
-        var agent = sp.GetRequiredService<ChatClientAgent>();
+        // ConfigureAgent only fires when AIAgent is resolved (not when ChatClientAgent is
+        // resolved directly — see the trade-off documented in AgentCoreBuilderExtensions).
+        var agent = sp.GetRequiredService<AIAgent>();
 
         Assert.NotNull(agent);
         Assert.True(callbackInvoked);

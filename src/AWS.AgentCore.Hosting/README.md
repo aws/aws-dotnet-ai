@@ -201,13 +201,36 @@ app.MapAgentCore<PromptRequest>(
 
 ## Observability
 
-OpenTelemetry instrumentation is enabled by default when you call `AddAgentCore()`. Traces, metrics, and logs are exported via OTLP, ready to be picked up by any OTLP-compatible collector.
+OpenTelemetry instrumentation is built into the package and works in two modes — pick the one that matches how your application configures OpenTelemetry:
+
+**Mode 1 — Standalone agent (no Aspire / custom OTel):** flip the `EnableObservability` toggle and `AddAgentCore()` registers a turnkey OTLP pipeline targeting the AgentCore Runtime sidecar (`http://localhost:4318`, HTTP/Protobuf) with ASP.NET Core, HttpClient, and AWS SDK instrumentation, plus OTLP exporters for traces, metrics, and logs.
+
+```csharp
+builder.AddAgentCore(options =>
+{
+    options.ModelId = "...";
+    options.EnableObservability = true;   // turnkey OTLP pipeline
+});
+```
+
+**Mode 2 — Aspire `ServiceDefaults` / custom OTel pipeline:** leave `EnableObservability` off (the default), then call `AddAgentCoreInstrumentation()` on your `TracerProviderBuilder` and `MeterProviderBuilder` to subscribe the AgentCore activity sources, meters, and AWS SDK instrumentation. Same shape as `AddAspNetCoreInstrumentation()` and `AddHttpClientInstrumentation()`.
+
+```csharp
+builder.AddServiceDefaults();   // your existing AddOpenTelemetry().AddOtlpExporter() setup
+builder.AddAgentCore(options => { options.ModelId = "..."; });
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t.AddAgentCoreInstrumentation())
+    .WithMetrics(m => m.AddAgentCoreInstrumentation());
+```
+
+Either way, `AddAgentCore()` always wraps `IChatClient` and `AIAgent` with `.UseOpenTelemetry()`, so the underlying activity sources fire whether or not anyone subscribes — no double-exporting, no risk of the library stomping on your OTel pipeline.
 
 > **⚠️ Production limitation (as of this release)**
 >
 > AWS Bedrock AgentCore Runtime does **not currently run an OTLP sidecar collector for non-Python agents**. This means telemetry emitted by your .NET agent will not be ingested into CloudWatch when deployed to AgentCore Runtime today. Support is planned but not yet available.
 >
-> In the meantime, **you can fully exercise the instrumentation locally** by running the [Aspire Dashboard](#local-development-with-the-aspire-dashboard) or any OTLP collector (Jaeger, Prometheus, OTLP collector with your backend of choice). Once AgentCore Runtime adds .NET sidecar support, no code changes will be needed — telemetry will flow automatically.
+> In the meantime, **you can fully exercise the instrumentation locally** by running the [Aspire Dashboard](#local-development-with-aspire) or any OTLP collector (Jaeger, Prometheus, etc.). Once AgentCore Runtime adds .NET sidecar support, no code changes will be needed — telemetry will flow automatically.
 
 ### What gets instrumented
 
@@ -218,16 +241,13 @@ When you wire up an agent through `AddAgentCore()`, the package wraps your `ICha
 | `invoke_agent <agent-name>` | Agent invocation (top-level) |
 | `execute_tool <function-name>` | Tool/function call from the agent |
 | `chat <model-name>` | Underlying chat model call |
-| `aws.agentcore.hosting.invocation` | HTTP-level span tagged with session/request id |
+| `aws.agentcore.hosting.invocation` | Internal-kind span for the agent invocation, tagged with `gen_ai.conversation.id` (when a session is present) |
 
 | Metric | Description |
 |---|---|
-| `gen_ai.client.operation.duration` (histogram) | Chat operation duration in seconds |
-| `gen_ai.client.token.usage` (histogram) | Input/output token usage |
-| `agent_framework.function.invocation.duration` (histogram) | Function invocation duration |
-| `aws.agentcore.hosting.invocations` (counter) | Invocations, tagged with `status=ok\|error` |
-| `aws.agentcore.hosting.invocation.duration` (histogram) | Invocation duration in seconds |
-| `aws.agentcore.hosting.memory.operations` (counter) | Memory `load`/`save` operations |
+| `gen_ai.client.operation.duration` (histogram, seconds) | Operation duration. Tagged with `gen_ai.operation.name` (`invoke_agent`, `search_memory`, `upsert_memory`, `chat`, `execute_tool`) and `error.type` when the operation fails. The OpenTelemetry resource carries `gen_ai.provider.name` (set to `aws.bedrock` automatically when `options.ModelId` is configured; override via `OTEL_RESOURCE_ATTRIBUTES=gen_ai.provider.name=<your-provider>` for non-Bedrock chat clients). The histogram count also serves as the operation count — no separate counter is needed. |
+| `gen_ai.client.token.usage` (histogram) | Input/output token usage (emitted by the wrapped `IChatClient`). |
+| `agent_framework.function.invocation.duration` (histogram) | Function invocation duration (emitted by the wrapped `AIAgent`). |
 
 In addition, ASP.NET Core, HttpClient, and AWS SDK requests are instrumented automatically.
 

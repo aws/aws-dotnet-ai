@@ -1,65 +1,67 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 
 namespace AWS.AgentCore.Hosting.Internal;
 
 /// <summary>
-/// Custom metrics instruments for agent operations. Provides counters and histograms
-/// for tracking invocations, invocation duration, and memory operations.
+/// OpenTelemetry GenAI semantic-convention metrics emitted for agent invocations
+/// and memory operations.
+/// See https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-metrics.md
 /// </summary>
 internal static class AgentCoreMetrics
 {
     private static readonly Meter AgentMeter = new(AgentCoreObservability.MeterName);
 
-    // Pre-computed status tags to avoid per-call allocations on the hot path.
-    private static readonly KeyValuePair<string, object?> StatusOkTag = new("status", "ok");
-    private static readonly KeyValuePair<string, object?> StatusErrorTag = new("status", "error");
+    // Pre-computed operation-name tags to avoid per-call allocations on the hot path.
+    private static readonly KeyValuePair<string, object?> OperationInvokeAgent = new("gen_ai.operation.name", "invoke_agent");
+    private static readonly KeyValuePair<string, object?> OperationSearchMemory = new("gen_ai.operation.name", "search_memory");
+    private static readonly KeyValuePair<string, object?> OperationUpsertMemory = new("gen_ai.operation.name", "upsert_memory");
 
-    // Pre-computed memory operation tags
-    private static readonly KeyValuePair<string, object?> OperationLoadTag = new("operation.type", "load");
-    private static readonly KeyValuePair<string, object?> OperationSaveTag = new("operation.type", "save");
-
-    private static readonly Counter<long> InvocationCounter =
-        AgentMeter.CreateCounter<long>(
-            "aws.agentcore.hosting.invocations",
-            unit: "{invocation}",
-            description: "Number of agent invocations");
-
-    private static readonly Histogram<double> InvocationDuration =
+    /// <summary>
+    /// gen_ai.client.operation.duration — GenAI operation duration in seconds.
+    /// Tagged with gen_ai.operation.name (required) and error.type (when the operation
+    /// ended in error). The OpenTelemetry resource carries gen_ai.provider.name (set by
+    /// AgentCoreObservability when a Bedrock ModelId is configured, or by the user via
+    /// OTEL_RESOURCE_ATTRIBUTES).
+    /// The histogram's count aggregation also serves as the invocation counter.
+    /// </summary>
+    private static readonly Histogram<double> OperationDuration =
         AgentMeter.CreateHistogram<double>(
-            "aws.agentcore.hosting.invocation.duration",
+            "gen_ai.client.operation.duration",
             unit: "s",
-            description: "Duration of agent invocations in seconds");
-
-    private static readonly Counter<long> MemoryOperationCounter =
-        AgentMeter.CreateCounter<long>(
-            "aws.agentcore.hosting.memory.operations",
-            unit: "{operation}",
-            description: "Number of AgentCore Memory operations");
+            description: "GenAI operation duration");
 
     /// <summary>
-    /// Records a single agent invocation, tagged with the outcome (ok or error).
+    /// Records the duration of an invoke_agent operation in seconds.
     /// </summary>
-    public static void RecordInvocation(bool isError = false) =>
-        InvocationCounter.Add(1, isError ? StatusErrorTag : StatusOkTag);
+    /// <param name="seconds">Elapsed time in seconds.</param>
+    /// <param name="errorType">
+    /// Optional error.type when the operation failed. Skipped when null. Set to the
+    /// exception's full type name or "_OTHER" when type is unknown.
+    /// </param>
+    public static void RecordInvocationDuration(double seconds, string? errorType)
+    {
+        var tags = new TagList { OperationInvokeAgent };
+        if (errorType is not null)
+            tags.Add("error.type", errorType);
+
+        OperationDuration.Record(seconds, tags);
+    }
 
     /// <summary>
-    /// Records the duration of an agent invocation in seconds.
+    /// Records a search_memory operation. The duration value is currently unmeasured
+    /// at the call sites; pass 0 if only the count is meaningful.
     /// </summary>
-    public static void RecordInvocationDuration(double seconds) =>
-        InvocationDuration.Record(seconds);
+    public static void RecordMemoryLoad(double seconds = 0) =>
+        OperationDuration.Record(seconds, OperationSearchMemory);
 
     /// <summary>
-    /// Records a memory load operation.
+    /// Records an upsert_memory operation. The duration value is currently unmeasured
+    /// at the call sites; pass 0 if only the count is meaningful.
     /// </summary>
-    public static void RecordMemoryLoad() =>
-        MemoryOperationCounter.Add(1, OperationLoadTag);
-
-    /// <summary>
-    /// Records a memory save operation.
-    /// </summary>
-    public static void RecordMemorySave() =>
-        MemoryOperationCounter.Add(1, OperationSaveTag);
+    public static void RecordMemorySave(double seconds = 0) =>
+        OperationDuration.Record(seconds, OperationUpsertMemory);
 }

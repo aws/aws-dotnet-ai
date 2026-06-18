@@ -145,10 +145,9 @@ public static class AgentCoreEndpointExtensions
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
-            using var activity = AgentCoreActivitySource.StartInvocation(
-                context.SessionId, context.RequestId);
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
             var stopwatch = Stopwatch.StartNew();
-            bool isError = false;
+            string? errorType = null;
 
             try
             {
@@ -168,15 +167,15 @@ public static class AgentCoreEndpointExtensions
             }
             catch (Exception ex)
             {
-                isError = true;
+                errorType = ex.GetType().FullName;
                 activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
                 activity?.AddException(ex);
                 throw;
             }
             finally
             {
-                AgentCoreMetrics.RecordInvocation(isError);
-                AgentCoreMetrics.RecordInvocationDuration(stopwatch.Elapsed.TotalSeconds);
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
             }
         });
 
@@ -237,10 +236,9 @@ public static class AgentCoreEndpointExtensions
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
 
-            using var activity = AgentCoreActivitySource.StartInvocation(
-                context.SessionId, context.RequestId);
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
             var stopwatch = Stopwatch.StartNew();
-            bool isError = false;
+            string? errorType = null;
 
             try
             {
@@ -251,15 +249,15 @@ public static class AgentCoreEndpointExtensions
             }
             catch (Exception ex)
             {
-                isError = true;
+                errorType = ex.GetType().FullName;
                 activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
                 activity?.AddException(ex);
                 throw;
             }
             finally
             {
-                AgentCoreMetrics.RecordInvocation(isError);
-                AgentCoreMetrics.RecordInvocationDuration(stopwatch.Elapsed.TotalSeconds);
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
             }
         });
 
@@ -321,10 +319,9 @@ public static class AgentCoreEndpointExtensions
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
 
-            using var activity = AgentCoreActivitySource.StartInvocation(
-                context.SessionId, context.RequestId);
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
             var stopwatch = Stopwatch.StartNew();
-            bool isError = false;
+            string? errorType = null;
 
             try
             {
@@ -335,15 +332,15 @@ public static class AgentCoreEndpointExtensions
             }
             catch (Exception ex)
             {
-                isError = true;
+                errorType = ex.GetType().FullName;
                 activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
                 activity?.AddException(ex);
                 throw;
             }
             finally
             {
-                AgentCoreMetrics.RecordInvocation(isError);
-                AgentCoreMetrics.RecordInvocationDuration(stopwatch.Elapsed.TotalSeconds);
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
             }
         });
 
@@ -387,10 +384,9 @@ public static class AgentCoreEndpointExtensions
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
 
-            using var activity = AgentCoreActivitySource.StartInvocation(
-                context.SessionId, context.RequestId);
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
             var stopwatch = Stopwatch.StartNew();
-            bool isError = false;
+            string? errorType = null;
 
             try
             {
@@ -399,15 +395,15 @@ public static class AgentCoreEndpointExtensions
             }
             catch (Exception ex)
             {
-                isError = true;
+                errorType = ex.GetType().FullName;
                 activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
                 activity?.AddException(ex);
                 throw;
             }
             finally
             {
-                AgentCoreMetrics.RecordInvocation(isError);
-                AgentCoreMetrics.RecordInvocationDuration(stopwatch.Elapsed.TotalSeconds);
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
             }
         });
 
@@ -469,10 +465,9 @@ public static class AgentCoreEndpointExtensions
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
 
-            using var activity = AgentCoreActivitySource.StartInvocation(
-                context.SessionId, context.RequestId);
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
             var stopwatch = Stopwatch.StartNew();
-            bool isError = false;
+            string? errorType = null;
 
             try
             {
@@ -481,15 +476,15 @@ public static class AgentCoreEndpointExtensions
             }
             catch (Exception ex)
             {
-                isError = true;
+                errorType = ex.GetType().FullName;
                 activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
                 activity?.AddException(ex);
                 throw;
             }
             finally
             {
-                AgentCoreMetrics.RecordInvocation(isError);
-                AgentCoreMetrics.RecordInvocationDuration(stopwatch.Elapsed.TotalSeconds);
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
             }
         });
 

@@ -12,6 +12,11 @@ using NativeAotExtensions.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Aspire ServiceDefaults sets up OpenTelemetry (incl. AddAgentCoreInstrumentation),
+// health checks, service discovery, and HTTP resilience. AddAgentCore() does not need
+// EnableObservability when ServiceDefaults owns the OTel pipeline.
+builder.AddServiceDefaults();
+
 builder.AddAgentCore(options =>
 {
     options.ModelId = "global.anthropic.claude-opus-4-7";

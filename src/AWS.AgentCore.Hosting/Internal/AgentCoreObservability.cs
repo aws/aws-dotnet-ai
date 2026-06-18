@@ -14,9 +14,18 @@ using OpenTelemetry.Trace;
 namespace AWS.AgentCore.Hosting.Internal;
 
 /// <summary>
-/// Encapsulates all OpenTelemetry registration logic for AgentCore.
-/// Called from AddAgentCore() to configure tracing, metrics, and logging
-/// with OTLP export to the AgentCore Runtime sidecar.
+/// OpenTelemetry registration logic for AgentCore.
+/// <para>
+/// <see cref="EnrichTracing"/> and <see cref="EnrichMetrics"/> add AgentCore activity sources,
+/// meters, and AWS instrumentation to a TracerProviderBuilder/MeterProviderBuilder. Used by both
+/// the public <c>AddAgentCoreInstrumentation()</c> extensions (for users wiring their own OTel
+/// pipeline) and the internal default-pipeline registration.
+/// </para>
+/// <para>
+/// <see cref="RegisterDefaultPipeline"/> registers a turnkey OTel pipeline targeting the
+/// AgentCore Runtime OTLP sidecar. Called from <c>AddAgentCore()</c> only when
+/// <see cref="AgentCoreOptions.EnableObservability"/> is <c>true</c>.
+/// </para>
 /// </summary>
 internal static class AgentCoreObservability
 {
@@ -24,45 +33,63 @@ internal static class AgentCoreObservability
     internal const string MeterName = "AWS.AgentCore.Hosting";
 
     // Default ActivitySource and Meter names used by Microsoft Agent Framework's OpenTelemetryAgent
-    // when no explicit sourceName is provided to .UseOpenTelemetry(). The "Experimental" prefix is
-    // intentional: the MS AF team's telemetry schema may evolve.
+    // when no explicit sourceName is provided to .UseOpenTelemetry().
     internal const string MsAgentFrameworkSource = "Experimental.Microsoft.Agents.AI";
 
     // Default ActivitySource and Meter names used by Microsoft.Extensions.AI's OpenTelemetryChatClient
-    // when no explicit sourceName is provided to .UseOpenTelemetry(). Different from the agent default
-    // because they are separate components — wrapping IChatClient directly emits under MEAI's source.
+    // when no explicit sourceName is provided to .UseOpenTelemetry().
     internal const string MsExtensionsAiSource = "Experimental.Microsoft.Extensions.AI";
 
     internal const string DefaultOtlpEndpoint = "http://localhost:4318";
     private const string OtlpEndpointEnvVar = "OTEL_EXPORTER_OTLP_ENDPOINT";
 
-    internal static void ConfigureOpenTelemetry(
+    /// <summary>
+    /// Adds the AgentCore activity sources and AWS SDK instrumentation to the
+    /// <see cref="TracerProviderBuilder"/>.
+    /// </summary>
+    internal static void EnrichTracing(TracerProviderBuilder tracing)
+    {
+        tracing
+            .AddSource(ActivitySourceName)
+            .AddSource(MsAgentFrameworkSource)
+            .AddSource(MsExtensionsAiSource)
+            .AddAWSInstrumentation();
+    }
+
+    /// <summary>
+    /// Adds the AgentCore meters to the <see cref="MeterProviderBuilder"/>.
+    /// </summary>
+    internal static void EnrichMetrics(MeterProviderBuilder metrics)
+    {
+        metrics
+            .AddMeter(MeterName)
+            .AddMeter(MsAgentFrameworkSource)
+            .AddMeter(MsExtensionsAiSource);
+    }
+
+    /// <summary>
+    /// Registers a default OpenTelemetry pipeline targeting the AgentCore Runtime OTLP sidecar
+    /// (localhost:4318, HTTP/Protobuf) with ASP.NET Core, HttpClient, and AWS SDK instrumentation
+    /// plus an OTLP exporter for traces, metrics, and logs.
+    /// Honors all standard <c>OTEL_EXPORTER_OTLP_*</c> environment variables — when any is set,
+    /// defers to the OTel SDK's native env-var resolution.
+    /// </summary>
+    internal static void RegisterDefaultPipeline(
         WebApplicationBuilder builder,
         AgentCoreOptions options)
     {
-        if (options.DisableObservability)
-            return;
-
-        // OTLP exporter configuration:
-        // - When the user has configured ANY OTEL_EXPORTER_OTLP_*_ENDPOINT env var, call
-        //   AddOtlpExporter() with no args so the SDK resolves all OTLP-related env vars
-        //   naturally (per-signal endpoints, protocol, headers, compression, timeout).
-        // - Otherwise, default to the AgentCore Runtime sidecar at http://localhost:4318
-        //   over HTTP/Protobuf.
         var hasUserOtlpConfig = HasUserConfiguredOtlpEndpoint();
 
-        // Tracing and Metrics
-        builder.Services.AddOpenTelemetry()
-            .ConfigureResource(ConfigureResourceBuilder)
+        builder.Services
+            .AddOpenTelemetry()
+            .ConfigureResource(r => ConfigureResourceBuilder(r, options))
             .WithTracing(tracing =>
             {
+                EnrichTracing(tracing);
+
                 tracing
-                    .AddSource(ActivitySourceName)
-                    .AddSource(MsAgentFrameworkSource)
-                    .AddSource(MsExtensionsAiSource)
                     .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddAWSInstrumentation();
+                    .AddHttpClientInstrumentation();
 
                 AddOtlpExporter(tracing, hasUserOtlpConfig);
 
@@ -70,10 +97,9 @@ internal static class AgentCoreObservability
             })
             .WithMetrics(metrics =>
             {
+                EnrichMetrics(metrics);
+
                 metrics
-                    .AddMeter(MeterName)
-                    .AddMeter(MsAgentFrameworkSource)
-                    .AddMeter(MsExtensionsAiSource)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation();
 
@@ -82,11 +108,10 @@ internal static class AgentCoreObservability
                 options.ConfigureMetrics?.Invoke(metrics);
             });
 
-        // Logging
         builder.Logging.AddOpenTelemetry(logging =>
         {
             var resourceBuilder = ResourceBuilder.CreateDefault();
-            ConfigureResourceBuilder(resourceBuilder);
+            ConfigureResourceBuilder(resourceBuilder, options);
             logging.SetResourceBuilder(resourceBuilder);
 
             logging.IncludeFormattedMessage = true;
@@ -131,7 +156,7 @@ internal static class AgentCoreObservability
             || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"));
     }
 
-    private static void ConfigureResourceBuilder(ResourceBuilder r)
+    private static void ConfigureResourceBuilder(ResourceBuilder r, AgentCoreOptions options)
     {
         // service.name / service.version default to the entry assembly when not otherwise set.
         // The OTel SDK's CreateDefault() also reads OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES,
@@ -156,6 +181,17 @@ internal static class AgentCoreObservability
             {
                 new KeyValuePair<string, object>("cloud.provider", "aws"),
                 new KeyValuePair<string, object>("cloud.region", region)
+            });
+        }
+
+        // OpenTelemetry GenAI semantic-convention attribute. Default to "aws.bedrock" when the
+        // user supplied a Bedrock ModelId. Users override by setting OTEL_RESOURCE_ATTRIBUTES,
+        // which the OTel SDK merges and which takes precedence over programmatic attributes.
+        if (!string.IsNullOrWhiteSpace(options.ModelId))
+        {
+            r.AddAttributes(new[]
+            {
+                new KeyValuePair<string, object>("gen_ai.provider.name", "aws.bedrock")
             });
         }
     }

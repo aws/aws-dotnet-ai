@@ -121,21 +121,27 @@ public static class AgentCoreBuilderExtensions
             logger.LogDebug("Skipping port configuration — ASPNETCORE_URLS or Aspire managed mode detected");
         }
 
-        // Configure OpenTelemetry observability
-        AgentCoreObservability.ConfigureOpenTelemetry(builder, options);
+        // OpenTelemetry pipeline registration.
+        // When EnableObservability is true, register a turnkey OTLP pipeline targeting the
+        // AgentCore Runtime sidecar. Otherwise, the application owns the pipeline — users wire
+        // their own with AddOpenTelemetry() and call AddAgentCoreInstrumentation() on their
+        // TracerProviderBuilder/MeterProviderBuilder to subscribe AgentCore sources/meters.
+        // The IChatClient/AIAgent .UseOpenTelemetry() wrapping below happens regardless, so
+        // the underlying activity sources fire whether or not anyone subscribes.
+        if (options.EnableObservability)
+            AgentCoreObservability.RegisterDefaultPipeline(builder, options);
 
         // IChatClient registration (priority order).
-        // When observability is enabled, wrap with .UseOpenTelemetry() so chat-level activities
-        // and metrics (gen_ai.client.operation.duration, gen_ai.client.token.usage) are emitted
-        // under Microsoft.Extensions.AI's default source name "Experimental.Microsoft.Extensions.AI".
+        // The .UseOpenTelemetry() wrapping is always applied — it has near-zero overhead when
+        // no listeners are subscribed, and ensures users who wire OTel separately (via
+        // AddAgentCoreInstrumentation, ServiceDefaults, ADOT, etc.) get full chat-level
+        // telemetry under "Experimental.Microsoft.Extensions.AI".
         if (options.ChatClient is not null)
         {
             logger.LogDebug("IChatClient: using explicit ChatClient from options");
-            var client = options.DisableObservability
-                ? options.ChatClient
-                : options.ChatClient.AsBuilder()
-                    .UseOpenTelemetry(configure: cfg => cfg.EnableSensitiveData = options.EnableSensitiveTelemetryData)
-                    .Build();
+            var client = options.ChatClient.AsBuilder()
+                .UseOpenTelemetry(configure: cfg => cfg.EnableSensitiveData = options.EnableSensitiveTelemetryData)
+                .Build();
             builder.Services.AddSingleton<IChatClient>(client);
         }
         else if (!string.IsNullOrWhiteSpace(options.ModelId))
@@ -145,12 +151,8 @@ public static class AgentCoreBuilderExtensions
             builder.Services.TryAddSingleton<IChatClient>(sp =>
             {
                 var bedrockClient = sp.GetRequiredService<IAmazonBedrockRuntime>();
-                var chatClient = bedrockClient.AsIChatClient(options.ModelId);
-
-                if (options.DisableObservability)
-                    return chatClient;
-
-                return chatClient.AsBuilder()
+                return bedrockClient.AsIChatClient(options.ModelId)
+                    .AsBuilder()
                     .UseOpenTelemetry(configure: cfg => cfg.EnableSensitiveData = options.EnableSensitiveTelemetryData)
                     .Build();
             });
@@ -232,9 +234,9 @@ public static class AgentCoreBuilderExtensions
                 ? options.ConfigureAgent(chatClientAgent)
                 : chatClientAgent;
 
-            if (options.DisableObservability)
-                return configuredAgent;
-
+            // Always wrap with .UseOpenTelemetry() — near-zero cost when no listeners are
+            // subscribed, and ensures users who wire OTel separately get full agent-level
+            // telemetry under "Experimental.Microsoft.Agents.AI".
             return configuredAgent.AsBuilder()
                 .UseOpenTelemetry(configure: cfg => cfg.EnableSensitiveData = options.EnableSensitiveTelemetryData)
                 .Build();
@@ -242,4 +244,5 @@ public static class AgentCoreBuilderExtensions
 
         return builder;
     }
+
 }

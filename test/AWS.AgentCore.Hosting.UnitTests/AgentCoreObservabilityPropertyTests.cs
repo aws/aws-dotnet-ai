@@ -60,9 +60,9 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
     // ──────────────────────────────────────────────────────────────────
     // Property 1: OTLP Endpoint Resolution
-    // For any AgentCoreOptions where DisableObservability is false, the
-    // resolved OTLP endpoint is the user-specified endpoint if provided,
-    // otherwise http://localhost:4318.
+    // For any AgentCoreOptions where EnableObservability is true, the
+    // resolved OTLP endpoint is the user-specified endpoint (via env vars)
+    // if provided, otherwise http://localhost:4318.
     // Validates: Requirements 1.1, 1.3
     // ──────────────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureTracing = tracing => tracing.AddSource(sourceName);
         });
 
@@ -133,7 +133,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureTracing = tracing => tracing.AddSource(sourceName);
         });
 
@@ -178,7 +178,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureTracing = tracing =>
             {
                 foreach (var name in sourceNames)
@@ -248,7 +248,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureMetrics = metrics =>
             {
                 metrics.AddMeter(meterName);
@@ -293,7 +293,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureMetrics = metrics =>
             {
                 metrics.AddMeter(meterName);
@@ -360,7 +360,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureLogging = logging =>
             {
                 logging.AddInMemoryExporter(logRecords);
@@ -428,7 +428,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureLogging = logging =>
             {
                 logging.AddInMemoryExporter(logRecords);
@@ -487,7 +487,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureTracing = tracing => tracing.AddSource(sourceName);
             options.ConfigureLogging = logging =>
             {
@@ -545,7 +545,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureLogging = logging =>
             {
                 logging.AddInMemoryExporter(logRecords);
@@ -591,7 +591,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureTracing = tracing => tracing.AddSource(sourceName);
             options.ConfigureLogging = logging =>
             {
@@ -683,7 +683,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureLogging = logging =>
             {
                 logging.AddInMemoryExporter(logRecords);
@@ -743,7 +743,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureTracing = tracing =>
             {
                 foreach (var source in inlineSources)
@@ -831,7 +831,7 @@ public class AgentCoreObservabilityPropertyTests : IDisposable
 
         builder.AddAgentCore(options =>
         {
-            options.DisableObservability = false;
+            options.EnableObservability = true;
             options.ConfigureTracing = tracing =>
             {
                 foreach (var source in inlineSources)

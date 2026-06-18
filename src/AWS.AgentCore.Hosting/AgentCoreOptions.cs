@@ -54,9 +54,26 @@ public class AgentCoreOptions
     public string? MemoryId { get; set; }
 
     /// <summary>
-    /// When true, skips all OpenTelemetry registration. Default: false.
+    /// When <c>true</c>, <c>AddAgentCore()</c> registers a default OpenTelemetry pipeline
+    /// targeting the AgentCore Runtime OTLP sidecar (<c>http://localhost:4318</c>, HTTP/Protobuf)
+    /// with ASP.NET Core, HttpClient, and AWS SDK instrumentation, plus an OTLP exporter for
+    /// traces, metrics, and logs. Default: <c>false</c>.
     /// </summary>
-    public bool DisableObservability { get; set; }
+    /// <remarks>
+    /// <para>
+    /// Set this to <c>true</c> for standalone agents that do not bring their own
+    /// OpenTelemetry setup.
+    /// </para>
+    /// <para>
+    /// Leave this <c>false</c> when the application already configures its own OpenTelemetry
+    /// pipeline (e.g. via Aspire <c>ServiceDefaults</c>, ADOT, or a custom OTel setup). In that
+    /// case, the <c>IChatClient</c> and <c>AIAgent</c> wrappers still emit telemetry and the
+    /// AgentCore activity sources/meters are subscribed via the
+    /// <c>AddAgentCoreInstrumentation()</c> extensions on
+    /// <see cref="TracerProviderBuilder"/> / <see cref="MeterProviderBuilder"/>.
+    /// </para>
+    /// </remarks>
+    public bool EnableObservability { get; set; }
 
     /// <summary>
     /// When true, the OpenTelemetry instrumentation on the wrapped <c>IChatClient</c> and

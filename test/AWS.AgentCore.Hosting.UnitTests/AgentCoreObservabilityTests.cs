@@ -38,7 +38,13 @@ public class AgentCoreObservabilityTests : IDisposable
         var mockChatClient = new Mock<IChatClient>();
         builder.Services.AddSingleton(mockChatClient.Object);
 
-        builder.AddAgentCore(configure);
+        // Default to enabling observability so the test exercises the registered pipeline.
+        // Tests that explicitly want to disable it pass a configure callback that overrides this.
+        builder.AddAgentCore(options =>
+        {
+            options.EnableObservability = true;
+            configure?.Invoke(options);
+        });
 
         var sp = builder.Services.BuildServiceProvider();
         _disposables.Add(sp);
@@ -77,7 +83,7 @@ public class AgentCoreObservabilityTests : IDisposable
         var mockChatClient = new Mock<IChatClient>();
         builder.Services.AddSingleton(mockChatClient.Object);
 
-        builder.AddAgentCore();
+        builder.AddAgentCore(options => options.EnableObservability = true);
 
         // Building the app exercises the logging pipeline registration
         var app = builder.Build();
@@ -202,17 +208,19 @@ public class AgentCoreObservabilityTests : IDisposable
     }
 
     [Fact]
-    public void DisableObservability_SkipsAllOtelRegistration()
+    public void EnableObservability_False_SkipsDefaultPipelineRegistration()
     {
         var sp = BuildServiceProvider(options =>
         {
-            options.DisableObservability = true;
+            options.EnableObservability = false;
         });
 
         var tracerProvider = sp.GetService<TracerProvider>();
         var meterProvider = sp.GetService<MeterProvider>();
 
-        // When observability is disabled, no OTEL providers should be registered
+        // When observability is opt-out, AddAgentCore() does not register a default pipeline.
+        // The application is expected to wire its own OTel (e.g., via Aspire ServiceDefaults
+        // or by calling AddAgentCoreInstrumentation() on its own TracerProvider/MeterProvider).
         Assert.Null(tracerProvider);
         Assert.Null(meterProvider);
     }
@@ -333,20 +341,6 @@ public class AgentCoreObservabilityTests : IDisposable
         meterProvider.ForceFlush(1000);
 
         Assert.Equal("Experimental.Microsoft.Extensions.AI", AgentCoreObservability.MsExtensionsAiSource);
-    }
-
-    [Fact]
-    public void AddAgentCore_DisableObservability_DoesNotRegisterTracerOrMeterProvider()
-    {
-        // When DisableObservability is true, ConfigureOpenTelemetry returns early and no
-        // OpenTelemetry providers are registered.
-        var sp = BuildServiceProvider(options => options.DisableObservability = true);
-
-        var tracerProvider = sp.GetService<TracerProvider>();
-        var meterProvider = sp.GetService<MeterProvider>();
-
-        Assert.Null(tracerProvider);
-        Assert.Null(meterProvider);
     }
 
     [Fact]

@@ -8,7 +8,7 @@
         <IsRoslynComponent>true</IsRoslynComponent>
         <GenerateDependencyFile>false</GenerateDependencyFile>
         <LangVersion>14.0</LangVersion>
-        <Version>0.0.1-preview</Version>
+        <Version>0.1.0-preview</Version>
         <IsPackable>true</IsPackable>
         <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
         <WarningsAsErrors>true</WarningsAsErrors>

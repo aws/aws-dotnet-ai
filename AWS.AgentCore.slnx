@@ -9,6 +9,7 @@
     <Project Path="sampleapps/NativeAotAnnotations/NativeAotAnnotations.csproj" />
     <Project Path="sampleapps/AspireAppHost/AspireAppHost.csproj" />
     <Project Path="sampleapps/RemoteMcpAgent/RemoteMcpAgent.csproj" />
+    <Project Path="sampleapps/ServiceDefaults/ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />

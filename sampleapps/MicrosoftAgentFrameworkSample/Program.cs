@@ -18,6 +18,10 @@ using MicrosoftAgentFrameworkSample.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Aspire ServiceDefaults sets up OpenTelemetry (incl. AddAgentCoreInstrumentation),
+// service discovery, and HTTP resilience.
+builder.AddServiceDefaults();
+
 builder.AddAgentCore(options =>
 {
     options.ModelId = "global.anthropic.claude-opus-4-7";

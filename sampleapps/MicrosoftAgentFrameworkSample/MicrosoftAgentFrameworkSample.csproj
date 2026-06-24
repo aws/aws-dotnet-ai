@@ -8,6 +8,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\AWS.AgentCore.Hosting\AWS.AgentCore.Hosting.csproj" />
+        <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
     </ItemGroup>
 
 </Project>

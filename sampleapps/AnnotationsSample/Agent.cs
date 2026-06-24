@@ -13,7 +13,7 @@ using Microsoft.Extensions.AI;
 
 namespace AnnotationsSample;
 
-public class Agent(ChatClientAgent chatAgent, IAmazonS3 s3Client, ILogger<Agent> logger)
+public class Agent(AIAgent chatAgent, IAmazonS3 s3Client, ILogger<Agent> logger)
 {
     [AgentCoreHandler]
     public async Task<string> HandleInvocation(

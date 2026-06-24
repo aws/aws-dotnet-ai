@@ -12,6 +12,10 @@ using NativeAotExtensions.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Aspire ServiceDefaults sets up OpenTelemetry (incl. AddAgentCoreInstrumentation),
+// service discovery, and HTTP resilience.
+builder.AddServiceDefaults();
+
 builder.AddAgentCore(options =>
 {
     options.ModelId = "global.anthropic.claude-opus-4-7";
@@ -27,7 +31,7 @@ var app = builder.Build();
 app.MapAgentCore<PromptRequest>(
     async (request, context, services, ct) =>
     {
-        var agent = services.GetRequiredService<ChatClientAgent>();
+        var agent = services.GetRequiredService<AIAgent>();
         var logger = services.GetRequiredService<ILogger<Program>>();
 
         logger.LogInformation("Invocation — SessionId={SessionId}, RequestId={RequestId}",

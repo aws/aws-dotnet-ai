@@ -121,11 +121,23 @@ public static class AgentCoreBuilderExtensions
             logger.LogDebug("Skipping port configuration — ASPNETCORE_URLS or Aspire managed mode detected");
         }
 
-        // IChatClient registration (priority order)
+        // The IChatClient/AIAgent .UseOpenTelemetry() wrapping below always fires so the
+        // underlying activity sources emit spans/metrics. Users who want to collect this
+        // telemetry set up their own OTel pipeline (e.g. via Aspire ServiceDefaults) and call
+        // AddAgentCoreInstrumentation() on their TracerProviderBuilder/MeterProviderBuilder.
+
+        // IChatClient registration (priority order).
+        // The .UseOpenTelemetry() wrapping is always applied — it has near-zero overhead when
+        // no listeners are subscribed, and ensures users who wire OTel separately (via
+        // AddAgentCoreInstrumentation, ServiceDefaults, ADOT, etc.) get full chat-level
+        // telemetry under "Experimental.Microsoft.Extensions.AI".
         if (options.ChatClient is not null)
         {
             logger.LogDebug("IChatClient: using explicit ChatClient from options");
-            builder.Services.AddSingleton<IChatClient>(options.ChatClient);
+            var client = options.ChatClient.AsBuilder()
+                .UseOpenTelemetry(configure: cfg => cfg.EnableSensitiveData = options.EnableSensitiveTelemetryData)
+                .Build();
+            builder.Services.AddSingleton<IChatClient>(client);
         }
         else if (!string.IsNullOrWhiteSpace(options.ModelId))
         {
@@ -134,7 +146,10 @@ public static class AgentCoreBuilderExtensions
             builder.Services.TryAddSingleton<IChatClient>(sp =>
             {
                 var bedrockClient = sp.GetRequiredService<IAmazonBedrockRuntime>();
-                return bedrockClient.AsIChatClient(options.ModelId);
+                return bedrockClient.AsIChatClient(options.ModelId)
+                    .AsBuilder()
+                    .UseOpenTelemetry(configure: cfg => cfg.EnableSensitiveData = options.EnableSensitiveTelemetryData)
+                    .Build();
             });
         }
         else
@@ -170,8 +185,16 @@ public static class AgentCoreBuilderExtensions
         // Register AgentCoreMemoryProvider
         builder.Services.AddSingleton<AgentCoreMemoryProvider>();
 
-        // Register AIAgent (may be a ChatClientAgent or a middleware-decorated agent)
-        builder.Services.AddSingleton<AIAgent>(sp =>
+        // Register ChatClientAgent (the raw inner agent — no OTEL wrapper or ConfigureAgent
+        // middleware applied, so users can inject the concrete type and call ChatClientAgent-specific APIs).
+        //
+        // Trade-off: Resolving ChatClientAgent bypasses any ConfigureAgent middleware AND the
+        // agent-level OpenTelemetry instrumentation (invoke_agent / execute_tool spans,
+        // agent_framework.function.invocation.duration metric).
+        // Chat-level telemetry (chat span, gen_ai.client.* metrics) still emits because
+        // IChatClient is wrapped at registration time.
+        // For full instrumentation and middleware support, inject AIAgent instead.
+        builder.Services.AddSingleton<ChatClientAgent>(sp =>
         {
             var chatClient = sp.GetService<IChatClient>();
             if (chatClient is null)
@@ -190,30 +213,31 @@ public static class AgentCoreBuilderExtensions
             // Only set the memory provider if the user hasn't configured their own ChatHistoryProvider
             agentOptions.ChatHistoryProvider ??= memoryProvider;
 
-            var agent = new ChatClientAgent(chatClient, agentOptions);
-
-            if (options.ConfigureAgent is not null)
-            {
-                return options.ConfigureAgent(agent);
-            }
-
-            return agent;
+            return new ChatClientAgent(chatClient, agentOptions);
         });
 
-        // Also register ChatClientAgent for users who need the concrete type (when no middleware is applied)
-        builder.Services.AddSingleton<ChatClientAgent>(sp =>
+        // Register AIAgent (the public-facing agent, decorated with middleware and OpenTelemetry).
+        // Wraps the inner ChatClientAgent with .UseOpenTelemetry() so MS Agent Framework's
+        // agent-level activities (invoke_agent, execute_tool) and metrics
+        // (agent_framework.function.invocation.duration) are emitted under
+        // "Experimental.Microsoft.Agents.AI".
+        builder.Services.AddSingleton<AIAgent>(sp =>
         {
-            var aiAgent = sp.GetRequiredService<AIAgent>();
-            if (aiAgent is ChatClientAgent chatClientAgent)
-            {
-                return chatClientAgent;
-            }
+            var chatClientAgent = sp.GetRequiredService<ChatClientAgent>();
 
-            throw new InvalidOperationException(
-                "Cannot resolve ChatClientAgent because ConfigureAgent was used to decorate the agent with middleware. " +
-                "Use AIAgent instead, which supports the full middleware pipeline.");
+            AIAgent configuredAgent = options.ConfigureAgent is not null
+                ? options.ConfigureAgent(chatClientAgent)
+                : chatClientAgent;
+
+            // Always wrap with .UseOpenTelemetry() — near-zero cost when no listeners are
+            // subscribed, and ensures users who wire OTel separately get full agent-level
+            // telemetry under "Experimental.Microsoft.Agents.AI".
+            return configuredAgent.AsBuilder()
+                .UseOpenTelemetry(configure: cfg => cfg.EnableSensitiveData = options.EnableSensitiveTelemetryData)
+                .Build();
         });
 
         return builder;
     }
+
 }

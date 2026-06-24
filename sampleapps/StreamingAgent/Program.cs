@@ -1,6 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+// This sample demonstrates how to wire up OpenTelemetry manually without Aspire ServiceDefaults.
+// Use this pattern when deploying directly to AgentCore Runtime or any environment where you
+// manage the OTel pipeline yourself.
+
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -8,9 +12,44 @@ using System.Runtime.InteropServices;
 using AWS.AgentCore.Hosting;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using OpenTelemetry;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using StreamingAgent.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Wire up OpenTelemetry manually. When OTEL_EXPORTER_OTLP_ENDPOINT is set (e.g. by Aspire
+// or a collector), the SDK uses it automatically. Otherwise, defaults to the AgentCore
+// Runtime OTLP sidecar at localhost:4318 (HTTP/Protobuf).
+var otel = builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .AddSource(builder.Environment.ApplicationName)
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddAWSInstrumentation()
+        .AddAgentCoreInstrumentation())
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddAWSInstrumentation()
+        .AddAgentCoreInstrumentation());
+
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+{
+    otel.UseOtlpExporter();
+}
+else
+{
+    otel.UseOtlpExporter(OtlpExportProtocol.HttpProtobuf, new Uri("http://localhost:4318"));
+}
+
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    logging.IncludeFormattedMessage = true;
+    logging.IncludeScopes = true;
+});
 
 builder.AddAgentCore(options =>
 {
@@ -24,7 +63,7 @@ builder.AddAgentCore(options =>
 var app = builder.Build();
 
 app.MapAgentCore<PromptRequest>(
-    (PromptRequest request, ChatClientAgent agent, AgentCoreRuntimeContext context,
+    (PromptRequest request, AIAgent agent, AgentCoreRuntimeContext context,
         ILogger<Program> logger, CancellationToken cancellationToken) =>
     {
         logger.LogInformation("Streaming invocation — SessionId={SessionId}, RequestId={RequestId}",

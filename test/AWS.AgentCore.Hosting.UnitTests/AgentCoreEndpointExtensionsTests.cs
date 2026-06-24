@@ -51,6 +51,26 @@ public class AgentCoreEndpointExtensionsTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task InvocationsEndpoint_WorksWithOctetStreamContentType()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (app, client) = await CreateTestAppAsync(
+            (TestRequest request) => Task.FromResult($"echo: {request.Input}"));
+
+        // AgentCore Runtime forwards requests with application/octet-stream, not application/json.
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/invocations");
+        httpRequest.Content = new StringContent(
+            """{"input":"Hello"}""", System.Text.Encoding.UTF8, "application/octet-stream");
+
+        var response = await client.SendAsync(httpRequest, ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        Assert.Equal("echo: Hello", json.GetProperty("message").GetString());
+    }
+
+    [Fact]
     public async Task InvocationsEndpoint_WithNullBody_Returns400()
     {
         var ct = TestContext.Current.CancellationToken;

@@ -49,4 +49,15 @@ public class AgentCoreOptions
     /// When neither is configured, the agent operates statelessly.
     /// </summary>
     public string? MemoryId { get; set; }
+
+    /// <summary>
+    /// When true, the OpenTelemetry instrumentation on the wrapped <c>IChatClient</c> and
+    /// <c>AIAgent</c> will include sensitive data such as prompts, responses, function arguments,
+    /// and function results in span attributes and metrics. Default: false.
+    /// </summary>
+    /// <remarks>
+    /// Enable only in development and test environments. Sensitive data may include user input,
+    /// model output, and tool invocation parameters that should not be exposed in production logs.
+    /// </remarks>
+    public bool EnableSensitiveTelemetryData { get; set; }
 }

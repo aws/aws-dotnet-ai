@@ -342,11 +342,11 @@ public class AgentCoreMemoryDIRegistrationTests
         });
 
         var sp = builder.Build().Services;
-        var agent = sp.GetRequiredService<Microsoft.Agents.AI.AIAgent>();
 
-        // The agent should be a ChatClientAgent with the memory provider wired
-        Assert.IsType<Microsoft.Agents.AI.ChatClientAgent>(agent);
-        var chatAgent = (Microsoft.Agents.AI.ChatClientAgent)agent;
+        // Resolve ChatClientAgent (the inner, unwrapped agent) so we can inspect the
+        // ChatHistoryProvider directly. AIAgent resolution returns the OTEL-wrapped agent.
+        var chatAgent = sp.GetRequiredService<Microsoft.Agents.AI.ChatClientAgent>();
+
         Assert.IsType<AgentCoreMemoryProvider>(chatAgent.ChatHistoryProvider);
     }
 }

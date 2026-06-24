@@ -12,7 +12,7 @@ using Microsoft.Agents.AI;
 
 namespace AnnotationsStreamingAgent;
 
-public class Agent(ChatClientAgent chatAgent, ILogger<Agent> logger)
+public class Agent(AIAgent chatAgent, ILogger<Agent> logger)
 {
     [AgentCoreHandler]
     public IAsyncEnumerable<string> HandleInvocation(

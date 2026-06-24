@@ -3,6 +3,7 @@
 
 using AWS.AgentCore.Hosting;
 using AWS.AgentCore.Hosting.Internal;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -133,7 +134,7 @@ public static class AgentCoreEndpointExtensions
 
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync<TRequest>(httpContext.Request.Body, JsonSerializerOptions.Web, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -143,18 +144,39 @@ public static class AgentCoreEndpointExtensions
                 return;
             }
 
-            var args = bindingPlan.ResolveArguments(request, httpContext);
+            var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
+            AgentCoreRuntimeContextProvider.CurrentContext = context;
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
+            var stopwatch = Stopwatch.StartNew();
+            string? errorType = null;
 
-            if (bindingPlan.IsStreaming)
+            try
             {
-                await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, handler, args);
+                var args = bindingPlan.ResolveArguments(request, httpContext);
+
+                if (bindingPlan.IsStreaming)
+                {
+                    await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, handler, args);
+                }
+                else
+                {
+                    var result = await bindingPlan.InvokeAsync(handler, args);
+                    await httpContext.Response.WriteAsJsonAsync(
+                        new JsonMessageResponse(result, DateTime.UtcNow),
+                        AgentCoreJsonContext.Default.JsonMessageResponse);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                var result = await bindingPlan.InvokeAsync(handler, args);
-                await httpContext.Response.WriteAsJsonAsync(
-                    new JsonMessageResponse(result, DateTime.UtcNow),
-                    AgentCoreJsonContext.Default.JsonMessageResponse);
+                errorType = ex.GetType().FullName;
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
+                activity?.AddException(ex);
+                throw;
+            }
+            finally
+            {
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
             }
         });
 
@@ -202,7 +224,7 @@ public static class AgentCoreEndpointExtensions
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync<TRequest>(httpContext.Request.Body, JsonSerializerOptions.Web, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -214,10 +236,30 @@ public static class AgentCoreEndpointExtensions
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
-            var result = await handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
-            await httpContext.Response.WriteAsJsonAsync(
-                new JsonMessageResponse(result, DateTime.UtcNow),
-                AgentCoreJsonContext.Default.JsonMessageResponse);
+
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
+            var stopwatch = Stopwatch.StartNew();
+            string? errorType = null;
+
+            try
+            {
+                var result = await handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonMessageResponse(result, DateTime.UtcNow),
+                    AgentCoreJsonContext.Default.JsonMessageResponse);
+            }
+            catch (Exception ex)
+            {
+                errorType = ex.GetType().FullName;
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
+                activity?.AddException(ex);
+                throw;
+            }
+            finally
+            {
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
+            }
         });
 
         MapPingEndpoint(app, pingHandler);
@@ -265,7 +307,7 @@ public static class AgentCoreEndpointExtensions
 
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync(httpContext.Request.Body, requestTypeInfo, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -277,10 +319,30 @@ public static class AgentCoreEndpointExtensions
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
-            var result = await handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
-            await httpContext.Response.WriteAsJsonAsync(
-                new JsonMessageResponse(result, DateTime.UtcNow),
-                AgentCoreJsonContext.Default.JsonMessageResponse);
+
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
+            var stopwatch = Stopwatch.StartNew();
+            string? errorType = null;
+
+            try
+            {
+                var result = await handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
+                await httpContext.Response.WriteAsJsonAsync(
+                    new JsonMessageResponse(result, DateTime.UtcNow),
+                    AgentCoreJsonContext.Default.JsonMessageResponse);
+            }
+            catch (Exception ex)
+            {
+                errorType = ex.GetType().FullName;
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
+                activity?.AddException(ex);
+                throw;
+            }
+            finally
+            {
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
+            }
         });
 
         MapPingEndpoint(app, pingHandler);
@@ -310,7 +372,7 @@ public static class AgentCoreEndpointExtensions
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync<TRequest>(httpContext.Request.Body, JsonSerializerOptions.Web, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -322,8 +384,28 @@ public static class AgentCoreEndpointExtensions
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
-            var stream = handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
-            await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, stream);
+
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
+            var stopwatch = Stopwatch.StartNew();
+            string? errorType = null;
+
+            try
+            {
+                var stream = handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
+                await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, stream);
+            }
+            catch (Exception ex)
+            {
+                errorType = ex.GetType().FullName;
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
+                activity?.AddException(ex);
+                throw;
+            }
+            finally
+            {
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
+            }
         });
 
         MapPingEndpoint(app, pingHandler);
@@ -371,7 +453,7 @@ public static class AgentCoreEndpointExtensions
 
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync(httpContext.Request.Body, requestTypeInfo, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -383,8 +465,28 @@ public static class AgentCoreEndpointExtensions
 
             var context = AgentCoreRuntimeContext.FromHttpContext(httpContext);
             AgentCoreRuntimeContextProvider.CurrentContext = context;
-            var stream = handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
-            await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, stream);
+
+            using var activity = AgentCoreActivitySource.StartInvocation(context.SessionId);
+            var stopwatch = Stopwatch.StartNew();
+            string? errorType = null;
+
+            try
+            {
+                var stream = handler(request, context, httpContext.RequestServices, httpContext.RequestAborted);
+                await StreamingResponseWriter.WriteStreamingResponseAsync(httpContext, stream);
+            }
+            catch (Exception ex)
+            {
+                errorType = ex.GetType().FullName;
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
+                activity?.AddException(ex);
+                throw;
+            }
+            finally
+            {
+                AgentCoreMetrics.RecordInvocationDuration(
+                    stopwatch.Elapsed.TotalSeconds, errorType);
+            }
         });
 
         MapPingEndpoint(app, pingHandler);

@@ -5,7 +5,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsAotCompatible>true</IsAotCompatible>
-        <Version>0.0.1-preview</Version>
+        <Version>0.1.0-preview</Version>
         <IsPackable>true</IsPackable>
         <PackageId>AWS.AgentCore.Hosting</PackageId>
         <Product>AI Integrations on AWS for .NET</Product>
@@ -36,6 +36,7 @@
         <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.35" />
         <PackageReference Include="Microsoft.Agents.AI" Version="1.3.0" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
+        <PackageReference Include="OpenTelemetry" Version="1.16.0" />
     </ItemGroup>
 
     <ItemGroup>

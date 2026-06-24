@@ -8,7 +8,7 @@ using Microsoft.Extensions.AI;
 
 namespace RemoteMcpAgent;
 
-public class Agent(ChatClientAgent chatAgent, McpToolProvider mcpToolProvider, ILogger<Agent> logger)
+public class Agent(AIAgent chatAgent, McpToolProvider mcpToolProvider, ILogger<Agent> logger)
 {
     [AgentCoreHandler]
     public async Task<string> HandleInvocation(

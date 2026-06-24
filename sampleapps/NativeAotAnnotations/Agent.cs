@@ -11,7 +11,7 @@ using NativeAotAnnotations.Models;
 
 namespace NativeAotAnnotations;
 
-public class Agent(ChatClientAgent chatAgent, ILogger<Agent> logger)
+public class Agent(AIAgent chatAgent, ILogger<Agent> logger)
 {
     [AgentCoreHandler(JsonContext = typeof(AppJsonContext))]
     public async Task<string> HandleInvocation(

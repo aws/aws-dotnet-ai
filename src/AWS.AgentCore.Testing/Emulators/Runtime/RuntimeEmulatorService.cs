@@ -37,7 +37,7 @@ public class RuntimeEmulatorService(HttpClient agentClient, ILogger<RuntimeEmula
         var request = new HttpRequestMessage(HttpMethod.Post, "/invocations");
         request.Headers.Add("X-Amzn-Bedrock-AgentCore-Runtime-Session-Id", sessionId);
         request.Headers.Add("X-Amzn-Bedrock-AgentCore-Runtime-Request-Id", requestId);
-        request.Content = new StringContent(submission.Text, Encoding.UTF8, "application/json");
+        request.Content = new StringContent(submission.Text, Encoding.UTF8, "application/octet-stream");
 
         using var response = await agentClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
@@ -76,7 +76,7 @@ public class RuntimeEmulatorService(HttpClient agentClient, ILogger<RuntimeEmula
         request.Headers.Add("X-Amzn-Bedrock-AgentCore-Runtime-Session-Id", sessionId);
         request.Headers.Add("X-Amzn-Bedrock-AgentCore-Runtime-Request-Id", requestId);
         request.Headers.Add("Accept", "text/event-stream");
-        request.Content = new StringContent(submission.Text, Encoding.UTF8, "application/json");
+        request.Content = new StringContent(submission.Text, Encoding.UTF8, "application/octet-stream");
 
         var response = await agentClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken);

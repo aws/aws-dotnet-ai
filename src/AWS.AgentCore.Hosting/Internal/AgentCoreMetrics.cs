@@ -23,9 +23,8 @@ internal static class AgentCoreMetrics
     /// <summary>
     /// gen_ai.client.operation.duration — GenAI operation duration in seconds.
     /// Tagged with gen_ai.operation.name (required) and error.type (when the operation
-    /// ended in error). The OpenTelemetry resource carries gen_ai.provider.name (set by
-    /// AgentCoreObservability when a Bedrock ModelId is configured, or by the user via
-    /// OTEL_RESOURCE_ATTRIBUTES).
+    /// ended in error). Users can set gen_ai.provider.name as a resource attribute via
+    /// OTEL_RESOURCE_ATTRIBUTES or their OTel resource configuration.
     /// The histogram's count aggregation also serves as the invocation counter.
     /// </summary>
     private static readonly Histogram<double> OperationDuration =

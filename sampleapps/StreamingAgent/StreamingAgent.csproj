@@ -8,7 +8,15 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\AWS.AgentCore.Hosting\AWS.AgentCore.Hosting.csproj" />
-        <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
+    </ItemGroup>
+
+    <!-- OpenTelemetry packages for standalone OTel setup (no Aspire ServiceDefaults) -->
+    <ItemGroup>
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AWS" Version="1.16.0" />
     </ItemGroup>
 
 </Project>

@@ -12,8 +12,7 @@ public class Startup
     public void ConfigureServices(WebApplicationBuilder builder)
     {
         // Aspire ServiceDefaults sets up OpenTelemetry (incl. AddAgentCoreInstrumentation),
-        // health checks, service discovery, and HTTP resilience. AddAgentCore() does not need
-        // EnableObservability when ServiceDefaults owns the OTel pipeline.
+        // service discovery, and HTTP resilience.
         builder.AddServiceDefaults();
 
         builder.AddAgentCore(options =>

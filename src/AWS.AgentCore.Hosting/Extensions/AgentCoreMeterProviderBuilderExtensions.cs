@@ -18,9 +18,7 @@ public static class AgentCoreMeterProviderBuilderExtensions
     /// </summary>
     /// <remarks>
     /// Use this when wiring up your own <see cref="MeterProviderBuilder"/> (e.g. inside an
-    /// Aspire <c>ServiceDefaults</c> project or a custom OpenTelemetry pipeline). For a turnkey
-    /// OTel pipeline targeting the AgentCore Runtime sidecar, set
-    /// <c>AgentCoreOptions.EnableObservability</c> to <c>true</c> in <c>AddAgentCore()</c> instead.
+    /// Aspire <c>ServiceDefaults</c> project or a custom OpenTelemetry pipeline).
     /// </remarks>
     /// <param name="builder">The meter provider builder.</param>
     /// <returns>The same <see cref="MeterProviderBuilder"/> for chaining.</returns>

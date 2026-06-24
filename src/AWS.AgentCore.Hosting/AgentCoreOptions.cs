@@ -3,9 +3,6 @@
 
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using OpenTelemetry.Logs;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
 
 namespace AWS.AgentCore.Hosting;
 
@@ -54,28 +51,6 @@ public class AgentCoreOptions
     public string? MemoryId { get; set; }
 
     /// <summary>
-    /// When <c>true</c>, <c>AddAgentCore()</c> registers a default OpenTelemetry pipeline
-    /// targeting the AgentCore Runtime OTLP sidecar (<c>http://localhost:4318</c>, HTTP/Protobuf)
-    /// with ASP.NET Core, HttpClient, and AWS SDK instrumentation, plus an OTLP exporter for
-    /// traces, metrics, and logs. Default: <c>false</c>.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Set this to <c>true</c> for standalone agents that do not bring their own
-    /// OpenTelemetry setup.
-    /// </para>
-    /// <para>
-    /// Leave this <c>false</c> when the application already configures its own OpenTelemetry
-    /// pipeline (e.g. via Aspire <c>ServiceDefaults</c>, ADOT, or a custom OTel setup). In that
-    /// case, the <c>IChatClient</c> and <c>AIAgent</c> wrappers still emit telemetry and the
-    /// AgentCore activity sources/meters are subscribed via the
-    /// <c>AddAgentCoreInstrumentation()</c> extensions on
-    /// <see cref="TracerProviderBuilder"/> / <see cref="MeterProviderBuilder"/>.
-    /// </para>
-    /// </remarks>
-    public bool EnableObservability { get; set; }
-
-    /// <summary>
     /// When true, the OpenTelemetry instrumentation on the wrapped <c>IChatClient</c> and
     /// <c>AIAgent</c> will include sensitive data such as prompts, responses, function arguments,
     /// and function results in span attributes and metrics. Default: false.
@@ -85,21 +60,4 @@ public class AgentCoreOptions
     /// model output, and tool invocation parameters that should not be exposed in production logs.
     /// </remarks>
     public bool EnableSensitiveTelemetryData { get; set; }
-
-    /// <summary>
-    /// Optional callback to customize the TracerProviderBuilder after defaults are applied.
-    /// Use this to add custom activity sources, additional instrumentation, or samplers.
-    /// </summary>
-    public Action<TracerProviderBuilder>? ConfigureTracing { get; set; }
-
-    /// <summary>
-    /// Optional callback to customize the MeterProviderBuilder after defaults are applied.
-    /// Use this to add custom meters or views.
-    /// </summary>
-    public Action<MeterProviderBuilder>? ConfigureMetrics { get; set; }
-
-    /// <summary>
-    /// Optional callback to customize the OpenTelemetry logging configuration after defaults are applied.
-    /// </summary>
-    public Action<OpenTelemetryLoggerOptions>? ConfigureLogging { get; set; }
 }

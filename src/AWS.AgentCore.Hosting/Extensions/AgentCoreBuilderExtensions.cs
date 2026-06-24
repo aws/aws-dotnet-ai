@@ -121,15 +121,10 @@ public static class AgentCoreBuilderExtensions
             logger.LogDebug("Skipping port configuration — ASPNETCORE_URLS or Aspire managed mode detected");
         }
 
-        // OpenTelemetry pipeline registration.
-        // When EnableObservability is true, register a turnkey OTLP pipeline targeting the
-        // AgentCore Runtime sidecar. Otherwise, the application owns the pipeline — users wire
-        // their own with AddOpenTelemetry() and call AddAgentCoreInstrumentation() on their
-        // TracerProviderBuilder/MeterProviderBuilder to subscribe AgentCore sources/meters.
-        // The IChatClient/AIAgent .UseOpenTelemetry() wrapping below happens regardless, so
-        // the underlying activity sources fire whether or not anyone subscribes.
-        if (options.EnableObservability)
-            AgentCoreObservability.RegisterDefaultPipeline(builder, options);
+        // The IChatClient/AIAgent .UseOpenTelemetry() wrapping below always fires so the
+        // underlying activity sources emit spans/metrics. Users who want to collect this
+        // telemetry set up their own OTel pipeline (e.g. via Aspire ServiceDefaults) and call
+        // AddAgentCoreInstrumentation() on their TracerProviderBuilder/MeterProviderBuilder.
 
         // IChatClient registration (priority order).
         // The .UseOpenTelemetry() wrapping is always applied — it has near-zero overhead when
@@ -221,11 +216,11 @@ public static class AgentCoreBuilderExtensions
             return new ChatClientAgent(chatClient, agentOptions);
         });
 
-        // Register AIAgent (the public-facing agent, optionally decorated with middleware and
-        // OpenTelemetry). When observability is enabled, this wraps the inner ChatClientAgent
-        // with .UseOpenTelemetry() so MS Agent Framework's agent-level activities (invoke_agent,
-        // execute_tool) and metrics (agent_framework.function.invocation.duration) are emitted
-        // under MS Agent Framework's default source name "Experimental.Microsoft.Agents.AI".
+        // Register AIAgent (the public-facing agent, decorated with middleware and OpenTelemetry).
+        // Wraps the inner ChatClientAgent with .UseOpenTelemetry() so MS Agent Framework's
+        // agent-level activities (invoke_agent, execute_tool) and metrics
+        // (agent_framework.function.invocation.duration) are emitted under
+        // "Experimental.Microsoft.Agents.AI".
         builder.Services.AddSingleton<AIAgent>(sp =>
         {
             var chatClientAgent = sp.GetRequiredService<ChatClientAgent>();

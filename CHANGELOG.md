@@ -1,3 +1,9 @@
+## Release 2026-06-24
+
+### AWS.AgentCore.Hosting (0.1.0-preview)
+* Added OpenTelemetry instrumentation support. IChatClient and AIAgent are wrapped with .UseOpenTelemetry() decorators that emit traces and metrics under standard Microsoft AI activity sources. Users wire their own OTel pipeline and call AddAgentCoreInstrumentation() on TracerProviderBuilder/MeterProviderBuilder to subscribe AgentCore sources and meters.
+* Fixed request deserialization to not require Content-Type: application/json. The AgentCore Runtime forwards requests without a JSON content type; the /invocations endpoint now reads the body directly via JsonSerializer instead of ReadFromJsonAsync.
+
 ## Release 2026-06-05
 
 ### AWS.AgentCore.Hosting (0.0.1-preview)

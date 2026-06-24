@@ -5,6 +5,7 @@ using AWS.AgentCore.Hosting;
 using AWS.AgentCore.Hosting.Internal;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
@@ -133,7 +134,7 @@ public static class AgentCoreEndpointExtensions
 
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync<TRequest>(httpContext.Request.Body, JsonSerializerOptions.Web, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -223,7 +224,7 @@ public static class AgentCoreEndpointExtensions
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync<TRequest>(httpContext.Request.Body, JsonSerializerOptions.Web, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -306,7 +307,7 @@ public static class AgentCoreEndpointExtensions
 
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync(httpContext.Request.Body, requestTypeInfo, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -371,7 +372,7 @@ public static class AgentCoreEndpointExtensions
     {
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync<TRequest>(httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync<TRequest>(httpContext.Request.Body, JsonSerializerOptions.Web, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -452,7 +453,7 @@ public static class AgentCoreEndpointExtensions
 
         app.MapPost("/invocations", async (HttpContext httpContext) =>
         {
-            var request = await httpContext.Request.ReadFromJsonAsync(requestTypeInfo, httpContext.RequestAborted);
+            var request = await JsonSerializer.DeserializeAsync(httpContext.Request.Body, requestTypeInfo, httpContext.RequestAborted);
             if (request is null)
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;

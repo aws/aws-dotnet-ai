@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore.Hosting",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Fixed request deserialization to not require Content-Type: application/json. The AgentCore Runtime forwards requests without a JSON content type; the /invocations endpoint now reads the body directly via JsonSerializer instead of ReadFromJsonAsync."
+      ]
+    }
+  ]
+}

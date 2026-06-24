@@ -4,7 +4,7 @@
       "Name": "AWS.AgentCore.Hosting",
       "Type": "Minor",
       "ChangelogMessages": [
-        "Added OpenTelemetry instrumentation for traces, metrics, and logs. Wraps IChatClient and AIAgent with Microsoft Agent Framework\u0027s OpenTelemetry decorators and exports via OTLP. Configurable via the AgentCoreOptions.ConfigureTracing/ConfigureMetrics/ConfigureLogging callbacks; opt out via DisableObservability."
+        "Added OpenTelemetry instrumentation support. IChatClient and AIAgent are wrapped with .UseOpenTelemetry() decorators that emit traces and metrics under standard Microsoft AI activity sources. Users wire their own OTel pipeline and call AddAgentCoreInstrumentation() on TracerProviderBuilder/MeterProviderBuilder to subscribe AgentCore sources and meters."
       ]
     }
   ]

@@ -1,3 +1,10 @@
+## Release 2026-08-04
+
+### AWS.AgentCore.Hosting (1.0.0)
+* Promoted AWS.AgentCore.Hosting to its first stable 1.0.0 release.
+### AWS.AgentCore.Testing (1.0.0)
+* Promoted AWS.AgentCore.Testing to its first stable 1.0.0 release.
+
 ## Release 2026-06-24
 
 ### AWS.AgentCore.Hosting (0.1.0-preview)

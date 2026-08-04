@@ -138,7 +138,7 @@ public class BedrockRealtimeClientTests
 
         try
         {
-            await client.CreateSessionAsync(options);
+            await client.CreateSessionAsync(options, cancellationToken: TestContext.Current.CancellationToken);
         }
         catch
         {
@@ -165,7 +165,7 @@ public class BedrockRealtimeClientTests
 
         try
         {
-            await client.CreateSessionAsync();
+            await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
         catch
         {
@@ -183,7 +183,7 @@ public class BedrockRealtimeClientTests
 
         using var client = new BedrockNovaRealtimeClient(mock.Object);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => client.CreateSessionAsync(null));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => client.CreateSessionAsync(null, cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains("No model ID was provided", ex.Message);
     }
 
@@ -199,7 +199,7 @@ public class BedrockRealtimeClientTests
         using var client = new BedrockNovaRealtimeClient(mock.Object);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.CreateSessionAsync());
+            () => client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     #region Extension Method Tests

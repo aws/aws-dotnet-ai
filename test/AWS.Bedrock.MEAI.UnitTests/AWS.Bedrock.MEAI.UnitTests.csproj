@@ -13,8 +13,7 @@
         <LangVersion>Latest</LangVersion>
         <IsPackable>false</IsPackable>
         <!-- MEAI001: uses evaluation-stage Microsoft.Extensions.AI APIs. -->
-        <!-- xUnit1051: xUnit v3 analyzer prefers TestContext.Current.CancellationToken; can be addressed as a follow-up cleanup across the ~4300-line chat test file. -->
-        <NoWarn>$(NoWarn);MEAI001;xUnit1051</NoWarn>
+        <NoWarn>$(NoWarn);MEAI001</NoWarn>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
     </PropertyGroup>

@@ -151,7 +151,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(mock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(session, session.GetService(typeof(BedrockNovaRealtimeSession)));
         Assert.Same(session, session.GetService(typeof(IRealtimeClientSession)));
@@ -169,7 +169,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(mock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         var metadata = (ChatClientMetadata?)session.GetService(typeof(ChatClientMetadata));
         Assert.NotNull(metadata);
@@ -189,7 +189,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(mock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Throws<ArgumentNullException>("serviceType", () => session.GetService(null!));
 
@@ -206,7 +206,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(mock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Null(session.GetService(typeof(BedrockNovaRealtimeSession), "key"));
 
@@ -223,7 +223,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(mock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Null(session.GetService(typeof(string)));
 
@@ -244,7 +244,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(mock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Null(session.Options);
 
@@ -265,7 +265,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(mock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await session.DisposeAsync();
 
@@ -283,7 +283,7 @@ public class BedrockRealtimeSessionTests
         var (session, _) = await CreateConnectedSessionWithCapture();
 
         await Assert.ThrowsAsync<ArgumentNullException>("message",
-            () => session.SendAsync(null!));
+            () => session.SendAsync(null!, cancellationToken: TestContext.Current.CancellationToken));
 
         await session.DisposeAsync();
     }
@@ -314,7 +314,7 @@ public class BedrockRealtimeSessionTests
             MaxOutputTokens = 2048
         };
 
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(options));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(options), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         Assert.Same(options, session.Options);
@@ -333,7 +333,7 @@ public class BedrockRealtimeSessionTests
             Voice = "matthew"
         };
 
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(options));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(options), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 1);
 
         lock (capturedEvents)
@@ -363,7 +363,7 @@ public class BedrockRealtimeSessionTests
             OutputAudioFormat = new RealtimeAudioFormat("audio/lpcm", 16000)
         };
 
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(options));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(options), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         lock (capturedEvents)
@@ -393,7 +393,7 @@ public class BedrockRealtimeSessionTests
             Instructions = "You are a helpful assistant."
         };
 
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(options));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(options), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 5);
 
         lock (capturedEvents)
@@ -426,7 +426,7 @@ public class BedrockRealtimeSessionTests
         var audioContent = new DataContent(new byte[] { 1, 2, 3 }, "audio/lpcm");
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => session.SendAsync(new InputAudioBufferAppendRealtimeClientMessage(audioContent)));
+            () => session.SendAsync(new InputAudioBufferAppendRealtimeClientMessage(audioContent), cancellationToken: TestContext.Current.CancellationToken));
 
         await session.DisposeAsync();
     }
@@ -437,13 +437,13 @@ public class BedrockRealtimeSessionTests
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
         // First configure the session
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         // Then send audio
         var audioBytes = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
         var audioContent = new DataContent(audioBytes, "audio/lpcm");
-        await session.SendAsync(new InputAudioBufferAppendRealtimeClientMessage(audioContent));
+        await session.SendAsync(new InputAudioBufferAppendRealtimeClientMessage(audioContent), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvent(capturedEvents, e => e.Contains("\"audioInput\""));
 
         lock (capturedEvents)
@@ -468,11 +468,11 @@ public class BedrockRealtimeSessionTests
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
         // Configure and open audio
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         var audioContent = new DataContent(new byte[] { 1, 2 }, "audio/lpcm");
-        await session.SendAsync(new InputAudioBufferAppendRealtimeClientMessage(audioContent));
+        await session.SendAsync(new InputAudioBufferAppendRealtimeClientMessage(audioContent), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvent(capturedEvents, e => e.Contains("\"audioInput\""));
 
         int eventCountBefore;
@@ -483,7 +483,7 @@ public class BedrockRealtimeSessionTests
 
         // Commit sends trailing silence instead of closing the content block
         // (Nova Sonic uses VAD to detect speech boundaries)
-        await session.SendAsync(new InputAudioBufferCommitRealtimeClientMessage());
+        await session.SendAsync(new InputAudioBufferCommitRealtimeClientMessage(), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, eventCountBefore + 1);
 
         lock (capturedEvents)
@@ -507,7 +507,7 @@ public class BedrockRealtimeSessionTests
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
         // Configure session
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         int eventCountBefore;
@@ -517,7 +517,7 @@ public class BedrockRealtimeSessionTests
         }
 
         // CreateResponse sends a silence nudge to keep the bidirectional stream flowing
-        await session.SendAsync(new CreateResponseRealtimeClientMessage());
+        await session.SendAsync(new CreateResponseRealtimeClientMessage(), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvent(capturedEvents, e => e.Contains("\"audioInput\""));
 
         lock (capturedEvents)
@@ -539,7 +539,7 @@ public class BedrockRealtimeSessionTests
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
         // Configure session
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         var item = new RealtimeConversationItem(
@@ -547,7 +547,7 @@ public class BedrockRealtimeSessionTests
             id: "test-id",
             role: ChatRole.User);
 
-        await session.SendAsync(new CreateConversationItemRealtimeClientMessage(item));
+        await session.SendAsync(new CreateConversationItemRealtimeClientMessage(item), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvent(capturedEvents, e => e.Contains("\"textInput\"") && e.Contains("Hello world"));
 
         lock (capturedEvents)
@@ -566,7 +566,7 @@ public class BedrockRealtimeSessionTests
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
         // Configure session
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         var toolResult = new FunctionResultContent("tool-call-id", "Sunny, 72°F");
@@ -575,7 +575,7 @@ public class BedrockRealtimeSessionTests
             id: "result-id",
             role: ChatRole.Tool);
 
-        await session.SendAsync(new CreateConversationItemRealtimeClientMessage(item));
+        await session.SendAsync(new CreateConversationItemRealtimeClientMessage(item), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvent(capturedEvents, e => e.Contains("\"toolResult\""));
 
         lock (capturedEvents)
@@ -623,7 +623,7 @@ public class BedrockRealtimeSessionTests
             RawRepresentation = rawJson
         };
 
-        await session.SendAsync(message);
+        await session.SendAsync(message, cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvent(capturedEvents, e => e.Contains("customEvent"));
 
         lock (capturedEvents)
@@ -640,10 +640,10 @@ public class BedrockRealtimeSessionTests
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
         // Send two session updates
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions { MaxOutputTokens = 1024 }));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions { MaxOutputTokens = 1024 }), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions { MaxOutputTokens = 2048 }));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions { MaxOutputTokens = 2048 }), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2); // count shouldn't grow beyond the initial 2
 
         lock (capturedEvents)
@@ -695,7 +695,7 @@ public class BedrockRealtimeSessionTests
         await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions
         {
             MaxOutputTokens = 512
-        }));
+        }), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         lock (capturedEvents)
@@ -723,7 +723,7 @@ public class BedrockRealtimeSessionTests
         {
             Voice = "amy",
             OutputAudioFormat = new RealtimeAudioFormat("audio/lpcm", 8000)
-        }));
+        }), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         lock (capturedEvents)
@@ -752,11 +752,11 @@ public class BedrockRealtimeSessionTests
         await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions
         {
             InputAudioFormat = new RealtimeAudioFormat("audio/lpcm", 8000)
-        }));
+        }), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         var audioContent = new DataContent(new byte[] { 1, 2, 3 }, "audio/lpcm");
-        await session.SendAsync(new InputAudioBufferAppendRealtimeClientMessage(audioContent));
+        await session.SendAsync(new InputAudioBufferAppendRealtimeClientMessage(audioContent), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvent(capturedEvents, e => e.Contains("\"contentStart\"") && e.Contains("\"AUDIO\""));
 
         lock (capturedEvents)
@@ -788,7 +788,7 @@ public class BedrockRealtimeSessionTests
     {
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         // Send multiple audio frames concurrently
@@ -823,7 +823,7 @@ public class BedrockRealtimeSessionTests
         await session.DisposeAsync();
 
         await Assert.ThrowsAsync<ObjectDisposedException>(
-            () => session.SendAsync(new RealtimeClientMessage()));
+            () => session.SendAsync(new RealtimeClientMessage(), cancellationToken: TestContext.Current.CancellationToken));
     }
 
     #endregion
@@ -840,7 +840,7 @@ public class BedrockRealtimeSessionTests
         await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions
         {
             MaxOutputTokens = 512
-        }));
+        }), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         // Dispose the session, which closes the channel
@@ -854,10 +854,10 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client2 = new BedrockNovaRealtimeClient(runtimeMock.Object, "test-model");
-        var session2 = await client2.CreateSessionAsync();
+        var session2 = await client2.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Configure the session
-        await session2.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session2.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
 
         // Dispose to trigger channel close, then verify second dispose is idempotent
         await session2.DisposeAsync();
@@ -870,7 +870,7 @@ public class BedrockRealtimeSessionTests
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
         // Configure the session first
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         using var cts = new CancellationTokenSource();
@@ -890,11 +890,11 @@ public class BedrockRealtimeSessionTests
         var (session, capturedEvents) = await CreateConnectedSessionWithCapture();
 
         // Configure
-        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()));
+        await session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken);
         WaitForEvents(capturedEvents, 2);
 
         // Send a message and then immediately dispose
-        var sendTask = session.SendAsync(new CreateResponseRealtimeClientMessage());
+        var sendTask = session.SendAsync(new CreateResponseRealtimeClientMessage(), cancellationToken: TestContext.Current.CancellationToken);
         await sendTask; // Should not throw
 
         await session.DisposeAsync();
@@ -914,7 +914,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(mock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // The session should expose the underlying IAmazonBedrockRuntime via GetService
         var runtime = session.GetService(typeof(IAmazonBedrockRuntime));
@@ -1102,7 +1102,7 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(runtimeMock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Simulate an active enumeration by setting the guard field via reflection
         var field = typeof(BedrockNovaRealtimeSession).GetField(
@@ -1114,7 +1114,7 @@ public class BedrockRealtimeSessionTests
         // Second enumeration should throw immediately
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await foreach (var _ in session.GetStreamingResponseAsync())
+            await foreach (var _ in session.GetStreamingResponseAsync(cancellationToken: TestContext.Current.CancellationToken))
             {
             }
         });
@@ -1204,13 +1204,13 @@ public class BedrockRealtimeSessionTests
             .ReturnsAsync(new Mock<InvokeModelWithBidirectionalStreamResponse>().Object);
 
         var client = new BedrockNovaRealtimeClient(runtimeMock.Object, "test-model");
-        var session = await client.CreateSessionAsync();
+        var session = await client.CreateSessionAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Dispose to cause ODE on any future send that gets past the initial check
         await session.DisposeAsync();
 
         var ex = await Assert.ThrowsAsync<ObjectDisposedException>(
-            () => session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions())));
+            () => session.SendAsync(new SessionUpdateRealtimeClientMessage(new RealtimeSessionOptions()), cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("BedrockNovaRealtimeSession", ex.ObjectName);
     }

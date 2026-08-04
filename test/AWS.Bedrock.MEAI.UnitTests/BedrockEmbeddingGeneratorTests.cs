@@ -13,7 +13,7 @@ public class BedrockEmbeddingGeneratorTests
     [Trait("UnitTest", "BedrockRuntime")]
     public void AsIEmbeddingGenerator_InvalidArguments_Throws()
     {
-        Assert.Throws<ArgumentNullException>("runtime", () => AmazonBedrockRuntimeExtensions.AsIEmbeddingGenerator(null));
+        Assert.Throws<ArgumentNullException>("runtime", () => AmazonBedrockRuntimeExtensions.AsIEmbeddingGenerator(null!));
     }
 
     [Theory]
@@ -22,7 +22,7 @@ public class BedrockEmbeddingGeneratorTests
     [InlineData("titan", null)]
     [InlineData(null, 42)]
     [InlineData("titan", 42)]
-    public void AsIEmbeddingGenerator_ReturnsInstance(string modelId, int? dimensions)
+    public void AsIEmbeddingGenerator_ReturnsInstance(string? modelId, int? dimensions)
     {
         IAmazonBedrockRuntime runtime = new AmazonBedrockRuntimeClient("awsAccessKeyId", "awsSecretAccessKey", RegionEndpoint.USEast1);
         IEmbeddingGenerator<string, Embedding<float>> generator = runtime.AsIEmbeddingGenerator(modelId, dimensions);

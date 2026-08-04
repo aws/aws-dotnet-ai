@@ -25,18 +25,18 @@ internal sealed class TestAIFunction : AIFunctionDeclaration
         string name,
         string description,
         JsonElement jsonSchema,
-        IReadOnlyDictionary<string, object> additionalProperties = null)
+        IReadOnlyDictionary<string, object?>? additionalProperties = null)
     {
         Name = name;
         Description = description;
         JsonSchema = jsonSchema;
-        AdditionalProperties = additionalProperties;
+        AdditionalProperties = additionalProperties ?? new Dictionary<string, object?>();
     }
 
     public override string Name { get; }
     public override string Description { get; }
     public override JsonElement JsonSchema { get; }
-    public override IReadOnlyDictionary<string, object> AdditionalProperties { get; }
+    public override IReadOnlyDictionary<string, object?> AdditionalProperties { get; }
 }
 
 public class BedrockChatClientTests
@@ -45,14 +45,14 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public void AsIChatClient_InvalidArguments_Throws()
     {
-        Assert.Throws<ArgumentNullException>("runtime", () => AmazonBedrockRuntimeExtensions.AsIChatClient(null));
+        Assert.Throws<ArgumentNullException>("runtime", () => AmazonBedrockRuntimeExtensions.AsIChatClient(null!));
     }
 
     [Theory]
     [Trait("UnitTest", "BedrockRuntime")]
     [InlineData(null)]
     [InlineData("claude")]
-    public void AsIChatClient_ReturnsInstance(string modelId)
+    public void AsIChatClient_ReturnsInstance(string? modelId)
     {
         var mockRuntime = new Mock<IAmazonBedrockRuntime>();
         IChatClient client = mockRuntime.Object.AsIChatClient(modelId);
@@ -81,7 +81,7 @@ public class BedrockChatClientTests
     {
         // Arrange
         var mockRuntime = new Mock<IAmazonBedrockRuntime>();
-        ConverseRequest capturedRequest = null;
+        ConverseRequest? capturedRequest = null;
 
         mockRuntime
             .Setup(x => x.ConverseAsync(It.IsAny<ConverseRequest>(), It.IsAny<CancellationToken>()))
@@ -136,7 +136,7 @@ public class BedrockChatClientTests
         };
 
         // Act
-        await client.GetResponseAsync(messages, options);
+        await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(capturedRequest);
@@ -212,7 +212,7 @@ public class BedrockChatClientTests
         var options = new ChatOptions { ResponseFormat = ChatResponseFormat.Json };
 
         // Act
-        var response = await client.GetResponseAsync(messages, options);
+        var response = await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(response);
@@ -246,7 +246,7 @@ public class BedrockChatClientTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await client.GetResponseAsync(messages, options));
+            await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public class BedrockChatClientTests
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<AmazonBedrockRuntimeException>(async () =>
-            await client.GetResponseAsync(messages, options));
+            await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal("ValidationException", ex.ErrorCode);
         Assert.Contains("toolChoice is not supported", ex.Message);
@@ -307,7 +307,7 @@ public class BedrockChatClientTests
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await client.GetResponseAsync(messages, options));
+            await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("did not return structured output", ex.Message);
         Assert.Contains("end_turn", ex.Message);
@@ -355,7 +355,7 @@ public class BedrockChatClientTests
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await client.GetResponseAsync(messages, options));
+            await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("did not return structured output", ex.Message);
     }
@@ -398,7 +398,7 @@ public class BedrockChatClientTests
         var options = new ChatOptions { ResponseFormat = ChatResponseFormat.Json };
 
         // Act
-        var response = await client.GetResponseAsync(messages, options);
+        var response = await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert - Empty object is valid JSON
         Assert.NotNull(response.Text);
@@ -445,7 +445,7 @@ public class BedrockChatClientTests
 
         // Act & Assert - Should throw InvalidOperationException, not NullReferenceException
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await client.GetResponseAsync(messages, options));
+            await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("did not return structured output", ex.Message);
     }
@@ -456,7 +456,7 @@ public class BedrockChatClientTests
     {
         // Arrange
         var mockRuntime = new Mock<IAmazonBedrockRuntime>();
-        ConverseRequest capturedRequest = null;
+        ConverseRequest? capturedRequest = null;
 
         mockRuntime
             .Setup(x => x.ConverseAsync(It.IsAny<ConverseRequest>(), It.IsAny<CancellationToken>()))
@@ -494,7 +494,7 @@ public class BedrockChatClientTests
         };
 
         // Act
-        await client.GetResponseAsync(messages, options);
+        await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert - native structured outputs is realized via OutputConfig, not a synthetic tool.
         Assert.NotNull(capturedRequest);
@@ -524,7 +524,7 @@ public class BedrockChatClientTests
         // jsonSchema.schema, so Native mode must fall back to a permissive object schema rather
         // than emitting a null (which would fail marshalling/validation).
         var mockRuntime = new Mock<IAmazonBedrockRuntime>();
-        ConverseRequest capturedRequest = null;
+        ConverseRequest? capturedRequest = null;
 
         mockRuntime
             .Setup(x => x.ConverseAsync(It.IsAny<ConverseRequest>(), It.IsAny<CancellationToken>()))
@@ -547,7 +547,7 @@ public class BedrockChatClientTests
         var options = new ChatOptions { ResponseFormat = ChatResponseFormat.Json };
 
         // Act
-        await client.GetResponseAsync(messages, options);
+        await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert - schema is populated with a permissive object schema, not null.
         Assert.NotNull(capturedRequest?.OutputConfig?.TextFormat?.Structure?.JsonSchema);
@@ -564,7 +564,7 @@ public class BedrockChatClientTests
     {
         // Arrange - the core regression from issue #4425: Tools + ResponseFormat must compose in Native mode.
         var mockRuntime = new Mock<IAmazonBedrockRuntime>();
-        ConverseRequest capturedRequest = null;
+        ConverseRequest? capturedRequest = null;
 
         mockRuntime
             .Setup(x => x.ConverseAsync(It.IsAny<ConverseRequest>(), It.IsAny<CancellationToken>()))
@@ -598,7 +598,7 @@ public class BedrockChatClientTests
         };
 
         // Act - must NOT throw (previously threw ArgumentException before reaching Bedrock).
-        var response = await client.GetResponseAsync(messages, options);
+        var response = await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(response);
@@ -620,7 +620,7 @@ public class BedrockChatClientTests
     {
         // Arrange
         var mockRuntime = new Mock<IAmazonBedrockRuntime>();
-        ConverseRequest capturedRequest = null;
+        ConverseRequest? capturedRequest = null;
 
         mockRuntime
             .Setup(x => x.ConverseAsync(It.IsAny<ConverseRequest>(), It.IsAny<CancellationToken>()))
@@ -637,7 +637,7 @@ public class BedrockChatClientTests
         var options = new ChatOptions { Tools = new[] { tool } };
 
         // Act
-        await client.GetResponseAsync(messages, options);
+        await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(capturedRequest);
@@ -654,7 +654,7 @@ public class BedrockChatClientTests
     {
         // Arrange
         var mockRuntime = new Mock<IAmazonBedrockRuntime>();
-        ConverseRequest capturedRequest = null;
+        ConverseRequest? capturedRequest = null;
 
         mockRuntime
             .Setup(x => x.ConverseAsync(It.IsAny<ConverseRequest>(), It.IsAny<CancellationToken>()))
@@ -670,12 +670,12 @@ public class BedrockChatClientTests
             "get_weather",
             "Get the weather",
             schema,
-            new Dictionary<string, object> { ["Strict"] = true });
+            new Dictionary<string, object?> { ["Strict"] = true });
 
         var options = new ChatOptions { Tools = new[] { tool } };
 
         // Act
-        await client.GetResponseAsync(messages, options);
+        await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(capturedRequest);
@@ -715,7 +715,7 @@ public class BedrockChatClientTests
         var options = new ChatOptions { ResponseFormat = ChatResponseFormat.ForJsonSchema(schema) };
 
         // Act - no InvalidOperationException (that path is SyntheticTool-only).
-        var response = await client.GetResponseAsync(messages, options);
+        var response = await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Equal(json, response.Text);
@@ -728,7 +728,7 @@ public class BedrockChatClientTests
     public async Task ResponseFormat_Json_Native_Streaming_DoesNotThrow_AndSetsOutputConfig()
     {
         // Arrange
-        ConverseStreamRequest capturedRequest = null;
+        ConverseStreamRequest? capturedRequest = null;
         IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
         {
             capturedRequest = request;
@@ -751,7 +751,7 @@ public class BedrockChatClientTests
 
         // Act - Native mode supports streaming ResponseFormat (no NotSupportedException).
         var updates = new List<ChatResponseUpdate>();
-        await foreach (var update in client.GetStreamingResponseAsync([new(ChatRole.User, "Summarize")], options))
+        await foreach (var update in client.GetStreamingResponseAsync([new(ChatRole.User, "Summarize")], options, cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -799,7 +799,7 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     [InlineData(null)]
     [InlineData("anthropic.claude-3-sonnet-20240229-v1:0")]
-    public void IChatClient_GetService_ReturnsExpectedInstance(string defaultModelId)
+    public void IChatClient_GetService_ReturnsExpectedInstance(string? defaultModelId)
     {
         IAmazonBedrockRuntime mock = CreateMock();
         IChatClient chatClient = mock.AsIChatClient(defaultModelId);
@@ -808,7 +808,7 @@ public class BedrockChatClientTests
         Assert.Same(mock, chatClient.GetService<IAmazonBedrockRuntime>());
         Assert.Same(chatClient, chatClient.GetService<IChatClient>());
 
-        ChatClientMetadata metadata = chatClient.GetService<ChatClientMetadata>();
+        ChatClientMetadata? metadata = chatClient.GetService<ChatClientMetadata>();
         Assert.NotNull(metadata);
         Assert.Equal("aws.bedrock", metadata.ProviderName);
         Assert.Equal(defaultModelId, metadata.DefaultModelId);
@@ -834,7 +834,7 @@ public class BedrockChatClientTests
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => CreateResponse("Hello"));
 
         IChatClient chatClient = mock.AsIChatClient("anthropic.claude-3-sonnet-20240229-v1:0");
-        ChatResponse result = await chatClient.GetResponseAsync("Hello");
+        ChatResponse result = await chatClient.GetResponseAsync("Hello", cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.NotNull(result.Messages);
         Assert.Single(result.Messages);
@@ -864,7 +864,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
         ChatMessage[] messages = [new(ChatRole.User, "What is the weather like?")];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -898,7 +898,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
         ChatMessage[] messages = [];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -912,7 +912,7 @@ public class BedrockChatClientTests
         IAmazonBedrockRuntime mock = CreateMock();
         IChatClient chatClient = mock.AsIChatClient("claude");
 
-        await Assert.ThrowsAsync<ArgumentNullException>("messages", () => chatClient.GetResponseAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>("messages", () => chatClient.GetResponseAsync(null!, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -944,7 +944,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -977,7 +977,7 @@ public class BedrockChatClientTests
             });
 
             IChatClient chatClient = mock.AsIChatClient("claude");
-            await chatClient.GetResponseAsync([new(ChatRole.User, [new DataContent(imageData, mimeType)])]);
+            await chatClient.GetResponseAsync([new(ChatRole.User, [new DataContent(imageData, mimeType)])], cancellationToken: TestContext.Current.CancellationToken);
             Assert.True(verified, $"Format {mimeType} not verified");
         }
     }
@@ -1011,7 +1011,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -1034,7 +1034,7 @@ public class BedrockChatClientTests
 
         IChatClient chatClient = mock.AsIChatClient("claude");
         DataContent dataContent = new(pdfData, "application/pdf") { Name = "report.pdf" };
-        await chatClient.GetResponseAsync([new(ChatRole.User, [dataContent])]);
+        await chatClient.GetResponseAsync([new(ChatRole.User, [dataContent])], cancellationToken: TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -1063,7 +1063,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -1106,7 +1106,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Send me an image")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Send me an image")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -1152,7 +1152,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Send me a video")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Send me a video")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -1199,7 +1199,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Send me a document")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Send me a document")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -1251,7 +1251,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.Usage);
         Assert.Equal(100, result.Usage.InputTokenCount);
@@ -1274,7 +1274,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("custom_reason", result.FinishReason?.Value);
     }
@@ -1299,7 +1299,7 @@ public class BedrockChatClientTests
             StopSequences = ["STOP1", "STOP2"]
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], options);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -1329,7 +1329,7 @@ public class BedrockChatClientTests
             new(ChatRole.User, [new DataContent(docData, mimeType) { Name = "file" }])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -1353,7 +1353,7 @@ public class BedrockChatClientTests
             new(ChatRole.User, [new DataContent(imageData, mimeType)])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -1381,7 +1381,7 @@ public class BedrockChatClientTests
             new(ChatRole.User, [new DataContent(videoData, mimeType)])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -1409,7 +1409,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
 
         FunctionCallContent funcCallContent = new("call_123", "get_weather",
-            new Dictionary<string, object> { ["location"] = "Seattle" });
+            new Dictionary<string, object?> { ["location"] = "Seattle" });
 
         ChatMessage[] messages =
         [
@@ -1417,7 +1417,7 @@ public class BedrockChatClientTests
             new(ChatRole.Assistant, [funcCallContent])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -1463,7 +1463,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         var dataContent = Assert.IsType<DataContent>(Assert.Single(result.Messages[0].Contents));
@@ -1506,7 +1506,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         var dataContent = Assert.IsType<DataContent>(Assert.Single(result.Messages[0].Contents));
@@ -1553,7 +1553,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         var dataContent = Assert.IsType<DataContent>(Assert.Single(result.Messages[0].Contents));
@@ -1595,7 +1595,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         var dataContent = Assert.IsType<DataContent>(Assert.Single(result.Messages[0].Contents));
@@ -1637,7 +1637,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         var dataContent = Assert.IsType<DataContent>(Assert.Single(result.Messages[0].Contents));
@@ -1679,7 +1679,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         var dataContent = Assert.IsType<DataContent>(Assert.Single(result.Messages[0].Contents));
@@ -1706,7 +1706,7 @@ public class BedrockChatClientTests
             new(ChatRole.User, [new DataContent(data, "application/unknown-type")])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
     [Fact]
@@ -1749,7 +1749,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
         ChatMessage[] messages = [new(ChatRole.User, "Think step by step about this problem.")];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -1791,7 +1791,7 @@ public class BedrockChatClientTests
             new(ChatRole.Assistant, [new TextReasoningContent(reasoningText) { ProtectedData = signature }])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -1824,7 +1824,7 @@ public class BedrockChatClientTests
 
         ChatMessage[] messages = [new(ChatRole.User, [reasoningContent])];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -1861,14 +1861,14 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Think")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Think")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         var reasoningContent = Assert.IsType<TextReasoningContent>(Assert.Single(result.Messages[0].Contents));
         Assert.NotNull(reasoningContent.AdditionalProperties);
         Assert.True(reasoningContent.AdditionalProperties.ContainsKey(nameof(ReasoningContentBlock.RedactedContent)));
 
-        var received = (byte[])reasoningContent.AdditionalProperties[nameof(ReasoningContentBlock.RedactedContent)];
+        var received = (byte[])reasoningContent.AdditionalProperties![nameof(ReasoningContentBlock.RedactedContent)]!;
         Assert.True(received.SequenceEqual(redactedData));
     }
 
@@ -1926,7 +1926,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
         ChatMessage[] messages = [new(ChatRole.User, "Cite your sources")];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -1982,11 +1982,11 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         TextContent textContent = Assert.IsType<TextContent>(result.Messages[0].Contents[0]);
-        CitationAnnotation citation = Assert.IsType<CitationAnnotation>(Assert.Single(textContent.Annotations));
+        CitationAnnotation citation = Assert.IsType<CitationAnnotation>(Assert.Single(textContent.Annotations!));
         Assert.Equal("fallback-source", citation.Snippet);
     }
 
@@ -2013,7 +2013,7 @@ public class BedrockChatClientTests
             new(ChatRole.User, "Hello")
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -2037,7 +2037,7 @@ public class BedrockChatClientTests
         ChatMessage[] messages = [new(ChatRole.User, "Hello")];
         ChatOptions options = new() { Instructions = "Be concise." };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2071,7 +2071,7 @@ public class BedrockChatClientTests
             StopSequences = ["STOP"]
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -2104,7 +2104,7 @@ public class BedrockChatClientTests
             IChatClient chatClient = mock.AsIChatClient("claude");
             ChatMessage[] messages = [new(ChatRole.User, "Test")];
 
-            ChatResponse result = await chatClient.GetResponseAsync(messages);
+            ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(expectedFinishReason, result.FinishReason);
         }
     }
@@ -2125,13 +2125,13 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.NotNull(result.Messages[0].AdditionalProperties);
         // Values are JsonElement when deserialized from Document
-        Assert.Equal("custom_value", ((JsonElement)result.Messages[0].AdditionalProperties["custom_field"]).GetString());
-        Assert.Equal(123, ((JsonElement)result.Messages[0].AdditionalProperties["number_field"]).GetInt32());
+        Assert.Equal("custom_value", ((JsonElement)result.Messages[0].AdditionalProperties!["custom_field"]!).GetString());
+        Assert.Equal(123, ((JsonElement)result.Messages[0].AdditionalProperties!["number_field"]!).GetInt32());
     }
 
     [Fact]
@@ -2161,7 +2161,7 @@ public class BedrockChatClientTests
 
         ChatMessage[] messages = [systemMessage, new(ChatRole.User, "Test")];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2188,7 +2188,7 @@ public class BedrockChatClientTests
             Tools = [tool]
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], options);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2214,7 +2214,7 @@ public class BedrockChatClientTests
         };
 
         // Should not throw
-        await foreach (var _ in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], options))
+        await foreach (var _ in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], options, cancellationToken: TestContext.Current.CancellationToken))
         {
             // Consume stream
         }
@@ -2312,7 +2312,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal(7, result.Messages[0].Contents.Count);
@@ -2331,7 +2331,7 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_RawRepresentation_Message()
     {
-        Message rawMessage = null;
+        Message? rawMessage = null;
 
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
         {
@@ -2353,7 +2353,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Same(rawMessage, result.Messages[0].RawRepresentation);
@@ -2363,7 +2363,7 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_RawRepresentation_Response()
     {
-        ConverseResponse rawResponse = null;
+        ConverseResponse? rawResponse = null;
 
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
         {
@@ -2386,7 +2386,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Same(rawResponse, result.RawRepresentation);
@@ -2416,7 +2416,7 @@ public class BedrockChatClientTests
 
         ChatMessage[] messages = [new(ChatRole.User, [content])];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2436,7 +2436,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
         ChatMessage[] messages = [new(ChatRole.User, "   ")];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2463,7 +2463,7 @@ public class BedrockChatClientTests
             new(ChatRole.Assistant, "Trimmed text   \n\n")
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2489,7 +2489,7 @@ public class BedrockChatClientTests
             new(ChatRole.Assistant, "   \n\n   ")
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2520,7 +2520,7 @@ public class BedrockChatClientTests
             }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync([chatMessage]);
+        ChatResponse result = await chatClient.GetResponseAsync([chatMessage], cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2551,7 +2551,7 @@ public class BedrockChatClientTests
             }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync([systemMessage, new(ChatRole.User, "Hello")]);
+        ChatResponse result = await chatClient.GetResponseAsync([systemMessage, new(ChatRole.User, "Hello")], cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2586,7 +2586,7 @@ public class BedrockChatClientTests
 
         ChatMessage[] messages = [new(ChatRole.User, [content1, content2])];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2594,7 +2594,7 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_WithRawRepresentationFactory()
     {
-        ConverseRequest factoryRequest = null;
+        ConverseRequest? factoryRequest = null;
 
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
         {
@@ -2621,7 +2621,7 @@ public class BedrockChatClientTests
             }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], options);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2664,19 +2664,19 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal(2, result.Messages[0].Contents.Count);
 
         var content1 = Assert.IsType<TextContent>(result.Messages[0].Contents[0]);
         Assert.Equal("Content 1", content1.Text);
-        var citation1 = Assert.IsType<CitationAnnotation>(Assert.Single(content1.Annotations));
+        var citation1 = Assert.IsType<CitationAnnotation>(Assert.Single(content1.Annotations!));
         Assert.Equal("Citation 1", citation1.Title);
 
         var content2 = Assert.IsType<TextContent>(result.Messages[0].Contents[1]);
         Assert.Equal("Content 2", content2.Text);
-        var citation2 = Assert.IsType<CitationAnnotation>(Assert.Single(content2.Annotations));
+        var citation2 = Assert.IsType<CitationAnnotation>(Assert.Single(content2.Annotations!));
         Assert.Equal("Citation 2", citation2.Title);
     }
 
@@ -2719,7 +2719,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages[0].Contents);
@@ -2751,7 +2751,7 @@ public class BedrockChatClientTests
             Tools = [tool]
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], options);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -2778,7 +2778,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         var funcCall = result.Messages[0].Contents.OfType<FunctionCallContent>().FirstOrDefault();
@@ -2804,7 +2804,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.NotNull(result.Messages[0].AdditionalProperties);
@@ -2848,7 +2848,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
         ChatMessage[] messages = [new(ChatRole.User, "What's the weather in San Francisco?")];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -2861,7 +2861,7 @@ public class BedrockChatClientTests
         Assert.Null(functionCall.Exception);
         Assert.NotNull(functionCall.RawRepresentation);
         // Arguments values are JsonElement when deserialized from Document
-        Assert.Equal("San Francisco", ((JsonElement)functionCall.Arguments["location"]).GetString());
+        Assert.Equal("San Francisco", ((JsonElement)functionCall.Arguments!["location"]!).GetString());
     }
 
     [Fact]
@@ -2899,7 +2899,7 @@ public class BedrockChatClientTests
         });
 
         IChatClient chatClient = mock.AsIChatClient("claude");
-        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")]);
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         FunctionCallContent functionCall = Assert.IsType<FunctionCallContent>(Assert.Single(result.Messages[0].Contents));
@@ -2937,7 +2937,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal("Based on the weather data, it's sunny.", ((TextContent)result.Messages[0].Contents[0]).Text);
@@ -2967,7 +2967,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3000,7 +3000,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Equal("Image processed.", ((TextContent)result.Messages[0].Contents[0]).Text);
     }
@@ -3032,7 +3032,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Equal("Text result processed.", ((TextContent)result.Messages[0].Contents[0]).Text);
     }
@@ -3075,7 +3075,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Equal("Multi-content processed.", ((TextContent)result.Messages[0].Contents[0]).Text);
     }
@@ -3115,7 +3115,7 @@ public class BedrockChatClientTests
             ]
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -3145,7 +3145,7 @@ public class BedrockChatClientTests
             ToolMode = ChatToolMode.RequireSpecific("get_weather")
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Messages);
@@ -3174,7 +3174,7 @@ public class BedrockChatClientTests
             ToolMode = ChatToolMode.RequireAny
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3218,7 +3218,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3247,7 +3247,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3276,7 +3276,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3304,7 +3304,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3326,11 +3326,11 @@ public class BedrockChatClientTests
         [
             new(ChatRole.User,
             [
-                new FunctionResultContent("call_null", (object)null)
+                new FunctionResultContent("call_null", (object?)null)
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3358,7 +3358,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3386,7 +3386,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3414,7 +3414,7 @@ public class BedrockChatClientTests
             ])
         ];
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3425,7 +3425,7 @@ public class BedrockChatClientTests
         IAmazonBedrockRuntime mock = CreateMock();
         IChatClient chatClient = mock.AsIChatClient("claude");
 
-        var enumerator = chatClient.GetStreamingResponseAsync(null).GetAsyncEnumerator();
+        var enumerator = chatClient.GetStreamingResponseAsync(null!, cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
         await Assert.ThrowsAsync<ArgumentNullException>("messages", () => enumerator.MoveNextAsync().AsTask());
     }
 
@@ -3452,7 +3452,7 @@ public class BedrockChatClientTests
         ChatMessage[] messages = [new(ChatRole.User, "Say hello")];
 
         List<ChatResponseUpdate> updates = [];
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync(messages))
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -3500,7 +3500,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
 
         List<ChatResponseUpdate> updates = [];
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")]))
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -3535,7 +3535,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
 
         List<ChatResponseUpdate> updates = [];
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Weather?")]))
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Weather?")], cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -3548,7 +3548,7 @@ public class BedrockChatClientTests
         Assert.Equal("tool_123", functionCall.CallId);
         Assert.NotNull(functionCall.Arguments);
         Assert.Null(functionCall.Exception);
-        Assert.Equal("Seattle", ((JsonElement)functionCall.Arguments["location"]).GetString());
+        Assert.Equal("Seattle", ((JsonElement)functionCall.Arguments!["location"]!).GetString());
 
         // Verify finish reason is ToolCalls
         Assert.Equal(ChatFinishReason.ToolCalls, updates.Last(u => u.FinishReason != null).FinishReason);
@@ -3574,7 +3574,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
 
         List<ChatResponseUpdate> updates = [];
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")]))
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -3609,7 +3609,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
 
         List<ChatResponseUpdate> updates = [];
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")]))
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -3643,7 +3643,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
 
         List<ChatResponseUpdate> updates = [];
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")]))
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -3676,7 +3676,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
 
         List<ChatResponseUpdate> updates = [];
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")]))
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -3709,7 +3709,7 @@ public class BedrockChatClientTests
         IChatClient chatClient = mock.AsIChatClient("claude");
 
         List<ChatResponseUpdate> updates = [];
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")]))
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -3747,7 +3747,7 @@ public class BedrockChatClientTests
             Reasoning = new() { Effort = effort }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3778,7 +3778,7 @@ public class BedrockChatClientTests
             Reasoning = new() { Effort = effort }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3799,7 +3799,7 @@ public class BedrockChatClientTests
             Reasoning = new() { Effort = ReasoningEffort.None }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3817,7 +3817,7 @@ public class BedrockChatClientTests
         ChatMessage[] messages = [new(ChatRole.User, "Hello")];
         ChatOptions options = new();
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3855,7 +3855,7 @@ public class BedrockChatClientTests
             }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3890,7 +3890,7 @@ public class BedrockChatClientTests
             }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3918,7 +3918,7 @@ public class BedrockChatClientTests
             Reasoning = new() { Effort = ReasoningEffort.High, Output = output }
         };
 
-        ChatResponse result = await chatClient.GetResponseAsync(messages, options);
+        ChatResponse result = await chatClient.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(result);
     }
 
@@ -3958,7 +3958,7 @@ public class BedrockChatClientTests
             Reasoning = new() { Effort = effort }
         };
 
-        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options)) { }
+        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken)) { }
     }
 
     [Theory]
@@ -3996,7 +3996,7 @@ public class BedrockChatClientTests
             Reasoning = new() { Effort = effort }
         };
 
-        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options)) { }
+        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken)) { }
     }
 
     [Fact]
@@ -4025,7 +4025,7 @@ public class BedrockChatClientTests
             Reasoning = new() { Effort = ReasoningEffort.None }
         };
 
-        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options)) { }
+        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken)) { }
     }
 
     [Fact]
@@ -4051,7 +4051,7 @@ public class BedrockChatClientTests
         ChatMessage[] messages = [new(ChatRole.User, "Hello")];
         ChatOptions options = new();
 
-        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options)) { }
+        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken)) { }
     }
 
     [Fact]
@@ -4096,7 +4096,7 @@ public class BedrockChatClientTests
             }
         };
 
-        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options)) { }
+        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken)) { }
     }
 
     [Fact]
@@ -4138,7 +4138,7 @@ public class BedrockChatClientTests
             }
         };
 
-        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options)) { }
+        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken)) { }
     }
 
     [Theory]
@@ -4173,7 +4173,7 @@ public class BedrockChatClientTests
             Reasoning = new() { Effort = ReasoningEffort.High, Output = output }
         };
 
-        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options)) { }
+        await foreach (var _ in chatClient.GetStreamingResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken)) { }
     }
 
     private static byte[] CreateContentBlockDeltaEventWithCitation(int contentBlockIndex, string text, string title, string snippet)
@@ -4181,7 +4181,7 @@ public class BedrockChatClientTests
         return CreateEventMessage("ContentBlockDelta", Encoding.UTF8.GetBytes($"{{\"contentBlockIndex\":{contentBlockIndex},\"delta\":{{\"text\":\"{text}\",\"citation\":{{\"title\":\"{title}\",\"sourceContent\":[{{\"text\":\"{snippet}\"}}]}}}}}}"));
     }
 
-    private static byte[] CreateContentBlockDeltaEventWithReasoning(int contentBlockIndex, string text, string signature, string redactedContentBase64)
+    private static byte[] CreateContentBlockDeltaEventWithReasoning(int contentBlockIndex, string text, string? signature, string? redactedContentBase64)
     {
         var sigPart = signature != null ? $",\"signature\":\"{signature}\"" : "";
         var redactedPart = redactedContentBase64 != null ? $",\"redactedContent\":\"{redactedContentBase64}\"" : "";
@@ -4258,8 +4258,8 @@ public class BedrockChatClientTests
     }
 
     private static IAmazonBedrockRuntime CreateMock(
-        Func<ConverseRequest, ConverseResponse> onConverseRequest = null,
-        Func<ConverseStreamRequest, ConverseStreamResponse> onConverseStreamRequest = null)
+        Func<ConverseRequest, ConverseResponse>? onConverseRequest = null,
+        Func<ConverseStreamRequest, ConverseStreamResponse>? onConverseStreamRequest = null)
     {
         var mock = new Mock<IAmazonBedrockRuntime>();
 

@@ -2,7 +2,13 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFrameworks>net472;net8.0</TargetFrameworks>
+        <!--
+          The MEAI package itself targets net472/netstandard2.0/net8.0 (see the src csproj), but the
+          CI runs on Linux (Amazon Linux ARM64) where the net472 test TFM cannot execute without Mono.
+          For now the tests run on net8.0 only; running the net472 tests (via Mono or a Windows runner)
+          is tracked as a follow-up. The src package still builds net472 for compile coverage.
+        -->
+        <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <LangVersion>Latest</LangVersion>
         <IsPackable>false</IsPackable>
@@ -19,11 +25,6 @@
         <PackageReference Include="Moq" Version="4.20.72" />
         <PackageReference Include="xunit.v3" Version="3.2.2" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
-    </ItemGroup>
-
-    <!-- Reference assemblies so net472 compiles on Linux CI. -->
-    <ItemGroup Condition="$([MSBuild]::GetTargetFrameworkIdentifier('$(TargetFramework)')) == '.NETFramework'">
-        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
     </ItemGroup>
 
     <ItemGroup>

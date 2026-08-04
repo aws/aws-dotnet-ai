@@ -9,8 +9,6 @@ phases:
       - find / -type f -name 'global.json' -delete
       # Install the latest .NET 10 SDK manually.
       - curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel 10.0
-      # Install Mono so the net472 target of AWS.Extensions.Bedrock.MEAI(.UnitTests) can execute on Linux.
-      - apt-get update && apt-get install -y mono-complete
 
   build:
     commands:

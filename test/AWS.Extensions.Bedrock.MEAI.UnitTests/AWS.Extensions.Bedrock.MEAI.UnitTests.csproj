@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFrameworks>net472;net8.0</TargetFrameworks>
+        <Nullable>enable</Nullable>
+        <LangVersion>Latest</LangVersion>
+        <IsPackable>false</IsPackable>
+        <!-- MEAI001: uses evaluation-stage Microsoft.Extensions.AI APIs. -->
+        <!-- xUnit1051: xUnit v3 analyzer prefers TestContext.Current.CancellationToken; can be addressed as a follow-up cleanup across the ~4300-line chat test file. -->
+        <NoWarn>$(NoWarn);MEAI001;xUnit1051</NoWarn>
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.5.1" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
+        <PackageReference Include="Moq" Version="4.20.72" />
+        <PackageReference Include="xunit.v3" Version="3.2.2" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    </ItemGroup>
+
+    <!-- Reference assemblies so net472 compiles on Linux CI. -->
+    <ItemGroup Condition="$([MSBuild]::GetTargetFrameworkIdentifier('$(TargetFramework)')) == '.NETFramework'">
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\AWS.Extensions.Bedrock.MEAI\AWS.Extensions.Bedrock.MEAI.csproj" />
+    </ItemGroup>
+
+</Project>

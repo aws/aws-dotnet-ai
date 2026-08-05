@@ -28,7 +28,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\AWS.Extensions.Bedrock.MEAI\AWS.Extensions.Bedrock.MEAI.csproj" />
+        <ProjectReference Include="..\..\src\AWS.Bedrock.MEAI\AWS.Bedrock.MEAI.csproj" />
     </ItemGroup>
 
 </Project>

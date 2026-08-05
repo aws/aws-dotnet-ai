@@ -40,7 +40,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\AWS.AgentCore.SourceGenerator\AWS.AgentCore.SourceGenerator.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" OutputItemType="Analyzer" SetTargetFramework="TargetFramework=netstandard2.0" />
-        <ProjectReference Include="..\AWS.Extensions.Bedrock.MEAI\AWS.Extensions.Bedrock.MEAI.csproj" />
+        <ProjectReference Include="..\AWS.Bedrock.MEAI\AWS.Bedrock.MEAI.csproj" />
     </ItemGroup>
 
     <PropertyGroup>

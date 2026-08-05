@@ -12,8 +12,8 @@
       "Path": "src/AWS.AgentCore.Testing/AWS.AgentCore.Testing.csproj"
     },
     {
-      "Name": "AWS.Extensions.Bedrock.MEAI",
-      "Path": "src/AWS.Extensions.Bedrock.MEAI/AWS.Extensions.Bedrock.MEAI.csproj"
+      "Name": "AWS.Bedrock.MEAI",
+      "Path": "src/AWS.Bedrock.MEAI/AWS.Bedrock.MEAI.csproj"
     }
   ],
   "UseCommitsForChangelog": false,

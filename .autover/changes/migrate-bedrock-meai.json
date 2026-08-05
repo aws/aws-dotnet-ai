@@ -1,7 +1,7 @@
 {
   "Projects": [
     {
-      "Name": "AWS.Extensions.Bedrock.MEAI",
+      "Name": "AWS.Bedrock.MEAI",
       "Type": "Major",
       "ChangelogMessages": [
         "Migrated the Bedrock Microsoft.Extensions.AI integration into the aws-dotnet-ai repository. This package was previously published as AWSSDK.Extensions.Bedrock.MEAI from the aws-sdk-net repository. The public API (namespace Amazon.BedrockRuntime and the AmazonBedrockRuntimeExtensions methods) is unchanged."

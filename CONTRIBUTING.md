@@ -79,7 +79,7 @@ The available projects are:
 
 - AWS.AgentCore.Hosting
 - AWS.AgentCore.Testing
-- AWS.Extensions.Bedrock.MEAI
+- AWS.Bedrock.MEAI
 
 The possible increment types are:
 

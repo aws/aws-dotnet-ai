@@ -1,6 +1,6 @@
-# AWS.Extensions.Bedrock.MEAI
+# AWS.Bedrock.MEAI
 
-`AWS.Extensions.Bedrock.MEAI` provides [Microsoft.Extensions.AI](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-ai)
+`AWS.Bedrock.MEAI` provides [Microsoft.Extensions.AI](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-ai)
 implementations for [Amazon Bedrock](https://aws.amazon.com/bedrock/). It lets .NET developers use
 Bedrock models through Microsoft's standard AI abstractions — `IChatClient`, `IEmbeddingGenerator`,
 `IImageGenerator`, and `IRealtimeClient` — so Bedrock plugs into the broader .NET AI ecosystem
@@ -16,7 +16,7 @@ Bedrock models through Microsoft's standard AI abstractions — `IChatClient`, `
 ## Installation
 
 ```
-dotnet add package AWS.Extensions.Bedrock.MEAI
+dotnet add package AWS.Bedrock.MEAI
 ```
 
 ## Getting started

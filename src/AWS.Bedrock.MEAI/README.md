@@ -9,10 +9,11 @@ Bedrock models through Microsoft's standard AI abstractions — `IChatClient`, `
 > This package was previously published as `AWSSDK.Extensions.Bedrock.MEAI` from the
 > [aws-sdk-net](https://github.com/aws/aws-sdk-net) repository. It now lives in
 > [aws-dotnet-ai](https://github.com/aws/aws-dotnet-ai) alongside the other .NET AI packages and
-> releases independently. As part of the move, the package's types moved from the
-> `Amazon.BedrockRuntime` namespace to `AWS.Bedrock.MEAI` (the `AmazonBedrockRuntimeExtensions`
-> methods are unchanged). Update your package reference and add `using AWS.Bedrock.MEAI;` where
-> you call the extension methods.
+> releases independently. The `AmazonBedrockRuntimeExtensions` methods (`AsIChatClient`,
+> `AsIEmbeddingGenerator`, etc.) remain in the `Amazon.BedrockRuntime` namespace, so existing call
+> sites need no code change — just update the package reference. The package's other types (such as
+> `BedrockStructuredOutputMode`) live in the `AWS.Bedrock.MEAI` namespace; add `using AWS.Bedrock.MEAI;`
+> only where you reference those directly.
 
 ## Installation
 
@@ -26,7 +27,6 @@ Turn an `IAmazonBedrockRuntime` client into an `IChatClient`:
 
 ```csharp
 using Amazon.BedrockRuntime;
-using AWS.Bedrock.MEAI;
 using Microsoft.Extensions.AI;
 
 IAmazonBedrockRuntime runtime = new AmazonBedrockRuntimeClient();

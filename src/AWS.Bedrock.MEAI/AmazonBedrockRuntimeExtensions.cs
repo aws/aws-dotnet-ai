@@ -1,12 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-using Amazon.BedrockRuntime;
+using AWS.Bedrock.MEAI;
 using Microsoft.Extensions.AI;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
-namespace AWS.Bedrock.MEAI;
+namespace Amazon.BedrockRuntime;
 
 /// <summary>Provides extensions for working with <see cref="IAmazonBedrockRuntime"/> instances.</summary>
 public static class AmazonBedrockRuntimeExtensions

@@ -3,12 +3,12 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <!--
-          The MEAI package itself targets net472/netstandard2.0/net8.0 (see the src csproj), but the
-          CI runs on Linux (Amazon Linux ARM64) where the net472 test TFM cannot execute without Mono.
-          For now the tests run on net8.0 only; running the net472 tests (via Mono or a Windows runner)
-          is tracked as a follow-up. The src package still builds net472 for compile coverage.
+          net8.0 runs on the default (Linux) CI target; net472 is added on Windows, where it can
+          execute natively (Amazon Linux CI cannot run net472 without Mono). The aws-dotnet-ai
+          pipeline runs this project on a Windows testing target so the net472 tests are covered.
         -->
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFrameworks>net8.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">net472;net8.0</TargetFrameworks>
         <Nullable>enable</Nullable>
         <LangVersion>Latest</LangVersion>
         <IsPackable>false</IsPackable>
@@ -25,6 +25,7 @@
         <PackageReference Include="xunit.v3" Version="3.2.2" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
     </ItemGroup>
+
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\AWS.Bedrock.MEAI\AWS.Bedrock.MEAI.csproj" />

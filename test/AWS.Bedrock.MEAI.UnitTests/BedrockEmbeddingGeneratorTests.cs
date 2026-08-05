@@ -1,11 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using Amazon;
+using Amazon.BedrockRuntime;
 using Microsoft.Extensions.AI;
 using System;
 using Xunit;
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 public class BedrockEmbeddingGeneratorTests
 {

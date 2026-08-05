@@ -3,6 +3,7 @@
 
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockRuntime;
+using AWS.Bedrock.MEAI;
 using AWS.AgentCore.Hosting;
 using AWS.AgentCore.Hosting.Internal;
 using Microsoft.Agents.AI;

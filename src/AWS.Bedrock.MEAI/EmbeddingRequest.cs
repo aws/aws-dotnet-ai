@@ -3,7 +3,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 internal sealed class EmbeddingRequest
 {

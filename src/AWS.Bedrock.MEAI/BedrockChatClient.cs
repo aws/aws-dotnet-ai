@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Amazon.Runtime.Documents;
 using Amazon.Runtime.Internal.Util;
@@ -17,7 +18,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 internal sealed partial class BedrockChatClient : IChatClient
 {

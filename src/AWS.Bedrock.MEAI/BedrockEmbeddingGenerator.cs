@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.AI;
 using System;
@@ -11,7 +12,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 internal sealed partial class BedrockEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
 {

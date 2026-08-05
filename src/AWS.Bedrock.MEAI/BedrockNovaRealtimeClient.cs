@@ -3,6 +3,7 @@
 
 #if NET8_0_OR_GREATER
 
+using Amazon.BedrockRuntime;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
@@ -11,7 +12,7 @@ using Microsoft.Extensions.AI;
 
 #pragma warning disable MEAI001 // Type is for evaluation purposes only
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 /// <summary>Represents an <see cref="IRealtimeClient"/> for Amazon Bedrock Nova Sonic.</summary>
 [Experimental("MEAI001")]

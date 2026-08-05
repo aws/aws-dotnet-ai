@@ -19,13 +19,14 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Amazon.Runtime.EventStreams;
 using Microsoft.Extensions.AI;
 
 #pragma warning disable MEAI001 // Type is for evaluation purposes only
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 /// <summary>Represents an <see cref="IRealtimeClientSession"/> for Amazon Bedrock Nova Sonic.</summary>
 [Experimental("MEAI001")]

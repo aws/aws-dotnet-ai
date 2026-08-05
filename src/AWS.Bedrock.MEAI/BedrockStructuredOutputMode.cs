@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 /// <summary>
 /// Controls how <see cref="Microsoft.Extensions.AI.ChatOptions.ResponseFormat"/> (structured output)

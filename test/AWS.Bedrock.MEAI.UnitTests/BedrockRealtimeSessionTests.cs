@@ -18,7 +18,7 @@ using Microsoft.Extensions.AI;
 using Moq;
 using Xunit;
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 public class BedrockRealtimeSessionTests
 {

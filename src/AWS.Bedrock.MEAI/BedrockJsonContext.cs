@@ -10,7 +10,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
-namespace Amazon.BedrockRuntime;
+namespace AWS.Bedrock.MEAI;
 
 /// <summary>Provides type information for use with <see cref="JsonSerializer"/>.</summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web,

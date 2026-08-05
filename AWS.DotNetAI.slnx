@@ -15,6 +15,7 @@
     <Project Path="src/AWS.AgentCore.SourceGenerator/AWS.AgentCore.SourceGenerator.csproj" />
     <Project Path="src/AWS.AgentCore.Hosting/AWS.AgentCore.Hosting.csproj" />
     <Project Path="src/AWS.AgentCore.Testing/AWS.AgentCore.Testing.csproj" />
+    <Project Path="src/AWS.Bedrock.MEAI/AWS.Bedrock.MEAI.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/AWS.AgentCore.Hosting.UnitTests/AWS.AgentCore.Hosting.UnitTests.csproj" />
@@ -22,5 +23,6 @@
     <Project Path="test/AWS.AgentCore.Testing.IntegrationTests/AWS.AgentCore.Testing.IntegrationTests.csproj" />
     <Project Path="test/AWS.AgentCore.SourceGenerator.UnitTests/AWS.AgentCore.SourceGenerator.UnitTests.csproj" />
     <Project Path="test/AWS.AgentCore.Hosting.IntegrationTests/AWS.AgentCore.Hosting.IntegrationTests.csproj" />
+    <Project Path="test/AWS.Bedrock.MEAI.UnitTests/AWS.Bedrock.MEAI.UnitTests.csproj" />
   </Folder>
 </Solution>

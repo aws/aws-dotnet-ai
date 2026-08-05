@@ -178,12 +178,12 @@ public static class DockerHelper
         var dir = Directory.GetCurrentDirectory();
         while (dir is not null)
         {
-            if (File.Exists(Path.Combine(dir, "AWS.AgentCore.slnx")))
+            if (File.Exists(Path.Combine(dir, "AWS.DotNetAI.slnx")))
                 return dir;
             dir = Directory.GetParent(dir)?.FullName;
         }
 
-        throw new InvalidOperationException("Could not find repository root (looking for AWS.AgentCore.slnx).");
+        throw new InvalidOperationException("Could not find repository root (looking for AWS.DotNetAI.slnx).");
     }
 
     private static async Task<string> RunProcessAsync(

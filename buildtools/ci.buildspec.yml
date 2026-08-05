@@ -12,8 +12,8 @@ phases:
 
   build:
     commands:
-      - dotnet build AWS.AgentCore.slnx -c Release
-      - dotnet test AWS.AgentCore.slnx -c Release --no-build --logger trx --logger "console;verbosity=detailed" --results-directory ./testresults
+      - dotnet build AWS.DotNetAI.slnx -c Release
+      - dotnet test AWS.DotNetAI.slnx -c Release --no-build --logger trx --logger "console;verbosity=detailed" --results-directory ./testresults
 reports:
   aws-dotnet-ai-tests:
     file-format: VisualStudioTrx

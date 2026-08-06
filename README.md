@@ -2,8 +2,6 @@
 
 [![build status](https://img.shields.io/github/actions/workflow/status/aws/aws-dotnet-ai/aws-ci.yml?branch=dev)](https://github.com/aws/aws-dotnet-ai/actions/workflows/aws-ci.yml)
 
-> **Developer Preview** — This project is in early preview and under active development. APIs may change between releases. Not recommended for production use.
-
 This repository contains .NET libraries for building AI agents on AWS. Built on top of [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/) and [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/), these packages provide a zero-friction path from local development to production deployment.
 
 ## Packages

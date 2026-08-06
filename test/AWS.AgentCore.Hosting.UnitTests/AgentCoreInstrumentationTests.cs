@@ -191,8 +191,8 @@ public class AgentCoreInstrumentationTests : IDisposable
         meterProvider.ForceFlush();
 
         var metric = exportedMetrics.First(m => m.Name == "gen_ai.client.operation.duration");
-        var point = GetFirstMetricPoint(metric);
-        Assert.Contains(point.tags, t => t.Key == "gen_ai.operation.name" && (string)t.Value! == "invoke_agent");
+        var points = GetMetricPointTags(metric);
+        Assert.Contains(points, tags => tags.Any(t => t.Key == "gen_ai.operation.name" && (string)t.Value! == "invoke_agent"));
     }
 
     [Fact]
@@ -209,8 +209,8 @@ public class AgentCoreInstrumentationTests : IDisposable
         meterProvider.ForceFlush();
 
         var metric = exportedMetrics.First(m => m.Name == "gen_ai.client.operation.duration");
-        var point = GetFirstMetricPoint(metric);
-        Assert.Contains(point.tags, t => t.Key == "error.type" && (string)t.Value! == "System.TimeoutException");
+        var points = GetMetricPointTags(metric);
+        Assert.Contains(points, tags => tags.Any(t => t.Key == "error.type" && (string)t.Value! == "System.TimeoutException"));
     }
 
     [Fact]
@@ -227,8 +227,8 @@ public class AgentCoreInstrumentationTests : IDisposable
         meterProvider.ForceFlush();
 
         var metric = exportedMetrics.First(m => m.Name == "gen_ai.client.operation.duration");
-        var point = GetFirstMetricPoint(metric);
-        Assert.Contains(point.tags, t => t.Key == "gen_ai.operation.name" && (string)t.Value! == "search_memory");
+        var points = GetMetricPointTags(metric);
+        Assert.Contains(points, tags => tags.Any(t => t.Key == "gen_ai.operation.name" && (string)t.Value! == "search_memory"));
     }
 
     [Fact]
@@ -245,21 +245,25 @@ public class AgentCoreInstrumentationTests : IDisposable
         meterProvider.ForceFlush();
 
         var metric = exportedMetrics.First(m => m.Name == "gen_ai.client.operation.duration");
-        var point = GetFirstMetricPoint(metric);
-        Assert.Contains(point.tags, t => t.Key == "gen_ai.operation.name" && (string)t.Value! == "upsert_memory");
+        var points = GetMetricPointTags(metric);
+        Assert.Contains(points, tags => tags.Any(t => t.Key == "gen_ai.operation.name" && (string)t.Value! == "upsert_memory"));
     }
 
-    private static (List<KeyValuePair<string, object?>> tags, double sum) GetFirstMetricPoint(Metric metric)
+    // Returns the tag-set of every metric point. AgentCoreMetrics uses a process-global
+    // static Meter, so points recorded by other tests running in parallel can appear here
+    // too. Callers must therefore match against all points rather than assuming a single one.
+    private static List<List<KeyValuePair<string, object?>>> GetMetricPointTags(Metric metric)
     {
-        var enumerator = metric.GetMetricPoints().GetEnumerator();
-        Assert.True(enumerator.MoveNext(), "Expected at least one metric point");
-        var point = enumerator.Current;
+        var points = new List<List<KeyValuePair<string, object?>>>();
+        foreach (ref readonly var point in metric.GetMetricPoints())
+        {
+            var tags = new List<KeyValuePair<string, object?>>();
+            foreach (var tag in point.Tags)
+                tags.Add(tag);
+            points.Add(tags);
+        }
 
-        var tags = new List<KeyValuePair<string, object?>>();
-        foreach (var tag in point.Tags)
-            tags.Add(tag);
-
-        var sum = point.GetHistogramSum();
-        return (tags, sum);
+        Assert.NotEmpty(points);
+        return points;
     }
 }

@@ -1,3 +1,8 @@
+## Release 2026-08-06
+
+### AWS.Bedrock.MEAI (1.0.0)
+* Migrated the Bedrock Microsoft.Extensions.AI integration into the aws-dotnet-ai repository. This package was previously published as AWSSDK.Extensions.Bedrock.MEAI from the aws-sdk-net repository. The AmazonBedrockRuntimeExtensions methods remain in the Amazon.BedrockRuntime namespace; the package's other types now live in the AWS.Bedrock.MEAI namespace.
+
 ## Release 2026-08-04
 
 ### AWS.AgentCore.Hosting (1.0.0)

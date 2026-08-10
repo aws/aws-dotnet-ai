@@ -576,7 +576,11 @@ public class BedrockRealtimeSessionTests
             role: ChatRole.Tool);
 
         await session.SendAsync(new CreateConversationItemRealtimeClientMessage(item), cancellationToken: TestContext.Current.CancellationToken);
+        // Wait for the toolResult AND its trailing contentEnd. The events are drained
+        // asynchronously by the background writer, so waiting only for toolResult races
+        // the later contentEnd assertion below.
         WaitForEvent(capturedEvents, e => e.Contains("\"toolResult\""));
+        WaitForEvent(capturedEvents, e => e.Contains("\"contentEnd\""));
 
         lock (capturedEvents)
         {

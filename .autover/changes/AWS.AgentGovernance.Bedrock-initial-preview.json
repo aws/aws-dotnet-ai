@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentGovernance.Bedrock",
+      "Type": "Minor",
+      "ChangelogMessages": [
+        "Initial preview release (0.1.0-preview): AWS backends for Microsoft's Agent Governance Toolkit. Adds a Bedrock Guardrails policy backend (IExternalPolicyBackend, fail-closed), Bedrock Guardrails PII sanitization of MCP tool output, and a CloudWatch audit sink with metrics. Configure via WithBedrockGovernance (MCP), AddBedrockGovernance (DI), or the GovernanceKernel extensions."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <LangVersion>Latest</LangVersion>
+        <IsAotCompatible>true</IsAotCompatible>
+        <Version>0.1.0-preview</Version>
+        <IsPackable>true</IsPackable>
+        <PackageId>AWS.AgentGovernance.Bedrock</PackageId>
+        <Product>AI Integrations on AWS for .NET</Product>
+        <Authors>Amazon Web Services</Authors>
+        <Company>Amazon Web Services</Company>
+        <Description>AWS backends for Microsoft's Agent Governance Toolkit: a Bedrock Guardrails policy backend, Bedrock Guardrails PII sanitization for MCP tool output, and a CloudWatch audit sink.</Description>
+        <PackageTags>AWS;Amazon;Bedrock;Guardrails;AgentGovernance;MCP;CloudWatch;AI;Governance</PackageTags>
+        <PackageProjectUrl>https://github.com/aws/aws-dotnet-ai</PackageProjectUrl>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageIcon>icon.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <WarningsAsErrors>true</WarningsAsErrors>
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.17.5" />
+        <PackageReference Include="AWSSDK.CloudWatchLogs" Version="4.0.103" />
+        <PackageReference Include="AWSSDK.CloudWatch" Version="4.0.103.2" />
+        <PackageReference Include="Microsoft.AgentGovernance" Version="5.0.0" />
+        <PackageReference Include="ModelContextProtocol" Version="2.1.0" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="AWS.AgentGovernance.Bedrock.UnitTests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100db5f59f098d27276c7833875a6263a3cc74ab17ba9a9df0b52aedbe7252745db7274d5271fd79c1f08f668ecfa8eaab5626fa76adc811d3c8fc55859b0d09d3bc0a84eecd0ba891f2b8a2fc55141cdcc37c2053d53491e650a479967c3622762977900eddbf1252ed08a2413f00a28f3a0752a81203f03ccb7f684db373518b4" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\icon.png" Pack="true" PackagePath="" />
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="" />
+        <None Include="..\..\NOTICE" Pack="true" PackagePath="" />
+        <None Include=".\README.md" Pack="true" PackagePath="" />
+    </ItemGroup>
+
+</Project>

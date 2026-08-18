@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Amazon;
 using Amazon.BedrockRuntime;
+using Amazon.Runtime;
 using AWS.Bedrock.MAG.Internal;
 
 namespace AWS.Bedrock.MAG.Mcp
@@ -24,8 +25,9 @@ namespace AWS.Bedrock.MAG.Mcp
         private readonly BedrockGuardrailClient _client;
 
         /// <summary>
-        /// Creates a sanitizer. Pass a client for tests or custom credentials; otherwise one is built from
-        /// <see cref="BedrockSanitizationOptions.Region"/> or the default chain.
+        /// Creates a sanitizer. Pass a client for full control; otherwise one is built from
+        /// <see cref="BedrockSanitizationOptions.Region"/> and
+        /// <see cref="BedrockSanitizationOptions.Credentials"/>, falling back to the default chain.
         /// </summary>
         public BedrockGuardrailsSanitizer(BedrockSanitizationOptions options, IAmazonBedrockRuntime? client = null)
         {
@@ -35,7 +37,7 @@ namespace AWS.Bedrock.MAG.Mcp
                 throw new ArgumentException($"{nameof(BedrockSanitizationOptions)}.{nameof(BedrockSanitizationOptions.GuardrailId)} must be set.", nameof(options));
             }
 
-            _client = new BedrockGuardrailClient(client ?? CreateClient(_options.Region));
+            _client = new BedrockGuardrailClient(client ?? CreateClient(_options.Region, _options.Credentials));
         }
 
         /// <summary>
@@ -72,8 +74,17 @@ namespace AWS.Bedrock.MAG.Mcp
             return new SanitizationResult { Text = masked!, RedactedTypes = detected, Blocked = false, Intervened = true };
         }
 
-        private static IAmazonBedrockRuntime CreateClient(RegionEndpoint? region)
-            => region is null ? new AmazonBedrockRuntimeClient() : new AmazonBedrockRuntimeClient(region);
+        private static IAmazonBedrockRuntime CreateClient(RegionEndpoint? region, AWSCredentials? credentials)
+        {
+            if (credentials is not null)
+            {
+                return region is null
+                    ? new AmazonBedrockRuntimeClient(credentials)
+                    : new AmazonBedrockRuntimeClient(credentials, region);
+            }
+
+            return region is null ? new AmazonBedrockRuntimeClient() : new AmazonBedrockRuntimeClient(region);
+        }
     }
 
     /// <summary>The outcome of sanitizing a single block of text.</summary>

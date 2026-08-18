@@ -58,5 +58,51 @@ namespace AWS.Bedrock.MAG.Internal
                 ? $"action={action}"
                 : $"action={action}; pii=[{string.Join(",", pii)}]";
         }
+
+        /// <summary>
+        /// Evaluates an inline-checks (InvokeGuardrailChecks) response. A content-filter or prompt-attack
+        /// finding trips when its severity meets <paramref name="severityThreshold"/>; a PII finding trips
+        /// when its confidence meets <paramref name="confidenceThreshold"/>. A finding with no score is
+        /// treated as tripped (fail-safe). Returns true when any check tripped, with a summary of which.
+        /// </summary>
+        public static bool ChecksTripped(
+            InvokeGuardrailChecksResponse response,
+            double severityThreshold,
+            double confidenceThreshold,
+            out string summary)
+        {
+            var tripped = new List<string>();
+            var results = response.Results;
+
+            if (results?.ContentFilter?.Results is { } contentFilter)
+            {
+                foreach (var entry in contentFilter.Where(e => Meets(e.SeverityScore, severityThreshold)))
+                {
+                    tripped.Add($"content:{entry.Category}");
+                }
+            }
+
+            if (results?.PromptAttack?.Results is { } promptAttack)
+            {
+                foreach (var entry in promptAttack.Where(e => Meets(e.SeverityScore, severityThreshold)))
+                {
+                    tripped.Add($"promptAttack:{entry.Category}");
+                }
+            }
+
+            if (results?.SensitiveInformation?.Results is { } sensitive)
+            {
+                foreach (var entry in sensitive.Where(e => Meets(e.ConfidenceScore, confidenceThreshold)))
+                {
+                    tripped.Add($"pii:{entry.Type}");
+                }
+            }
+
+            summary = tripped.Count == 0 ? "no checks tripped" : string.Join(",", tripped);
+            return tripped.Count > 0;
+        }
+
+        // A finding with no score is treated as meeting the threshold (fail-safe toward deny).
+        private static bool Meets(double? score, double threshold) => !score.HasValue || score.Value >= threshold;
     }
 }

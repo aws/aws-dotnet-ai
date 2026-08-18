@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using Amazon;
+using Amazon.Runtime;
 
 namespace AWS.Bedrock.MAG
 {
@@ -28,6 +29,12 @@ namespace AWS.Bedrock.MAG
 
         /// <summary>The region to create the Bedrock client in. Null uses the default credential/region chain.</summary>
         public RegionEndpoint? Region { get; set; }
+
+        /// <summary>
+        /// Explicit credentials for the Bedrock client. Null (default) falls back to the default credential
+        /// chain (environment, profile, EC2/ECS/Lambda role, etc.).
+        /// </summary>
+        public AWSCredentials? Credentials { get; set; }
 
         /// <summary>
         /// When true (default), a Bedrock or AWS error denies the call, matching the toolkit's default-deny

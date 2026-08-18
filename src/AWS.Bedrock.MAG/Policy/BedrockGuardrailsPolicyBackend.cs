@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Amazon;
 using Amazon.BedrockRuntime;
+using Amazon.Runtime;
 using AgentGovernance.Policy;
 using AWS.Bedrock.MAG.Internal;
 
@@ -29,8 +30,9 @@ namespace AWS.Bedrock.MAG.Policy
         private readonly BedrockGuardrailClient _client;
 
         /// <summary>
-        /// Creates a policy backend. Pass a client for tests or custom credentials; otherwise one is built
-        /// from <see cref="BedrockGuardrailsPolicyOptions.Region"/> or the default chain.
+        /// Creates a policy backend. Pass a client for full control; otherwise one is built from
+        /// <see cref="BedrockGuardrailsPolicyOptions.Region"/> and
+        /// <see cref="BedrockGuardrailsPolicyOptions.Credentials"/>, falling back to the default chain.
         /// </summary>
         public BedrockGuardrailsPolicyBackend(BedrockGuardrailsPolicyOptions options, IAmazonBedrockRuntime? client = null)
         {
@@ -40,7 +42,7 @@ namespace AWS.Bedrock.MAG.Policy
                 throw new ArgumentException($"{nameof(BedrockGuardrailsPolicyOptions)}.{nameof(BedrockGuardrailsPolicyOptions.GuardrailId)} must be set.", nameof(options));
             }
 
-            _client = new BedrockGuardrailClient(client ?? CreateClient(_options.Region));
+            _client = new BedrockGuardrailClient(client ?? CreateClient(_options.Region, _options.Credentials));
         }
 
         /// <inheritdoc />
@@ -166,7 +168,16 @@ namespace AWS.Bedrock.MAG.Policy
             }
         }
 
-        private static IAmazonBedrockRuntime CreateClient(RegionEndpoint? region)
-            => region is null ? new AmazonBedrockRuntimeClient() : new AmazonBedrockRuntimeClient(region);
+        private static IAmazonBedrockRuntime CreateClient(RegionEndpoint? region, AWSCredentials? credentials)
+        {
+            if (credentials is not null)
+            {
+                return region is null
+                    ? new AmazonBedrockRuntimeClient(credentials)
+                    : new AmazonBedrockRuntimeClient(credentials, region);
+            }
+
+            return region is null ? new AmazonBedrockRuntimeClient() : new AmazonBedrockRuntimeClient(region);
+        }
     }
 }

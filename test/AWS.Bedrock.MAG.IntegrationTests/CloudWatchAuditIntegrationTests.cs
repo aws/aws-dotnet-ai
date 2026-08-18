@@ -1,0 +1,87 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Amazon.CloudWatchLogs;
+using Amazon.CloudWatchLogs.Model;
+using AgentGovernance.Audit;
+using AWS.Bedrock.MAG;
+using AWS.Bedrock.MAG.Audit;
+using AWS.Bedrock.MAG.IntegrationTests.Infrastructure;
+using Xunit;
+
+namespace AWS.Bedrock.MAG.IntegrationTests
+{
+    /// <summary>Writes a governance event to a real CloudWatch log group and reads it back (PR: audit sink).</summary>
+    [Collection("bedrock-integration")]
+    public class CloudWatchAuditIntegrationTests
+    {
+        private readonly GuardrailFixture _fx;
+
+        public CloudWatchAuditIntegrationTests(GuardrailFixture fx) => _fx = fx;
+
+        [Fact]
+        public async Task Delivers_a_governance_event_to_cloudwatch_logs()
+        {
+            if (_fx.SkipReason is { } reason)
+            {
+                Assert.Skip(reason);
+            }
+
+            var eventId = $"evt-int-{Guid.NewGuid():N}";
+            var options = new CloudWatchAuditOptions
+            {
+                LogGroupName = _fx.LogGroupName,
+                EmitMetrics = false,
+                Region = _fx.Region,
+                FlushInterval = TimeSpan.FromSeconds(1)
+            };
+
+            using (var sink = new CloudWatchAuditSink(options))
+            {
+                var emitter = new AuditEmitter();
+                sink.Subscribe(emitter);
+                emitter.Emit(new GovernanceEvent
+                {
+                    Type = GovernanceEventType.PolicyViolation,
+                    AgentId = "did:mesh:integration",
+                    SessionId = "integration-session",
+                    PolicyName = "integration",
+                    EventId = eventId
+                });
+                // Dispose (below) flushes and closes the AWS.Logger.Core logger.
+            }
+
+            using var logs = new AmazonCloudWatchLogsClient(_fx.Region);
+            var found = await WaitForLogAsync(logs, _fx.LogGroupName, eventId, TimeSpan.FromSeconds(90));
+
+            Assert.True(found, $"event {eventId} did not appear in {_fx.LogGroupName} within the timeout");
+        }
+
+        private static async Task<bool> WaitForLogAsync(IAmazonCloudWatchLogs logs, string logGroup, string needle, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    var response = await logs.FilterLogEventsAsync(new FilterLogEventsRequest { LogGroupName = logGroup });
+                    if (response.Events is not null && response.Events.Any(e => e.Message is not null && e.Message.Contains(needle, StringComparison.Ordinal)))
+                    {
+                        return true;
+                    }
+                }
+                catch (ResourceNotFoundException)
+                {
+                    // Log group/stream not created by AWS.Logger.Core yet.
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(3));
+            }
+
+            return false;
+        }
+    }
+}

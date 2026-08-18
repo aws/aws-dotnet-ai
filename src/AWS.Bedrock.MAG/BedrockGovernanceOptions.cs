@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using Amazon;
+using Amazon.Runtime;
 
 namespace AWS.Bedrock.MAG
 {
@@ -37,6 +38,12 @@ namespace AWS.Bedrock.MAG
 
         /// <summary>Default region for all backends. Null uses the default chain. Per-feature Region overrides this.</summary>
         public RegionEndpoint? Region { get; set; }
+
+        /// <summary>
+        /// Default credentials for all backends. Null uses the default credential chain. A per-feature
+        /// <c>Credentials</c> value overrides this.
+        /// </summary>
+        public AWSCredentials? Credentials { get; set; }
 
         /// <summary>When true (default), a Guardrails/AWS policy error denies the call. Flows into the policy backend.</summary>
         public bool FailClosed { get; set; } = true;

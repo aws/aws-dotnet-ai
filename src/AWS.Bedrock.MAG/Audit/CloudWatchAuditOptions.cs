@@ -3,6 +3,7 @@
 
 using System;
 using Amazon;
+using Amazon.Runtime;
 
 namespace AWS.Bedrock.MAG
 {
@@ -29,5 +30,11 @@ namespace AWS.Bedrock.MAG
 
         /// <summary>The region for the CloudWatch clients. Null uses the default credential/region chain.</summary>
         public RegionEndpoint? Region { get; set; }
+
+        /// <summary>
+        /// Explicit credentials for the CloudWatch Logs and metrics clients. Null (default) falls back to the
+        /// default credential chain (environment, profile, EC2/ECS/Lambda role, etc.).
+        /// </summary>
+        public AWSCredentials? Credentials { get; set; }
     }
 }

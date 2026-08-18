@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Amazon;
 using Amazon.CloudWatch;
 using Amazon.CloudWatch.Model;
+using Amazon.Runtime;
 using AWS.Logger;
 using AWS.Logger.Core;
 using AgentGovernance.Audit;
@@ -52,7 +53,7 @@ namespace AWS.Bedrock.MAG.Audit
 
             if (options.EmitMetrics)
             {
-                _metrics = metricsClient ?? CreateMetricsClient(options.Region);
+                _metrics = metricsClient ?? CreateMetricsClient(options.Region, options.Credentials);
                 _metricTimer = new Timer(_ => _ = FlushMetricsGuardedAsync(), null, options.FlushInterval, options.FlushInterval);
             }
         }
@@ -177,6 +178,11 @@ namespace AWS.Bedrock.MAG.Audit
                 config.Region = options.Region.SystemName;
             }
 
+            if (options.Credentials is not null)
+            {
+                config.Credentials = options.Credentials;
+            }
+
             if (!string.IsNullOrWhiteSpace(options.LogStreamName))
             {
                 config.LogStreamName = options.LogStreamName;
@@ -187,8 +193,17 @@ namespace AWS.Bedrock.MAG.Audit
             return logger;
         }
 
-        private static IAmazonCloudWatch CreateMetricsClient(RegionEndpoint? region)
-            => region is null ? new AmazonCloudWatchClient() : new AmazonCloudWatchClient(region);
+        private static IAmazonCloudWatch CreateMetricsClient(RegionEndpoint? region, AWSCredentials? credentials)
+        {
+            if (credentials is not null)
+            {
+                return region is null
+                    ? new AmazonCloudWatchClient(credentials)
+                    : new AmazonCloudWatchClient(credentials, region);
+            }
+
+            return region is null ? new AmazonCloudWatchClient() : new AmazonCloudWatchClient(region);
+        }
 
         /// <summary>Unsubscribes from the emitter, flushes remaining metrics, and closes the logger.</summary>
         public void Dispose()

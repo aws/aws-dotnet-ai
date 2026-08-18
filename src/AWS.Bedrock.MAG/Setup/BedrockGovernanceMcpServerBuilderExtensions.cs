@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System;
+using AWS.Bedrock.MAG;
 using AWS.Bedrock.MAG.Mcp;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
 
-namespace AWS.Bedrock.MAG
+// Placed in the DI namespace so the extension method is discoverable wherever the MCP server builder is in
+// scope, without an extra using for AWS.Bedrock.MAG.
+namespace Microsoft.Extensions.DependencyInjection
 {
     /// <summary>
     /// Adds Bedrock Guardrails policy, PII sanitization, and CloudWatch audit to an MCP server. Mirrors the

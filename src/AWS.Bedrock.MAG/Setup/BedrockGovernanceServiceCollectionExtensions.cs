@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System;
+using AWS.Bedrock.MAG;
 using AWS.Bedrock.MAG.Audit;
 using AWS.Bedrock.MAG.Setup;
-using Microsoft.Extensions.DependencyInjection;
 
-namespace AWS.Bedrock.MAG
+// Placed in the DI namespace so the extension method is discoverable wherever IServiceCollection is in scope,
+// without an extra using for AWS.Bedrock.MAG.
+namespace Microsoft.Extensions.DependencyInjection
 {
     /// <summary>
     /// Registers the Bedrock policy backend and CloudWatch audit sink against a <c>GovernanceKernel</c>
@@ -57,6 +59,13 @@ namespace AWS.Bedrock.MAG
                 options.Policy.Region ??= options.Region;
                 options.Sanitization.Region ??= options.Region;
                 options.Audit.Region ??= options.Region;
+            }
+
+            if (options.Credentials is not null)
+            {
+                options.Policy.Credentials ??= options.Credentials;
+                options.Sanitization.Credentials ??= options.Credentials;
+                options.Audit.Credentials ??= options.Credentials;
             }
         }
 

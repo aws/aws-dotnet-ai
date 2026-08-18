@@ -1,0 +1,38 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+using System;
+using System.Collections.Generic;
+using Amazon;
+
+namespace AWS.Bedrock.MAG
+{
+    /// <summary>
+    /// Configures the Bedrock Guardrails policy backend.
+    /// </summary>
+    public sealed class BedrockGuardrailsPolicyOptions
+    {
+        /// <summary>The guardrail identifier (ID or ARN) to evaluate tool-call context against. Required.</summary>
+        public string? GuardrailId { get; set; }
+
+        /// <summary>The guardrail version to apply. Defaults to the mutable working draft.</summary>
+        public string GuardrailVersion { get; set; } = "DRAFT";
+
+        /// <summary>
+        /// Serializes the tool-call context (tool name and arguments the toolkit passes) into the text
+        /// handed to the guardrail. Defaults to a compact JSON object, matching the toolkit's OPA and
+        /// Cedar backends. Override with a prose projection when leaning on topic or intent policies that
+        /// an ML guardrail scores better against free text.
+        /// </summary>
+        public Func<IReadOnlyDictionary<string, object>, string>? ContextSerializer { get; set; }
+
+        /// <summary>The region to create the Bedrock client in. Null uses the default credential/region chain.</summary>
+        public RegionEndpoint? Region { get; set; }
+
+        /// <summary>
+        /// When true (default), a Bedrock or AWS error denies the call, matching the toolkit's default-deny
+        /// posture. When false, an error allows the call and the error is recorded in the decision metadata.
+        /// </summary>
+        public bool FailClosed { get; set; } = true;
+    }
+}

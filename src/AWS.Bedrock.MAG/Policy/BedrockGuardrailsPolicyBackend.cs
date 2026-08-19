@@ -148,6 +148,11 @@ namespace AWS.Bedrock.MAG.Policy
                 case bool b:
                     writer.WriteBooleanValue(b);
                     break;
+                // Tool arguments deserialized from JSON arrive as JsonElement; write the real value (object,
+                // array, string, number) so the guardrail inspects the content, not "System.Text.Json.JsonElement".
+                case JsonElement je:
+                    je.WriteTo(writer);
+                    break;
                 case int i:
                     writer.WriteNumberValue(i);
                     break;
@@ -155,17 +160,52 @@ namespace AWS.Bedrock.MAG.Policy
                     writer.WriteNumberValue(l);
                     break;
                 case double d:
-                    writer.WriteNumberValue(d);
+                    WriteDouble(writer, d);
                     break;
                 case float f:
-                    writer.WriteNumberValue(f);
+                    WriteDouble(writer, f);
                     break;
                 case decimal m:
                     writer.WriteNumberValue(m);
                     break;
+                // Nested dictionaries/collections are serialized recursively rather than stringified to a CLR
+                // type name, so PII buried in a structured argument is still shown to the guardrail.
+                case IEnumerable<KeyValuePair<string, object>> map:
+                    writer.WriteStartObject();
+                    foreach (var pair in map)
+                    {
+                        writer.WritePropertyName(pair.Key);
+                        WriteValue(writer, pair.Value);
+                    }
+
+                    writer.WriteEndObject();
+                    break;
+                case System.Collections.IEnumerable seq:
+                    writer.WriteStartArray();
+                    foreach (var item in seq)
+                    {
+                        WriteValue(writer, item);
+                    }
+
+                    writer.WriteEndArray();
+                    break;
                 default:
                     writer.WriteStringValue(value.ToString());
                     break;
+            }
+        }
+
+        // Utf8JsonWriter throws on NaN/Infinity. Render non-finite values as text so a stray non-finite number
+        // doesn't fail the whole serialization (which would skip guardrail evaluation of the surrounding text).
+        private static void WriteDouble(Utf8JsonWriter writer, double value)
+        {
+            if (double.IsFinite(value))
+            {
+                writer.WriteNumberValue(value);
+            }
+            else
+            {
+                writer.WriteStringValue(value.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
         }
 

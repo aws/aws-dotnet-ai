@@ -102,7 +102,10 @@ namespace AWS.Bedrock.MAG.Internal
             return tripped.Count > 0;
         }
 
-        // A finding with no score is treated as meeting the threshold (fail-safe toward deny).
+        // A finding with no score is treated as meeting the threshold. This is deliberate: an entry only
+        // appears in the results when the guardrail flagged something, so a missing score denies (fail-safe)
+        // rather than risk letting a real detection through. The trade-off is possible over-blocking if the
+        // API ever returns a flagged entry without a score.
         private static bool Meets(double? score, double threshold) => !score.HasValue || score.Value >= threshold;
     }
 }

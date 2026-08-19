@@ -23,11 +23,6 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         [Fact]
         public void Kernel_denies_a_blocked_tool_call_and_allows_a_benign_one()
         {
-            if (_fx.SkipReason is { } reason)
-            {
-                Assert.Skip(reason);
-            }
-
             using var kernel = new GovernanceKernel();
             kernel.AddBedrockGuardrailsPolicy(o =>
             {

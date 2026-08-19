@@ -83,11 +83,24 @@ namespace AWS.Bedrock.MAG.Audit
                     break;
                 case IFormattable formattable:
                     // Invariant, round-trippable form for DateTime/DateTimeOffset/TimeSpan/Guid/etc.
-                    writer.WriteStringValue(formattable.ToString(null, CultureInfo.InvariantCulture));
+                    writer.WriteStringValue(SafeToString(() => formattable.ToString(null, CultureInfo.InvariantCulture)));
                     break;
                 default:
-                    writer.WriteStringValue(value.ToString());
+                    writer.WriteStringValue(SafeToString(value.ToString));
                     break;
+            }
+        }
+
+        // A custom Data value whose ToString/IFormattable throws must not drop the whole audit record.
+        private static string SafeToString(Func<string?> toString)
+        {
+            try
+            {
+                return toString() ?? string.Empty;
+            }
+            catch
+            {
+                return "<unserializable>";
             }
         }
     }

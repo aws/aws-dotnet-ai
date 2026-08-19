@@ -33,10 +33,12 @@ namespace AWS.Bedrock.MAG.Audit
         private readonly object _metricLock = new();
         private readonly Dictionary<MetricKey, int> _metricCounts = new();
         private readonly Timer? _metricTimer;
+        private readonly bool _ownsMetricsClient;
 
         private AuditEmitter? _emitter;
         private Action<GovernanceEvent>? _handler;
         private int _disposed;
+        private int _flushing;
 
         /// <summary>
         /// Creates a sink. Pass a logger/metrics client for tests or custom credentials; otherwise they are
@@ -49,10 +51,18 @@ namespace AWS.Bedrock.MAG.Audit
             IAmazonCloudWatch? metricsClient = null)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
+            if (options.FlushInterval <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options), options.FlushInterval, "FlushInterval must be greater than zero.");
+            }
+
             _logger = logger ?? CreateLogger(options);
 
             if (options.EmitMetrics)
             {
+                // Only dispose a client we created; an injected one is owned by the caller.
+                _ownsMetricsClient = metricsClient is null;
                 _metrics = metricsClient ?? CreateMetricsClient(options.Region, options.Credentials);
                 _metricTimer = new Timer(_ => _ = FlushMetricsGuardedAsync(), null, options.FlushInterval, options.FlushInterval);
             }
@@ -117,7 +127,10 @@ namespace AWS.Bedrock.MAG.Audit
 
             var data = snapshot.Select(pair =>
             {
-                var dimensions = new List<Dimension> { new() { Name = "AgentId", Value = pair.Key.AgentId } };
+                // CloudWatch rejects an empty dimension value and fails the whole PutMetricData batch, so fall
+                // back to a sentinel when AgentId is empty (required only guarantees it's set, not non-empty).
+                var agentId = string.IsNullOrEmpty(pair.Key.AgentId) ? "unknown" : pair.Key.AgentId;
+                var dimensions = new List<Dimension> { new() { Name = "AgentId", Value = agentId } };
                 if (!string.IsNullOrEmpty(pair.Key.PolicyName))
                 {
                     dimensions.Add(new Dimension { Name = "PolicyName", Value = pair.Key.PolicyName });
@@ -147,6 +160,13 @@ namespace AWS.Bedrock.MAG.Audit
 
         private async Task FlushMetricsGuardedAsync()
         {
+            // Skip this tick if a flush is already running, so a slow/throttled endpoint can't pile up
+            // overlapping PutMetricData calls. The next timer tick picks up whatever accumulated.
+            if (Interlocked.CompareExchange(ref _flushing, 1, 0) != 0)
+            {
+                return;
+            }
+
             try
             {
                 await FlushMetricsAsync().ConfigureAwait(false);
@@ -154,6 +174,10 @@ namespace AWS.Bedrock.MAG.Audit
             catch
             {
                 // Audit must never break the governance loop. Drop the metric batch on persistent failure.
+            }
+            finally
+            {
+                Volatile.Write(ref _flushing, 0);
             }
         }
 
@@ -222,11 +246,18 @@ namespace AWS.Bedrock.MAG.Audit
 
             try
             {
-                FlushMetricsAsync().GetAwaiter().GetResult();
+                // Bound the final flush so a hung PutMetricData can't block shutdown indefinitely.
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                FlushMetricsAsync(cts.Token).GetAwaiter().GetResult();
             }
             catch
             {
                 // Best-effort final metric flush.
+            }
+
+            if (_ownsMetricsClient)
+            {
+                _metrics?.Dispose();
             }
 
             // Flushes queued log messages and stops the AWS.Logger.Core background thread.

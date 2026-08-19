@@ -23,11 +23,6 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         [Fact]
         public async Task Redacts_an_ssn_in_tool_output()
         {
-            if (_fx.SkipReason is { } reason)
-            {
-                Assert.Skip(reason);
-            }
-
             var result = await Sanitizer().SanitizeAsync(GuardrailFixture.SsnSample);
 
             Assert.True(result.Modified);
@@ -38,11 +33,6 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         [Fact]
         public async Task Leaves_clean_output_unchanged()
         {
-            if (_fx.SkipReason is { } reason)
-            {
-                Assert.Skip(reason);
-            }
-
             var result = await Sanitizer().SanitizeAsync("The build finished successfully.");
 
             Assert.False(result.Modified);

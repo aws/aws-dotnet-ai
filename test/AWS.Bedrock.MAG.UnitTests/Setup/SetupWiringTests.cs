@@ -65,7 +65,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Setup
         }
 
         [Fact]
-        public void Normalize_flows_failclosed_to_policy()
+        public void Normalize_flows_failclosed_to_policy_when_policy_unset()
         {
             var options = new BedrockGovernanceOptions { FailClosed = false };
             options.Policy.GuardrailId = "gr";
@@ -73,6 +73,20 @@ namespace AWS.Bedrock.MAG.UnitTests.Setup
             BedrockGovernanceServiceCollectionExtensions.Normalize(options);
 
             Assert.False(options.Policy.FailClosed);
+        }
+
+        [Fact]
+        public void Normalize_keeps_explicit_policy_failclosed_over_umbrella()
+        {
+            // Umbrella wants fail-open, but the per-feature value is explicitly fail-closed: the explicit
+            // per-feature value must win (regression guard for the ??= override).
+            var options = new BedrockGovernanceOptions { FailClosed = false };
+            options.Policy.GuardrailId = "gr";
+            options.Policy.FailClosed = true;
+
+            BedrockGovernanceServiceCollectionExtensions.Normalize(options);
+
+            Assert.True(options.Policy.FailClosed);
         }
 
         // --- Validate (via the public entry point) ---

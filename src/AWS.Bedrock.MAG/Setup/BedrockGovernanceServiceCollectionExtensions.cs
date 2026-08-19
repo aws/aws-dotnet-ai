@@ -52,7 +52,10 @@ namespace Microsoft.Extensions.DependencyInjection
         internal static void Normalize(BedrockGovernanceOptions options)
         {
             options.Sanitization.GuardrailId ??= options.Policy.GuardrailId;
-            options.Policy.FailClosed = options.FailClosed;
+
+            // Umbrella FailClosed is the default; an explicit per-feature Policy.FailClosed wins (??=), like
+            // Region/Credentials below. FailClosed is nullable so "unset" is distinguishable from "false".
+            options.Policy.FailClosed ??= options.FailClosed;
 
             if (options.Region is not null)
             {

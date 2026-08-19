@@ -37,9 +37,12 @@ namespace AWS.Bedrock.MAG
         public AWSCredentials? Credentials { get; set; }
 
         /// <summary>
-        /// When true (default), a Bedrock or AWS error denies the call, matching the toolkit's default-deny
-        /// posture. When false, an error allows the call and the error is recorded in the decision metadata.
+        /// How a Bedrock or AWS error is handled. When true, the error denies the call (matching the
+        /// toolkit's default-deny posture); when false, the error allows the call and is recorded in the
+        /// decision metadata. Null (the default) means "unset": a standalone backend treats it as fail-closed,
+        /// and the DI/MCP entry points fill it from the umbrella <c>FailClosed</c> so a per-feature value here
+        /// overrides the umbrella default.
         /// </summary>
-        public bool FailClosed { get; set; } = true;
+        public bool? FailClosed { get; set; }
     }
 }

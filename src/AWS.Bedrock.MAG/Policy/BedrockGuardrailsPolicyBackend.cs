@@ -96,7 +96,8 @@ namespace AWS.Bedrock.MAG.Policy
         // engine would still deny; the error is kept in Metadata for the audit.
         private ExternalPolicyDecision BuildErrorDecision(Exception ex)
         {
-            if (_options.FailClosed)
+            // Null means unset; a standalone backend defaults to fail-closed (the safe default-deny posture).
+            if (_options.FailClosed ?? true)
             {
                 return new ExternalPolicyDecision
                 {

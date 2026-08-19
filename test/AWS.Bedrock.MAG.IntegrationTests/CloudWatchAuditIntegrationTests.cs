@@ -25,11 +25,6 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         [Fact]
         public async Task Delivers_a_governance_event_to_cloudwatch_logs()
         {
-            if (_fx.SkipReason is { } reason)
-            {
-                Assert.Skip(reason);
-            }
-
             var eventId = $"evt-int-{Guid.NewGuid():N}";
             var options = new CloudWatchAuditOptions
             {

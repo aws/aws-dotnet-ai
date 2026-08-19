@@ -15,10 +15,10 @@ namespace AWS.Bedrock.MAG
         /// <summary>Content-filter categories to evaluate (e.g. HATE, INSULTS, SEXUAL, VIOLENCE, MISCONDUCT).</summary>
         public IList<string> ContentFilterCategories { get; } = new List<string>();
 
-        /// <summary>Prompt-attack categories to evaluate (e.g. PROMPT_ATTACK).</summary>
+        /// <summary>Prompt-attack categories to evaluate (e.g. JAILBREAK, PROMPT_INJECTION, PROMPT_LEAKAGE).</summary>
         public IList<string> PromptAttackCategories { get; } = new List<string>();
 
-        /// <summary>PII entity types to detect (e.g. US_SSN, EMAIL, NAME).</summary>
+        /// <summary>PII entity types to detect (e.g. US_SOCIAL_SECURITY_NUMBER, EMAIL, PHONE).</summary>
         public IList<string> SensitiveInformationEntities { get; } = new List<string>();
 
         /// <summary>

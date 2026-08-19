@@ -24,11 +24,6 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         [Fact]
         public async Task Allows_a_benign_tool_call()
         {
-            if (_fx.SkipReason is { } reason)
-            {
-                Assert.Skip(reason);
-            }
-
             var decision = await Backend().EvaluateAsync(new Dictionary<string, object>
             {
                 ["tool"] = "list_files",
@@ -42,11 +37,6 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         [Fact]
         public async Task Denies_when_the_guardrail_intervenes()
         {
-            if (_fx.SkipReason is { } reason)
-            {
-                Assert.Skip(reason);
-            }
-
             var decision = await Backend().EvaluateAsync(new Dictionary<string, object>
             {
                 ["tool"] = "run",

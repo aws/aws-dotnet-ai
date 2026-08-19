@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.BedrockRuntime;
@@ -120,6 +121,52 @@ namespace AWS.Bedrock.MAG.UnitTests.Mcp
             Assert.Equal("SSN {US_SSN}", Assert.IsType<TextContentBlock>(result.Content[0]).Text);
             Assert.IsType<ImageContentBlock>(result.Content[1]);
             Assert.Equal("nothing sensitive", Assert.IsType<TextContentBlock>(result.Content[2]).Text);
+        }
+
+        [Fact]
+        public async Task Redacts_pii_in_embedded_text_resources()
+        {
+            var inner = new StubTool("read_file", new CallToolResult
+            {
+                Content = new List<ContentBlock>
+                {
+                    new EmbeddedResourceBlock
+                    {
+                        Resource = new TextResourceContents
+                        {
+                            Uri = "file:///patient.txt",
+                            MimeType = "text/plain",
+                            Text = "SSN 123-45-6789"
+                        }
+                    }
+                }
+            });
+            var sanitizer = Sanitizer(BedrockReturning(Redacting("SSN {US_SSN}", "US_SSN")));
+            var tool = new GovernedBedrockMcpServerTool(inner, sanitizer);
+
+            var result = await tool.InvokeAsync(McpTest.Request());
+
+            var block = Assert.IsType<EmbeddedResourceBlock>(Assert.Single(result.Content));
+            var resource = Assert.IsType<TextResourceContents>(block.Resource);
+            Assert.Equal("SSN {US_SSN}", resource.Text);
+            Assert.DoesNotContain("123-45-6789", resource.Text);
+        }
+
+        [Fact]
+        public async Task Preserves_result_meta_when_rebuilding()
+        {
+            var meta = new JsonObject { ["trace"] = "abc-123" };
+            var inner = new StubTool("lookup_patient", new CallToolResult
+            {
+                Content = new List<ContentBlock> { new TextContentBlock { Text = "SSN 123-45-6789" } },
+                Meta = meta
+            });
+            var sanitizer = Sanitizer(BedrockReturning(Redacting("SSN {US_SSN}", "US_SSN")));
+            var tool = new GovernedBedrockMcpServerTool(inner, sanitizer);
+
+            var result = await tool.InvokeAsync(McpTest.Request());
+
+            Assert.Same(meta, result.Meta);
         }
 
         [Fact]

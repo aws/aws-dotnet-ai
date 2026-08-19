@@ -35,11 +35,6 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         [Fact]
         public async Task Denies_when_inline_pii_check_detects_an_ssn()
         {
-            if (_fx.SkipReason is { } reason)
-            {
-                Assert.Skip(reason);
-            }
-
             var decision = await Backend().EvaluateAsync(new Dictionary<string, object>
             {
                 ["tool"] = "lookup",
@@ -52,11 +47,6 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         [Fact]
         public async Task Allows_when_inline_pii_check_finds_nothing()
         {
-            if (_fx.SkipReason is { } reason)
-            {
-                Assert.Skip(reason);
-            }
-
             var decision = await Backend().EvaluateAsync(new Dictionary<string, object>
             {
                 ["tool"] = "lookup",

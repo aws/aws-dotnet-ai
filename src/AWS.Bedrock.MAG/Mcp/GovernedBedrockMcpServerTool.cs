@@ -50,25 +50,54 @@ namespace AWS.Bedrock.MAG.Mcp
             var redactedTypes = new HashSet<string>(StringComparer.Ordinal);
             var blocks = new List<ContentBlock>(result.Content.Count);
 
+            void Track(SanitizationResult sanitized)
+            {
+                modified = true;
+                blocked |= sanitized.Blocked;
+                foreach (var type in sanitized.RedactedTypes)
+                {
+                    redactedTypes.Add(type);
+                }
+            }
+
             foreach (var block in result.Content)
             {
+                // Text carried directly in a text block.
                 if (block is TextContentBlock textBlock && !string.IsNullOrWhiteSpace(textBlock.Text))
                 {
                     var sanitized = await _sanitizer.SanitizeAsync(textBlock.Text, cancellationToken).ConfigureAwait(false);
                     if (sanitized.Modified)
                     {
-                        modified = true;
-                        blocked |= sanitized.Blocked;
-                        foreach (var type in sanitized.RedactedTypes)
-                        {
-                            redactedTypes.Add(type);
-                        }
-
+                        Track(sanitized);
                         blocks.Add(new TextContentBlock
                         {
                             Text = sanitized.Text,
                             Annotations = textBlock.Annotations,
                             Meta = textBlock.Meta
+                        });
+                        continue;
+                    }
+                }
+                // Text carried inside an embedded text resource (e.g. a returned file); scrub it too so PII
+                // in a resource isn't a fail-open bypass of the text path above.
+                else if (block is EmbeddedResourceBlock { Resource: TextResourceContents trc } erb
+                    && !string.IsNullOrWhiteSpace(trc.Text))
+                {
+                    var sanitized = await _sanitizer.SanitizeAsync(trc.Text, cancellationToken).ConfigureAwait(false);
+                    if (sanitized.Modified)
+                    {
+                        Track(sanitized);
+                        blocks.Add(new EmbeddedResourceBlock
+                        {
+                            Resource = new TextResourceContents
+                            {
+                                Text = sanitized.Text,
+                                Uri = trc.Uri,
+                                MimeType = trc.MimeType,
+                                Meta = trc.Meta
+                            },
+                            Annotations = erb.Annotations,
+                            Meta = erb.Meta
                         });
                         continue;
                     }
@@ -84,14 +113,16 @@ namespace AWS.Bedrock.MAG.Mcp
 
             EmitRedaction(redactedTypes, blocked);
 
-            // Only text blocks are sanitized, matching the toolkit's own sanitizer. StructuredContent is
-            // passed through unchanged; sanitizing arbitrary structured JSON through a guardrail is a
-            // post-v1 follow-up. Callers returning PII in StructuredContent should mirror it as text.
+            // Scrubbing covers text blocks and embedded text resources. Not scrubbed (documented v1 limits):
+            // StructuredContent (sanitizing arbitrary structured JSON is a post-v1 follow-up; callers with PII
+            // there should mirror it as text), non-text content (images/audio/blob resources), and nested
+            // ToolResultContentBlock content. Meta/IsError/StructuredContent are carried through unchanged.
             return new CallToolResult
             {
                 Content = blocks,
                 StructuredContent = result.StructuredContent,
-                IsError = result.IsError
+                IsError = result.IsError,
+                Meta = result.Meta
             };
         }
 

@@ -1,3 +1,10 @@
+## Release 2026-08-20 #2
+
+### AWS.AgentCore.Hosting (1.1.1)
+* Fixed AgentCoreMemoryProvider replaying conversation history in reverse (newest-first) order. The AgentCore Memory ListEvents API returns events newest-first; the provider now sorts them ascending by EventTimestamp so chat history is presented oldest-first and multi-turn follow-ups bind to the most recent turn.
+### AWS.AgentCore.Testing (1.0.1)
+* Updated the in-memory Memory emulator (InMemoryEventStore.ListEvents) to return events newest-first, matching the ordering of the real Amazon Bedrock AgentCore Memory ListEvents API so local tests exercise the same ordering behavior as production.
+
 ## Release 2026-08-20
 
 ### AWS.AgentCore.Hosting (1.1.0)

@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore.Hosting",
+      "Type": "Minor",
+      "ChangelogMessages": [
+        "Updated the Bedrock Microsoft.Extensions.AI dependency to the in-repo AWS.Bedrock.MEAI package, replacing the older AWSSDK.Extensions.Bedrock.MEAI package. The public API (Amazon.BedrockRuntime namespace and AmazonBedrockRuntimeExtensions methods) is unchanged."
+      ]
+    }
+  ]
+}

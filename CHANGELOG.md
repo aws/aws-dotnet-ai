@@ -1,3 +1,8 @@
+## Release 2026-08-20
+
+### AWS.AgentCore.Hosting (1.1.0)
+* Updated the Bedrock Microsoft.Extensions.AI dependency to the in-repo AWS.Bedrock.MEAI package, replacing the older AWSSDK.Extensions.Bedrock.MEAI package. The public API (Amazon.BedrockRuntime namespace and AmazonBedrockRuntimeExtensions methods) is unchanged.
+
 ## Release 2026-08-06
 
 ### AWS.Bedrock.MEAI (1.0.0)

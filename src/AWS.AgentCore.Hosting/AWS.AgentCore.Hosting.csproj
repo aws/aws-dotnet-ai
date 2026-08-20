@@ -5,7 +5,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsAotCompatible>true</IsAotCompatible>
-        <Version>1.0.0</Version>
+        <Version>1.1.0</Version>
         <IsPackable>true</IsPackable>
         <PackageId>AWS.AgentCore.Hosting</PackageId>
         <Product>AI Integrations on AWS for .NET</Product>

@@ -2,14 +2,14 @@
   "Projects": [
     {
       "Name": "AWS.AgentCore.Hosting",
-      "Type": "Minor",
+      "Type": "Patch",
       "ChangelogMessages": [
         "Fixed AgentCoreMemoryProvider replaying conversation history in reverse (newest-first) order. The AgentCore Memory ListEvents API returns events newest-first; the provider now sorts them ascending by EventTimestamp so chat history is presented oldest-first and multi-turn follow-ups bind to the most recent turn."
       ]
     },
     {
       "Name": "AWS.AgentCore.Testing",
-      "Type": "Minor",
+      "Type": "Patch",
       "ChangelogMessages": [
         "Updated the in-memory Memory emulator (InMemoryEventStore.ListEvents) to return events newest-first, matching the ordering of the real Amazon Bedrock AgentCore Memory ListEvents API so local tests exercise the same ordering behavior as production."
       ]

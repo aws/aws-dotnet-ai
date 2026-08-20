@@ -48,7 +48,9 @@ public class InMemoryEventStore
 
     /// <summary>
     /// Lists events filtered by memoryId/actorId/sessionId with pagination and optional payload inclusion.
-    /// Returns events in chronological order.
+    /// Returns events newest-first (most recent <c>EventTimestamp</c> first), matching the
+    /// ordering of the real Amazon Bedrock AgentCore Memory <c>ListEvents</c> API. Consumers
+    /// that need chronological order must sort ascending themselves.
     /// </summary>
     /// <exception cref="InvalidNextTokenException">Thrown when the nextToken is malformed or not a valid pagination token.</exception>
     public ListEventsApiResponse ListEvents(
@@ -67,7 +69,8 @@ public class InMemoryEventStore
         List<StoredEvent> snapshot;
         lock (events)
         {
-            snapshot = events.OrderBy(e => e.EventTimestamp).ToList();
+            // Newest-first, matching the real AgentCore Memory ListEvents API.
+            snapshot = events.OrderByDescending(e => e.EventTimestamp).ToList();
         }
 
         var page = snapshot

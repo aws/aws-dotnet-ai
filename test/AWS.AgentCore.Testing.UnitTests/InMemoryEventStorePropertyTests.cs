@@ -94,15 +94,16 @@ public class InMemoryEventStorePropertyTests
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // Property 2: Memory Store Chronological Ordering
+    // Property 2: Memory Store Newest-First Ordering
     // For any set of N events stored with distinct timestamps (in arbitrary
     // insertion order) for the same MemoryId/SessionId/ActorId, ListEvents
-    // should return all N events sorted by EventTimestamp in ascending order.
+    // should return all N events sorted by EventTimestamp in descending order
+    // (newest-first), matching the real AgentCore Memory ListEvents API.
     // **Validates: Requirements 3.3**
     // ──────────────────────────────────────────────────────────────────
 
     [Property(MaxTest = 20)]
-    public bool ChronologicalOrdering_ListEventsReturnsSortedByTimestamp(PositiveInt countWrapper)
+    public bool NewestFirstOrdering_ListEventsReturnsSortedByTimestampDescending(PositiveInt countWrapper)
     {
         // Cap N to a reasonable size for test performance
         var n = Math.Min(countWrapper.Get, 50);
@@ -153,10 +154,10 @@ public class InMemoryEventStorePropertyTests
         if (listResponse.Events.Count != n)
             return false;
 
-        // Verify events are sorted by EventTimestamp ascending
+        // Verify events are sorted by EventTimestamp descending (newest-first)
         for (int i = 0; i < listResponse.Events.Count - 1; i++)
         {
-            if (listResponse.Events[i].EventTimestamp >= listResponse.Events[i + 1].EventTimestamp)
+            if (listResponse.Events[i].EventTimestamp <= listResponse.Events[i + 1].EventTimestamp)
                 return false;
         }
 
@@ -168,7 +169,7 @@ public class InMemoryEventStorePropertyTests
     // For any set of N events stored for the same MemoryId/SessionId/ActorId
     // where N exceeds the page size, iterating through all pages using
     // NextToken should yield exactly N events with no duplicates and no gaps,
-    // in chronological order.
+    // in newest-first order.
     // **Validates: Requirements 3.7**
     // ──────────────────────────────────────────────────────────────────
 
@@ -238,10 +239,10 @@ public class InMemoryEventStorePropertyTests
         if (distinctIds != n)
             return false;
 
-        // Verify chronological order (no gaps — events are sorted ascending by timestamp)
+        // Verify newest-first order (no gaps — events are sorted descending by timestamp)
         for (int i = 0; i < allEvents.Count - 1; i++)
         {
-            if (allEvents[i].EventTimestamp >= allEvents[i + 1].EventTimestamp)
+            if (allEvents[i].EventTimestamp <= allEvents[i + 1].EventTimestamp)
                 return false;
         }
 
@@ -439,7 +440,9 @@ public class InMemoryEventStorePropertyTests
                 return false;
         }
 
-        // Verify payloads present when includePayloads=true
+        // Verify payloads present when includePayloads=true.
+        // Events were stored with ascending timestamps (Message 0..n-1) but are
+        // returned newest-first, so Events[i] corresponds to Message (n-1-i).
         for (int i = 0; i < n; i++)
         {
             var payload = withPayloads.Events[i].Payload;
@@ -448,7 +451,7 @@ public class InMemoryEventStorePropertyTests
 
             // Verify the payload content is intact
             var text = payload[0].Conversational?.Content?.Text;
-            if (text != $"Message {i}")
+            if (text != $"Message {n - 1 - i}")
                 return false;
         }
 

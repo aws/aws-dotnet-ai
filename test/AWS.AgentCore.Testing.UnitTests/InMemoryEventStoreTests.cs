@@ -196,11 +196,13 @@ public class InMemoryEventStoreTests
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // ListEvents_ReturnsChronologicalOrder
+    // ListEvents_ReturnsNewestFirst
+    // Matches the real AgentCore Memory ListEvents API, which returns events
+    // in reverse chronological order (most recent first).
     // ──────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void ListEvents_ReturnsChronologicalOrder()
+    public void ListEvents_ReturnsNewestFirst()
     {
         var store = new InMemoryEventStore();
 
@@ -217,23 +219,23 @@ public class InMemoryEventStoreTests
             includePayloads: true, maxResults: null, nextToken: null);
 
         Assert.Equal(3, response.Events.Count);
-        Assert.Equal("First", response.Events[0].Payload![0].Conversational!.Content!.Text);
+        Assert.Equal("Third", response.Events[0].Payload![0].Conversational!.Content!.Text);
         Assert.Equal("Second", response.Events[1].Payload![0].Conversational!.Content!.Text);
-        Assert.Equal("Third", response.Events[2].Payload![0].Conversational!.Content!.Text);
+        Assert.Equal("First", response.Events[2].Payload![0].Conversational!.Content!.Text);
 
-        // Also verify timestamps are in ascending order
-        Assert.True(response.Events[0].EventTimestamp < response.Events[1].EventTimestamp);
-        Assert.True(response.Events[1].EventTimestamp < response.Events[2].EventTimestamp);
+        // Also verify timestamps are in descending order (newest-first)
+        Assert.True(response.Events[0].EventTimestamp > response.Events[1].EventTimestamp);
+        Assert.True(response.Events[1].EventTimestamp > response.Events[2].EventTimestamp);
     }
 
     [Fact]
-    public void ListEvents_ReturnsChronologicalOrder_WithManyEvents()
+    public void ListEvents_ReturnsNewestFirst_WithManyEvents()
     {
         var store = new InMemoryEventStore();
         var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        // Insert 10 events in reverse chronological order
-        for (int i = 9; i >= 0; i--)
+        // Insert 10 events in chronological order
+        for (int i = 0; i < 10; i++)
         {
             store.CreateEvent("memory-1", CreateRequest(
                 timestamp: baseTime.AddMinutes(i),
@@ -247,8 +249,8 @@ public class InMemoryEventStoreTests
 
         for (int i = 0; i < response.Events.Count - 1; i++)
         {
-            Assert.True(response.Events[i].EventTimestamp <= response.Events[i + 1].EventTimestamp,
-                $"Event at index {i} has timestamp {response.Events[i].EventTimestamp} which is after event at index {i + 1} with timestamp {response.Events[i + 1].EventTimestamp}");
+            Assert.True(response.Events[i].EventTimestamp >= response.Events[i + 1].EventTimestamp,
+                $"Event at index {i} has timestamp {response.Events[i].EventTimestamp} which is before event at index {i + 1} with timestamp {response.Events[i + 1].EventTimestamp}");
         }
     }
 
@@ -368,11 +370,11 @@ public class InMemoryEventStoreTests
         var uniqueIds = allEvents.Select(e => e.EventId).Distinct().ToList();
         Assert.Equal(totalEvents, uniqueIds.Count);
 
-        // Verify chronological order is maintained across pages
+        // Verify newest-first order is maintained across pages
         for (int i = 0; i < allEvents.Count - 1; i++)
         {
-            Assert.True(allEvents[i].EventTimestamp <= allEvents[i + 1].EventTimestamp,
-                $"Event at index {i} has timestamp {allEvents[i].EventTimestamp} which is after event at index {i + 1} with timestamp {allEvents[i + 1].EventTimestamp}");
+            Assert.True(allEvents[i].EventTimestamp >= allEvents[i + 1].EventTimestamp,
+                $"Event at index {i} has timestamp {allEvents[i].EventTimestamp} which is before event at index {i + 1} with timestamp {allEvents[i + 1].EventTimestamp}");
         }
     }
 

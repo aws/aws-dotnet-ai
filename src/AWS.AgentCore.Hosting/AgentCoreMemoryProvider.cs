@@ -138,7 +138,7 @@ internal sealed class AgentCoreMemoryProvider(
 
         AgentCoreMetrics.RecordMemoryLoad();
 
-        var messages = new List<ChatMessage>();
+        var events = new List<Event>();
 
         var request = new ListEventsRequest
         {
@@ -153,16 +153,26 @@ internal sealed class AgentCoreMemoryProvider(
         {
             await foreach (var evt in memoryClient.Paginators.ListEvents(request).Events.WithCancellation(cancellationToken))
             {
-                if (TryConvertEventToChatMessage(evt, out var chatMessage))
-                {
-                    messages.Add(chatMessage);
-                }
+                events.Add(evt);
             }
         }
-        catch (Exception ex) when (messages.Count > 0)
+        catch (Exception ex) when (events.Count > 0)
         {
-            // Partial pagination failure — return what we have
-            logger.LogWarning(ex, "Error during pagination. Returning {Count} messages loaded so far.", messages.Count);
+            // Partial pagination failure — proceed with what we have.
+            logger.LogWarning(ex, "Error during pagination. Proceeding with {Count} events loaded so far.", events.Count);
+        }
+
+        // ListEvents returns events newest-first, but chat history must be presented
+        // to the model oldest-first (chronological order) so multi-turn follow-ups
+        // (e.g. "prices please") bind to the most recent turn rather than a stale one.
+        // OrderBy is a stable sort, so events sharing a timestamp keep their relative order.
+        var messages = new List<ChatMessage>(events.Count);
+        foreach (var evt in events.OrderBy(e => e.EventTimestamp))
+        {
+            if (TryConvertEventToChatMessage(evt, out var chatMessage))
+            {
+                messages.Add(chatMessage);
+            }
         }
 
         return messages;

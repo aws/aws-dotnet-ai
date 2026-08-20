@@ -222,6 +222,69 @@ public class AgentCoreMemoryProviderPropertyTests
     }
 
     // ──────────────────────────────────────────────────────────────────
+    // Regression: History is returned oldest-first (chronological order)
+    // The real AgentCore Memory ListEvents API returns events newest-first.
+    // The provider must sort ascending by EventTimestamp so multi-turn
+    // follow-ups bind to the most recent turn, not a stale one.
+    // ──────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ProvideChatHistory_WhenServiceReturnsNewestFirst_ReturnsOldestFirst()
+    {
+        var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        // Chronological conversation: index i is older than index i+1.
+        var chronological = new[]
+        {
+            (Role.USER, "top 3 dinners for a rainy Thursday?", baseTime.AddMinutes(0)),
+            (Role.ASSISTANT, "here are 3 dinners", baseTime.AddMinutes(1)),
+            (Role.USER, "what candy for movie night?", baseTime.AddMinutes(2)),
+            (Role.ASSISTANT, "here are 3 candies", baseTime.AddMinutes(3)),
+        };
+
+        // The service returns events newest-first — reverse the chronological order.
+        var newestFirst = chronological.Reverse().Select(t => new Event
+        {
+            EventTimestamp = t.Item3,
+            Payload =
+            [
+                new PayloadType
+                {
+                    Conversational = new Conversational
+                    {
+                        Role = t.Item1,
+                        Content = new Content { Text = t.Item2 }
+                    }
+                }
+            ]
+        }).ToList();
+
+        var mockPaginator = new Mock<IListEventsPaginator>();
+        mockPaginator.Setup(p => p.Events).Returns(new TestPaginatedEnumerable<Event>(newestFirst));
+
+        var mockPaginatorFactory = new Mock<IBedrockAgentCorePaginatorFactory>();
+        mockPaginatorFactory.Setup(f => f.ListEvents(It.IsAny<ListEventsRequest>())).Returns(mockPaginator.Object);
+
+        var mockClient = new Mock<IAmazonBedrockAgentCore>();
+        mockClient.Setup(c => c.Paginators).Returns(mockPaginatorFactory.Object);
+
+        var options = new AgentCoreOptions { MemoryId = "test-memory" };
+        var provider = new AgentCoreMemoryProvider(options, NullLogger<AgentCoreMemoryProvider>.Instance, mockClient.Object);
+
+        var session = CreateSessionWithRuntimeContext("test-session");
+        var context = CreateInvokingContext(provider, session);
+
+        var messages = (await InvokeProvideChatHistoryAsync(provider, context)).ToList();
+
+        // History must be oldest-first so the latest turn sits closest to the new prompt.
+        Assert.Equal(chronological.Length, messages.Count);
+        for (int i = 0; i < chronological.Length; i++)
+        {
+            Assert.Equal(chronological[i].Item2, messages[i].Text);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────
     // Property 4: Errors Never Propagate to Caller
     // For any exception thrown by the Memory client during ListEvents or
     // CreateEvent, the provider catches it and returns gracefully.

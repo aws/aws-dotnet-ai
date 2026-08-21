@@ -12,20 +12,18 @@ namespace AWS.Bedrock.MAG.IntegrationTests
 {
     /// <summary>
     /// Runs the policy backend in inline-checks mode against real InvokeGuardrailChecks, i.e. with no
-    /// pre-created guardrail (PR: InvokeGuardrailChecks).
+    /// pre-created guardrail (PR: InvokeGuardrailChecks). Deliberately does NOT join the
+    /// "bedrock-integration" collection: the shared fixture provisions a real guardrail and log group, which
+    /// this mode neither needs nor should require, so these tests can run with inline-check-only permissions
+    /// and genuinely exercise the no-pre-created-guardrail path.
     /// </summary>
-    [Collection("bedrock-integration")]
     public class InlineChecksIntegrationTests
     {
-        private readonly GuardrailFixture _fx;
-
-        public InlineChecksIntegrationTests(GuardrailFixture fx) => _fx = fx;
-
-        private BedrockGuardrailsPolicyBackend Backend()
+        private static BedrockGuardrailsPolicyBackend Backend()
         {
             var options = new BedrockGuardrailsPolicyOptions
             {
-                Region = _fx.Region,
+                Region = IntegrationConfig.Region,
                 InlineChecks = new GuardrailChecksOptions { ConfidenceThreshold = 0.1 }
             };
             options.InlineChecks.SensitiveInformationEntities.Add("US_SOCIAL_SECURITY_NUMBER");

@@ -91,7 +91,33 @@ namespace AWS.Bedrock.MAG.UnitTests.Mcp
             var evt = Assert.Single(captured);
             Assert.Equal(GovernanceEventType.PolicyViolation, evt.Type);
             Assert.Equal("pii_redaction", evt.Data["kind"]);
+            Assert.Equal("bedrock-guardrails-pii", evt.PolicyName);
             Assert.Contains("US_SSN", evt.Data["entities"]!.ToString());
+        }
+
+        [Fact]
+        public async Task Emits_generic_intervention_event_when_no_pii_entities()
+        {
+            // A non-PII intervention (content/topic/word filter) masks text but enumerates no PII entities.
+            // The audit event must be classified as a generic guardrail intervention, not a PII redaction.
+            var response = new ApplyGuardrailResponse
+            {
+                Action = GuardrailAction.GUARDRAIL_INTERVENED,
+                Outputs = new List<GuardrailOutputContent> { new() { Text = "[filtered]" } }
+            };
+            var inner = new StubTool("lookup", TextResult("some banned content"));
+            var sanitizer = Sanitizer(BedrockReturning(response));
+            var emitter = new AuditEmitter();
+            var captured = new List<GovernanceEvent>();
+            emitter.OnAll(captured.Add);
+
+            var tool = new GovernedBedrockMcpServerTool(inner, sanitizer, emitter);
+            await tool.InvokeAsync(McpTest.Request());
+
+            var evt = Assert.Single(captured);
+            Assert.Equal("guardrail_intervention", evt.Data["kind"]);
+            Assert.Equal("bedrock-guardrails", evt.PolicyName);
+            Assert.Equal(string.Empty, evt.Data["entities"]!.ToString());
         }
 
         [Fact]

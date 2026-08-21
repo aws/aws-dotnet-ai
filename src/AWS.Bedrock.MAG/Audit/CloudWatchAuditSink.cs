@@ -38,7 +38,10 @@ namespace AWS.Bedrock.MAG.Audit
         private AuditEmitter? _emitter;
         private Action<GovernanceEvent>? _handler;
         private int _disposed;
-        private int _flushing;
+
+        // Serializes flushes: the timer path enters without blocking (skips its tick if busy), and Dispose
+        // blocks on it so the final flush and client disposal can't race an in-flight PutMetricData.
+        private readonly SemaphoreSlim _flushGate = new(1, 1);
 
         /// <summary>
         /// Creates a sink. Pass a logger/metrics client for tests or custom credentials; otherwise they are
@@ -162,7 +165,7 @@ namespace AWS.Bedrock.MAG.Audit
         {
             // Skip this tick if a flush is already running, so a slow/throttled endpoint can't pile up
             // overlapping PutMetricData calls. The next timer tick picks up whatever accumulated.
-            if (Interlocked.CompareExchange(ref _flushing, 1, 0) != 0)
+            if (!await _flushGate.WaitAsync(0).ConfigureAwait(false))
             {
                 return;
             }
@@ -177,7 +180,7 @@ namespace AWS.Bedrock.MAG.Audit
             }
             finally
             {
-                Volatile.Write(ref _flushing, 0);
+                _flushGate.Release();
             }
         }
 
@@ -246,9 +249,20 @@ namespace AWS.Bedrock.MAG.Audit
 
             try
             {
-                // Bound the final flush so a hung PutMetricData can't block shutdown indefinitely.
+                // Bound shutdown so a hung PutMetricData can't block it indefinitely. Timer.Dispose() does not
+                // wait for a fire-and-forget flush it already kicked off, so wait on the gate first: this lets
+                // any in-flight timer flush finish before we run (and reset) the final flush and dispose the
+                // metrics client, otherwise that client could be disposed mid-request and drop the last batch.
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                FlushMetricsAsync(cts.Token).GetAwaiter().GetResult();
+                _flushGate.Wait(cts.Token);
+                try
+                {
+                    FlushMetricsAsync(cts.Token).GetAwaiter().GetResult();
+                }
+                finally
+                {
+                    _flushGate.Release();
+                }
             }
             catch
             {
@@ -259,6 +273,8 @@ namespace AWS.Bedrock.MAG.Audit
             {
                 _metrics?.Dispose();
             }
+
+            _flushGate.Dispose();
 
             // Flushes queued log messages and stops the AWS.Logger.Core background thread.
             _logger.Close();

@@ -153,6 +153,27 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
         }
 
         [Fact]
+        public void Dispose_flushes_pending_metrics_exactly_once()
+        {
+            // The flush interval is 10 minutes, so the timer never fires here: the single PutMetricData proves
+            // Dispose runs the final flush (coordinated through the flush gate) before closing down.
+            var logger = new Mock<IAWSLoggerCore>();
+            var metrics = Metrics();
+            var sink = new CloudWatchAuditSink(Options(emitMetrics: true), logger.Object, metrics.Object);
+            var emitter = new AuditEmitter();
+            sink.Subscribe(emitter);
+            emitter.Emit(Event(GovernanceEventType.PolicyViolation));
+
+            sink.Dispose();
+
+            metrics.Verify(
+                c => c.PutMetricDataAsync(It.IsAny<PutMetricDataRequest>(), It.IsAny<CancellationToken>()),
+                Times.Once);
+            // A caller-owned metrics client must not be disposed by the sink.
+            metrics.Verify(c => c.Dispose(), Times.Never);
+        }
+
+        [Fact]
         public void Dispose_unsubscribes_from_the_emitter()
         {
             var logger = new Mock<IAWSLoggerCore>();

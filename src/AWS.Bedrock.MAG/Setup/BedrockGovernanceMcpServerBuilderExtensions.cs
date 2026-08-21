@@ -26,7 +26,9 @@ namespace Microsoft.Extensions.DependencyInjection
             ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(configure);
 
-            var options = BedrockGovernanceServiceCollectionExtensions.AddShared(builder.Services, configure);
+            // Validate the sanitizer guardrail here: this MCP path is the only one that registers and runs it.
+            var options = BedrockGovernanceServiceCollectionExtensions.AddShared(
+                builder.Services, configure, validateSanitization: true);
 
             if (options.EnablePiiSanitization)
             {

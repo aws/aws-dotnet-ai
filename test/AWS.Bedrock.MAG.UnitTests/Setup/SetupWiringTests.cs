@@ -9,6 +9,7 @@ using Amazon;
 using AgentGovernance;
 using AWS.Bedrock.MAG;
 using AWS.Bedrock.MAG.Mcp;
+using AWS.Bedrock.MAG.Policy;
 using AWS.Bedrock.MAG.Setup;
 using AWS.Bedrock.MAG.UnitTests.Mcp;
 using Microsoft.Extensions.DependencyInjection;
@@ -106,12 +107,31 @@ namespace AWS.Bedrock.MAG.UnitTests.Setup
         }
 
         [Fact]
-        public void AddBedrockGovernance_throws_when_sanitization_guardrail_missing()
+        public void AddBedrockGovernance_does_not_validate_sanitizer_for_audit_only_registration()
         {
+            // PII sanitization is MCP-only; the DI path never uses it. An audit-only registration must not
+            // fail for a missing sanitizer guardrail even though EnablePiiSanitization defaults to true.
             var services = new ServiceCollection();
 
-            Assert.Throws<InvalidOperationException>(() =>
+            var ex = Record.Exception(() =>
                 services.AddBedrockGovernance(o =>
+                {
+                    o.EnablePolicy = false;
+                    o.EnableAudit = true;
+                    // EnablePiiSanitization left at its default (true) with no guardrail configured.
+                }));
+
+            Assert.Null(ex);
+        }
+
+        [Fact]
+        public void WithBedrockGovernance_throws_when_sanitization_guardrail_missing()
+        {
+            // The MCP path does register and run the sanitizer, so it must validate the guardrail.
+            var builder = new StubMcpServerBuilder();
+
+            Assert.Throws<InvalidOperationException>(() =>
+                builder.WithBedrockGovernance(o =>
                 {
                     o.EnablePolicy = false;
                     o.EnablePiiSanitization = true;
@@ -236,7 +256,11 @@ namespace AWS.Bedrock.MAG.UnitTests.Setup
                 default_action: deny
                 rules: []
                 """);
+            // Seed an external backend too, so the test verifies ReplacePolicyBackends clears external
+            // backends (OPA/Cedar/custom), not just loaded YAML policies.
+            kernel.PolicyEngine.AddExternalBackend(new StubExternalBackend("seeded-external"));
             Assert.Single(kernel.PolicyEngine.ListPolicies());
+            Assert.Contains("seeded-external", kernel.PolicyEngine.ListExternalBackends());
 
             var services = new ServiceCollection();
             services.AddSingleton(kernel);
@@ -250,18 +274,30 @@ namespace AWS.Bedrock.MAG.UnitTests.Setup
                 ReplacePolicyBackends = true
             };
             options.Policy.GuardrailId = "gr";
+            // Deterministic region so the Bedrock client constructs without relying on ambient AWS config,
+            // letting StartAsync complete rather than throwing (which the old test silently swallowed).
+            options.Policy.Region = RegionEndpoint.USWest2;
 
             var startup = new BedrockGovernanceStartup(options, provider);
-            try
-            {
-                await startup.StartAsync(CancellationToken.None);
-            }
-            catch
-            {
-                // Constructing a real Bedrock client without AWS config can throw; ClearPolicies runs first.
-            }
+            await startup.StartAsync(CancellationToken.None);
 
+            // Both the loaded YAML policy and the seeded external backend are cleared; Bedrock is the sole
+            // remaining external policy evaluator.
             Assert.Empty(kernel.PolicyEngine.ListPolicies());
+            var backend = Assert.Single(kernel.PolicyEngine.ListExternalBackends());
+            Assert.Equal(BedrockGuardrailsPolicyBackend.BackendName, backend);
+        }
+
+        // Minimal external backend for seeding the PolicyEngine; never evaluated in these wiring tests.
+        private sealed class StubExternalBackend : global::AgentGovernance.Policy.IExternalPolicyBackend
+        {
+            public StubExternalBackend(string name) => Name = name;
+
+            public string Name { get; }
+
+            public global::AgentGovernance.Policy.ExternalPolicyDecision Evaluate(
+                System.Collections.Generic.IReadOnlyDictionary<string, object> context)
+                => new() { Backend = Name, Allowed = true, Reason = "stub" };
         }
     }
 }

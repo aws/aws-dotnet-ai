@@ -105,5 +105,53 @@ namespace AWS.Bedrock.MAG.UnitTests
             Assert.Contains("action=GUARDRAIL_INTERVENED", summary);
             Assert.Contains("NAME", summary);
         }
+
+        [Fact]
+        public void ChecksTripped_treats_a_content_finding_with_no_severity_score_as_tripped()
+        {
+            // Fail-safe: a flagged entry with no score must deny rather than slip through. A very high
+            // threshold ensures the entry only trips because the missing score is treated as meeting it.
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    ContentFilter = new GuardrailChecksContentFilterResult
+                    {
+                        Results = new List<GuardrailChecksContentFilterResultEntry>
+                        {
+                            new() { Category = "HATE" } // SeverityScore deliberately unset (null).
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 1.0, confidenceThreshold: 1.0, out var summary);
+
+            Assert.True(tripped);
+            Assert.Contains("HATE", summary);
+        }
+
+        [Fact]
+        public void ChecksTripped_treats_a_pii_finding_with_no_confidence_score_as_tripped()
+        {
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    SensitiveInformation = new GuardrailChecksSensitiveInformationResult
+                    {
+                        Results = new List<GuardrailChecksSensitiveInformationResultEntry>
+                        {
+                            new() { Type = "US_SOCIAL_SECURITY_NUMBER" } // ConfidenceScore deliberately unset (null).
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 1.0, confidenceThreshold: 1.0, out var summary);
+
+            Assert.True(tripped);
+            Assert.Contains("US_SOCIAL_SECURITY_NUMBER", summary);
+        }
     }
 }

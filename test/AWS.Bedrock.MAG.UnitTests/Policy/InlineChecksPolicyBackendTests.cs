@@ -49,6 +49,30 @@ namespace AWS.Bedrock.MAG.UnitTests.Policy
             }
         };
 
+        private static BedrockGuardrailsPolicyOptions PromptAttackOptions(double severityThreshold = 0.5)
+        {
+            var options = new BedrockGuardrailsPolicyOptions
+            {
+                InlineChecks = new GuardrailChecksOptions { SeverityThreshold = severityThreshold }
+            };
+            options.InlineChecks.PromptAttackCategories.Add("PROMPT_INJECTION");
+            return options;
+        }
+
+        private static InvokeGuardrailChecksResponse PromptAttackResult(string category, double severity) => new()
+        {
+            Results = new GuardrailChecksResults
+            {
+                PromptAttack = new GuardrailChecksPromptAttackResult
+                {
+                    Results = new List<GuardrailChecksPromptAttackResultEntry>
+                    {
+                        new() { Category = category, SeverityScore = severity }
+                    }
+                }
+            }
+        };
+
         private static readonly Dictionary<string, object> Context = new() { ["tool"] = "send_email" };
 
         [Fact]
@@ -115,6 +139,34 @@ namespace AWS.Bedrock.MAG.UnitTests.Policy
             var decision = await backend.EvaluateAsync(Context);
 
             Assert.True(decision.Allowed);
+        }
+
+        [Fact]
+        public async Task Emits_prompt_attack_config_and_denies_on_severity()
+        {
+            InvokeGuardrailChecksRequest? captured = null;
+            var mock = Mock(PromptAttackResult("PROMPT_INJECTION", 0.9), r => captured = r);
+            var backend = new BedrockGuardrailsPolicyBackend(PromptAttackOptions(severityThreshold: 0.5), mock.Object);
+
+            var decision = await backend.EvaluateAsync(Context);
+
+            Assert.NotNull(captured);
+            Assert.NotNull(captured!.Checks.PromptAttack);
+            Assert.Single(captured.Checks.PromptAttack.Categories);
+            Assert.False(decision.Allowed);
+            Assert.Contains("PROMPT_INJECTION", decision.Reason);
+        }
+
+        [Theory]
+        [InlineData(-0.1)]
+        [InlineData(1.1)]
+        [InlineData(double.NaN)]
+        [InlineData(double.PositiveInfinity)]
+        public void Threshold_setters_reject_out_of_range_or_non_finite_values(double bad)
+        {
+            // An unenforced threshold > 1 (or NaN) can never be met and would silently allow every detection.
+            Assert.Throws<ArgumentOutOfRangeException>(() => new GuardrailChecksOptions { SeverityThreshold = bad });
+            Assert.Throws<ArgumentOutOfRangeException>(() => new GuardrailChecksOptions { ConfidenceThreshold = bad });
         }
     }
 }

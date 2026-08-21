@@ -24,18 +24,23 @@ namespace Microsoft.Extensions.DependencyInjection
             ArgumentNullException.ThrowIfNull(services);
             ArgumentNullException.ThrowIfNull(configure);
 
-            AddShared(services, configure);
+            // PII sanitization is an MCP-only feature (see WithBedrockGovernance). This DI/non-MCP path never
+            // registers or invokes the sanitizer, so it neither validates nor acts on EnablePiiSanitization —
+            // an audit-only registration must not fail for a missing sanitizer guardrail it can't use.
+            AddShared(services, configure, validateSanitization: false);
             return services;
         }
 
         // Shared registration used by both the DI and MCP entry points. Returns the resolved options so the
-        // MCP entry point can decide whether to add the PII decorator.
-        internal static BedrockGovernanceOptions AddShared(IServiceCollection services, Action<BedrockGovernanceOptions> configure)
+        // MCP entry point can decide whether to add the PII decorator. Only the MCP path validates the
+        // sanitizer guardrail, since it is the only path that registers and runs the sanitizer.
+        internal static BedrockGovernanceOptions AddShared(
+            IServiceCollection services, Action<BedrockGovernanceOptions> configure, bool validateSanitization)
         {
             var options = new BedrockGovernanceOptions();
             configure(options);
             Normalize(options);
-            Validate(options);
+            Validate(options, validateSanitization);
 
             services.AddSingleton(options);
 
@@ -72,14 +77,14 @@ namespace Microsoft.Extensions.DependencyInjection
             }
         }
 
-        internal static void Validate(BedrockGovernanceOptions options)
+        internal static void Validate(BedrockGovernanceOptions options, bool validateSanitization)
         {
             if (options.EnablePolicy && string.IsNullOrWhiteSpace(options.Policy.GuardrailId))
             {
                 throw new InvalidOperationException("EnablePolicy is true but Policy.GuardrailId is not set.");
             }
 
-            if (options.EnablePiiSanitization && string.IsNullOrWhiteSpace(options.Sanitization.GuardrailId))
+            if (validateSanitization && options.EnablePiiSanitization && string.IsNullOrWhiteSpace(options.Sanitization.GuardrailId))
             {
                 throw new InvalidOperationException(
                     "EnablePiiSanitization is true but no guardrail is set. Set Sanitization.GuardrailId or Policy.GuardrailId.");

@@ -21,7 +21,6 @@ namespace AWS.Bedrock.MAG.Setup
     {
         private readonly BedrockGovernanceOptions _options;
         private readonly IServiceProvider _services;
-        private CloudWatchAuditSink? _sink;
 
         public BedrockGovernanceStartup(BedrockGovernanceOptions options, IServiceProvider services)
         {
@@ -57,8 +56,8 @@ namespace AWS.Bedrock.MAG.Setup
 
             if (_options.EnableAudit)
             {
-                _sink = _services.GetService<CloudWatchAuditSink>();
-                _sink?.Subscribe(kernel.AuditEmitter);
+                var sink = _services.GetService<CloudWatchAuditSink>();
+                sink?.Subscribe(kernel.AuditEmitter);
             }
 
             return Task.CompletedTask;
@@ -66,7 +65,9 @@ namespace AWS.Bedrock.MAG.Setup
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            _sink?.Dispose();
+            // The audit sink is a container-owned singleton; the ServiceProvider disposes it after all hosted
+            // services have stopped. Disposing it here could shut auditing down while other services are still
+            // stopping (and emitting events), and would double-dispose the same instance.
             return Task.CompletedTask;
         }
     }

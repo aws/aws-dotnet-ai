@@ -169,7 +169,23 @@ namespace AWS.Bedrock.MAG.Policy
                     writer.WriteNumberValue(m);
                     break;
                 // Nested dictionaries/collections are serialized recursively rather than stringified to a CLR
-                // type name, so PII buried in a structured argument is still shown to the guardrail.
+                // type name, so PII buried in a structured argument is still shown to the guardrail. The
+                // non-generic IDictionary case catches the common concrete maps whose value type is not object
+                // (Dictionary<string, string>, Dictionary<string, int>, ...) — these do NOT implement
+                // IEnumerable<KeyValuePair<string, object>> and would otherwise fall through to the IEnumerable
+                // branch below and be written as an array of stringified KeyValuePair entries.
+                case System.Collections.IDictionary dict:
+                    writer.WriteStartObject();
+                    foreach (System.Collections.DictionaryEntry entry in dict)
+                    {
+                        writer.WritePropertyName(entry.Key?.ToString() ?? "null");
+                        WriteValue(writer, entry.Value);
+                    }
+
+                    writer.WriteEndObject();
+                    break;
+                // Read-only dictionaries that don't implement the non-generic IDictionary (e.g. some
+                // IReadOnlyDictionary<string, object> implementations) are still written as JSON objects.
                 case IEnumerable<KeyValuePair<string, object>> map:
                     writer.WriteStartObject();
                     foreach (var pair in map)

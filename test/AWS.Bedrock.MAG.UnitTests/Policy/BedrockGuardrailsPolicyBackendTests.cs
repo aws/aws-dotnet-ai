@@ -122,6 +122,32 @@ namespace AWS.Bedrock.MAG.UnitTests.Policy
         }
 
         [Fact]
+        public async Task Default_context_serializer_writes_nested_typed_dictionaries_as_objects()
+        {
+            // A nested Dictionary<string, string> / <string, int> does not implement
+            // IEnumerable<KeyValuePair<string, object>>; it must still be written as a JSON object (with its
+            // values visible to the guardrail), not an array of stringified KeyValuePair entries.
+            ApplyGuardrailRequest? captured = null;
+            var backend = Backend(MockReturning(new ApplyGuardrailResponse { Action = GuardrailAction.NONE }, r => captured = r).Object);
+
+            var context = new Dictionary<string, object>
+            {
+                ["tool"] = "send_email",
+                ["arguments"] = new Dictionary<string, string> { ["ssn"] = "123-45-6789" },
+                ["counts"] = new Dictionary<string, int> { ["retries"] = 3 }
+            };
+
+            await backend.EvaluateAsync(context);
+
+            var text = captured!.Content[0].Text.Text;
+            Assert.Contains("\"arguments\":{\"ssn\":\"123-45-6789\"}", text);
+            Assert.Contains("\"counts\":{\"retries\":3}", text);
+            // Guard against the regression: no array-of-stringified-pairs and the PII value is present verbatim.
+            Assert.DoesNotContain("[123-45-6789", text);
+            Assert.Contains("123-45-6789", text);
+        }
+
+        [Fact]
         public async Task EvaluateAsync_fail_closed_denies_and_sets_error_on_exception()
         {
             var backend = Backend(MockThrowing().Object, failClosed: true);

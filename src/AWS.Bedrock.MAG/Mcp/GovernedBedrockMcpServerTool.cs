@@ -111,7 +111,7 @@ namespace AWS.Bedrock.MAG.Mcp
                 return result;
             }
 
-            EmitRedaction(redactedTypes, blocked);
+            EmitInterventionEvent(redactedTypes, blocked);
 
             // Scrubbing covers text blocks and embedded text resources. Not scrubbed (documented v1 limits):
             // StructuredContent (sanitizing arbitrary structured JSON is a post-v1 follow-up; callers with PII
@@ -126,23 +126,27 @@ namespace AWS.Bedrock.MAG.Mcp
             };
         }
 
-        private void EmitRedaction(IReadOnlyCollection<string> redactedTypes, bool blocked)
+        private void EmitInterventionEvent(IReadOnlyCollection<string> redactedTypes, bool blocked)
         {
             if (_audit is null)
             {
                 return;
             }
 
+            // An intervention is either a PII redaction (entities enumerated) or a non-PII policy such as a
+            // content/topic/word filter (no entities). Classify the audit event by what actually fired instead
+            // of always labeling it a PII redaction, which the sanitizer explicitly supports for non-PII cases.
+            var isPii = redactedTypes.Count > 0;
             var toolName = _inner.ProtocolTool.Name;
             _audit.Emit(new GovernanceEvent
             {
                 Type = GovernanceEventType.PolicyViolation,
                 AgentId = $"mcp-tool:{toolName}",
                 SessionId = "mcp-response-sanitization",
-                PolicyName = "bedrock-guardrails-pii",
+                PolicyName = isPii ? "bedrock-guardrails-pii" : "bedrock-guardrails",
                 Data =
                 {
-                    ["kind"] = "pii_redaction",
+                    ["kind"] = isPii ? "pii_redaction" : "guardrail_intervention",
                     ["tool"] = toolName,
                     ["entities"] = string.Join(",", redactedTypes),
                     ["blocked"] = blocked

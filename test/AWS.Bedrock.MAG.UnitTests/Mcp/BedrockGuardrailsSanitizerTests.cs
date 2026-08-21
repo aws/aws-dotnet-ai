@@ -159,5 +159,33 @@ namespace AWS.Bedrock.MAG.UnitTests.Mcp
             Assert.True(result.Blocked);
             Assert.DoesNotContain("123-45-6789", result.Text);
         }
+
+        [Fact]
+        public async Task Fails_closed_when_intervened_but_masked_output_is_whitespace_only()
+        {
+            // Whitespace-only masked output carries no sanitized content; treating it as valid would return an
+            // effectively empty result for content the guardrail flagged as unsafe. Must fail closed.
+            var response = new ApplyGuardrailResponse
+            {
+                Action = GuardrailAction.GUARDRAIL_INTERVENED,
+                Outputs = new List<GuardrailOutputContent> { new() { Text = "   \t\n" } },
+                Assessments = new List<GuardrailAssessment>
+                {
+                    new GuardrailAssessment
+                    {
+                        SensitiveInformationPolicy = new GuardrailSensitiveInformationPolicyAssessment
+                        {
+                            PiiEntities = new List<GuardrailPiiEntityFilter> { new() { Type = new GuardrailPiiEntityType("US_SSN") } }
+                        }
+                    }
+                }
+            };
+            var sanitizer = Sanitizer(Mock(response).Object);
+
+            var result = await sanitizer.SanitizeAsync("SSN 123-45-6789");
+
+            Assert.True(result.Blocked);
+            Assert.DoesNotContain("123-45-6789", result.Text);
+        }
     }
 }

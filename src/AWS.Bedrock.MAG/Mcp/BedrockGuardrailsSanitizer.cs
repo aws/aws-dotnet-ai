@@ -62,9 +62,10 @@ namespace AWS.Bedrock.MAG.Mcp
             var detected = GuardrailResponseMapper.GetDetectedPiiTypes(response);
             var masked = response.Outputs?.FirstOrDefault()?.Text;
 
-            // Block explicitly, or fail closed when the guardrail intervened but returned no masked text.
-            // Never fall back to the original content: intervention means it was not safe to return as-is.
-            if (_options.BlockOnMatch || string.IsNullOrEmpty(masked))
+            // Block explicitly, or fail closed when the guardrail intervened but returned no usable masked
+            // text (null, empty, or whitespace-only). Never fall back to the original content: intervention
+            // means it was not safe to return as-is, and whitespace-only output carries no sanitized content.
+            if (_options.BlockOnMatch || string.IsNullOrWhiteSpace(masked))
             {
                 return new SanitizationResult { Text = BlockedPlaceholder, RedactedTypes = detected, Blocked = true, Intervened = true };
             }

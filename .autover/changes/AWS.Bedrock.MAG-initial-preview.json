@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Bedrock.MAG",
+      "Type": "Minor",
+      "ChangelogMessages": [
+        "Initial preview scaffold (0.1.0-preview): package infrastructure and a shared internal guardrail client wrapping ApplyGuardrail. User-facing features (policy backend, audit sink, PII sanitizer, high-level entry points) ship in follow-up preview releases."
+      ]
+    }
+  ]
+}

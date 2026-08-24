@@ -288,6 +288,51 @@ namespace AWS.Bedrock.MAG.UnitTests.Setup
             Assert.Equal(BedrockGuardrailsPolicyBackend.BackendName, backend);
         }
 
+        [Fact]
+        public async Task DI_registration_runs_hosted_service_and_replaces_policy_backends()
+        {
+            // Full DI path: register through the public AddBedrockGovernance API and let the host run the
+            // registered IHostedService, rather than newing up BedrockGovernanceStartup directly. This locks in
+            // that the toolkit's kernel is fully populated at resolve time (construction-time policy loading, no
+            // toolkit hosted service), so ClearPolicies runs against a complete PolicyEngine and can't be
+            // silently re-populated by a later-ordered hosted service.
+            var kernel = new GovernanceKernel();
+            kernel.PolicyEngine.LoadYaml(
+                """
+                apiVersion: governance.toolkit/v1
+                name: baseline
+                default_action: deny
+                rules: []
+                """);
+            kernel.PolicyEngine.AddExternalBackend(new StubExternalBackend("seeded-external"));
+
+            var services = new ServiceCollection();
+            // Mirrors the toolkit's WithGovernance kernel registration.
+            services.AddSingleton(kernel);
+            services.AddBedrockGovernance(o =>
+            {
+                o.EnablePolicy = true;
+                o.EnableAudit = false;
+                o.EnablePiiSanitization = false;
+                o.ReplacePolicyBackends = true;
+                o.Policy.GuardrailId = "gr";
+                // Deterministic region so the Bedrock client constructs without ambient AWS config.
+                o.Policy.Region = RegionEndpoint.USWest2;
+            });
+
+            using var provider = services.BuildServiceProvider();
+
+            // Run the hosted services exactly as the generic host would at startup.
+            foreach (var hosted in provider.GetServices<IHostedService>())
+            {
+                await hosted.StartAsync(CancellationToken.None);
+            }
+
+            Assert.Empty(kernel.PolicyEngine.ListPolicies());
+            var backend = Assert.Single(kernel.PolicyEngine.ListExternalBackends());
+            Assert.Equal(BedrockGuardrailsPolicyBackend.BackendName, backend);
+        }
+
         // Minimal external backend for seeding the PolicyEngine; never evaluated in these wiring tests.
         private sealed class StubExternalBackend : global::AgentGovernance.Policy.IExternalPolicyBackend
         {

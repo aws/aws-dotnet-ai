@@ -6,8 +6,6 @@ using AWS.Bedrock.MAG;
 using AWS.Bedrock.MAG.Audit;
 using AWS.Bedrock.MAG.Setup;
 
-// Placed in the DI namespace so the extension method is discoverable wherever IServiceCollection is in scope,
-// without an extra using for AWS.Bedrock.MAG.
 namespace Microsoft.Extensions.DependencyInjection
 {
     /// <summary>

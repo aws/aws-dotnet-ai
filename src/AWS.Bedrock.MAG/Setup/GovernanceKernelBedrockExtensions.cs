@@ -6,8 +6,6 @@ using AWS.Bedrock.MAG;
 using AWS.Bedrock.MAG.Audit;
 using AWS.Bedrock.MAG.Policy;
 
-// Placed in the AgentGovernance namespace so the extension methods are discoverable wherever a
-// GovernanceKernel is in scope, without an extra using for AWS.Bedrock.MAG.
 namespace AgentGovernance
 {
     /// <summary>

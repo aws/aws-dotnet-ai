@@ -19,6 +19,10 @@
       "Name": "AWS.Bedrock.MAG",
       "Path": "src/AWS.Bedrock.MAG/AWS.Bedrock.MAG.csproj",
       "PrereleaseLabel": "preview"
+    },
+    {
+      "Name": "AWS.Speech.MEAI",
+      "Path": "src/AWS.Speech.MEAI/AWS.Speech.MEAI.csproj"
     }
   ],
   "UseCommitsForChangelog": false,

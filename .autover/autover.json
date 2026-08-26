@@ -17,7 +17,8 @@
     },
     {
       "Name": "AWS.Speech.MEAI",
-      "Path": "src/AWS.Speech.MEAI/AWS.Speech.MEAI.csproj"
+      "Path": "src/AWS.Speech.MEAI/AWS.Speech.MEAI.csproj",
+      "PrereleaseLabel": "preview"
     }
   ],
   "UseCommitsForChangelog": false,

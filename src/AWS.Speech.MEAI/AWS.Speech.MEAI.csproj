@@ -34,8 +34,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="AWSSDK.Polly" Version="4.0.100.8" />
         <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.3" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
+    </ItemGroup>
+
+    <!-- Amazon Transcribe streaming requires HTTP/2, which is unavailable on net472/netstandard2.0. -->
+    <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+        <PackageReference Include="AWSSDK.TranscribeStreaming" Version="4.0.101.1" />
     </ItemGroup>
 
     <ItemGroup>

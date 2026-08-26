@@ -80,6 +80,7 @@ The available projects are:
 - AWS.AgentCore.Hosting
 - AWS.AgentCore.Testing
 - AWS.Bedrock.MEAI
+- AWS.Speech.MEAI
 
 The possible increment types are:
 

@@ -19,7 +19,10 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <WarningsAsErrors>true</WarningsAsErrors>
-        <NoWarn>$(NoWarn);MEAI001</NoWarn>
+        <!-- CS0436: this package and AWS.Bedrock.MEAI (visible via InternalsVisibleTo) both define the
+             System.Diagnostics.CodeAnalysis.ExperimentalAttribute polyfill on net472/netstandard2.0.
+             The compiler uses this assembly's local copy, which is the intended behavior. -->
+        <NoWarn>$(NoWarn);MEAI001;CS0436</NoWarn>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>

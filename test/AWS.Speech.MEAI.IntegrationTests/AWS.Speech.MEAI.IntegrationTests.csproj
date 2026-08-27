@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <!-- Amazon Transcribe streaming and the VoiceAgent loop are net8.0-only, so the integration
+             tests target net8.0 and run against live AWS. -->
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <LangVersion>Latest</LangVersion>
+        <IsPackable>false</IsPackable>
+        <!-- MEAI001: uses evaluation-stage Microsoft.Extensions.AI APIs.
+             xUnit1051: these live tests use their own linked timeout tokens (derived from
+             TestContext.Current.CancellationToken) rather than threading it through every call. -->
+        <NoWarn>$(NoWarn);MEAI001;xUnit1051</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.3" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
+        <PackageReference Include="xunit.v3" Version="3.2.2" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\AWS.Speech.MEAI\AWS.Speech.MEAI.csproj" />
+    </ItemGroup>
+
+</Project>

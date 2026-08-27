@@ -42,9 +42,13 @@
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
     </ItemGroup>
 
-    <!-- Amazon Transcribe streaming requires HTTP/2, which is unavailable on net472/netstandard2.0. -->
+    <!-- Amazon Transcribe streaming requires HTTP/2, which is unavailable on net472/netstandard2.0.
+         The VoiceAgent loop and its AddVoiceAgent DI helper are net8-only for the same reason, so the
+         DI packages are referenced only there and never burden the down-level Polly TTS surface. -->
     <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
         <PackageReference Include="AWSSDK.TranscribeStreaming" Version="4.0.101.1" />
+        <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.35" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
     </ItemGroup>
 
     <ItemGroup>

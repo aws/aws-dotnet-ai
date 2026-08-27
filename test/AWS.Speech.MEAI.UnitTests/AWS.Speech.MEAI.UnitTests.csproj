@@ -12,8 +12,10 @@
         <Nullable>enable</Nullable>
         <LangVersion>Latest</LangVersion>
         <IsPackable>false</IsPackable>
-        <!-- MEAI001: uses evaluation-stage Microsoft.Extensions.AI APIs. -->
-        <NoWarn>$(NoWarn);MEAI001</NoWarn>
+        <!-- MEAI001: uses evaluation-stage Microsoft.Extensions.AI APIs.
+             xUnit1051: these unit tests deliberately drive the loop with their own tokens (or none);
+             they do not need TestContext.Current.CancellationToken threaded through every call. -->
+        <NoWarn>$(NoWarn);MEAI001;xUnit1051</NoWarn>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
     </PropertyGroup>

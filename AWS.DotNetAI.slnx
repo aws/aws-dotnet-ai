@@ -26,5 +26,6 @@
     <Project Path="test/AWS.AgentCore.Hosting.IntegrationTests/AWS.AgentCore.Hosting.IntegrationTests.csproj" />
     <Project Path="test/AWS.Bedrock.MEAI.UnitTests/AWS.Bedrock.MEAI.UnitTests.csproj" />
     <Project Path="test/AWS.Speech.MEAI.UnitTests/AWS.Speech.MEAI.UnitTests.csproj" />
+    <Project Path="test/AWS.Speech.MEAI.IntegrationTests/AWS.Speech.MEAI.IntegrationTests.csproj" />
   </Folder>
 </Solution>

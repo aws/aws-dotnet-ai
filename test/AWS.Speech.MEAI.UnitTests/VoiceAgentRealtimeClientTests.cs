@@ -52,7 +52,7 @@ public class VoiceAgentRealtimeClientTests
         Assert.Contains(messages, m => m.Type.Value == RealtimeServerMessageType.OutputAudioDelta.Value);
         Assert.Contains(messages, m => m.Type.Value == RealtimeServerMessageType.ResponseDone.Value);
 
-        Assert.Equal("amazon.nova-sonic-v1:0", session.Options.Model);
+        Assert.Equal("amazon.nova-sonic-v1:0", session.Options?.Model);
     }
 
     [Fact]

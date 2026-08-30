@@ -16,10 +16,12 @@ namespace AWS.Bedrock.MAG.Audit
     /// </summary>
     internal static class GovernanceEventSerializer
     {
-        // CloudWatch Logs caps a single event near 256 KB, and AWS.Logger.Core splits an over-cap message into
-        // raw substrings that are each no longer valid JSON. Stay conservatively under that so every emitted
-        // line remains one valid JSON object; an over-cap record is replaced by a compact envelope below.
-        private const int MaxMessageBytes = 256_000;
+        // CloudWatch Logs caps a single event near 1 MB (raised from 256 KB in April 2025:
+        // https://aws.amazon.com/about-aws/whats-new/2025/04/amazon-cloudwatch-logs-increases-log-event-size-1-mb/),
+        // and AWS.Logger.Core splits an over-cap message into raw substrings that are each no longer valid JSON.
+        // Stay conservatively under that so every emitted line remains one valid JSON object; an over-cap record
+        // is replaced by a compact envelope below.
+        private const int MaxMessageBytes = 1_000_000;
 
         public static string Serialize(GovernanceEvent e)
         {

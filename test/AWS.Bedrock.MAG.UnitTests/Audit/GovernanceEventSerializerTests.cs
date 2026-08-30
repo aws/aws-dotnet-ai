@@ -156,18 +156,18 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 AgentId = "did:mesh:agent",
                 SessionId = "session-1",
                 PolicyName = "big-policy",
-                Data = new Dictionary<string, object> { ["blob"] = new string('x', 300_000) }
+                Data = new Dictionary<string, object> { ["blob"] = new string('x', 1_200_000) }
             };
 
             var json = GovernanceEventSerializer.Serialize(e);
 
             using var doc = JsonDocument.Parse(json);
             Assert.True(doc.RootElement.GetProperty("truncated").GetBoolean());
-            Assert.True(doc.RootElement.GetProperty("originalBytes").GetInt32() > 256_000);
+            Assert.True(doc.RootElement.GetProperty("originalBytes").GetInt32() > 1_000_000);
             Assert.Equal("did:mesh:agent", doc.RootElement.GetProperty("agentId").GetString());
             Assert.Equal("big-policy", doc.RootElement.GetProperty("policyName").GetString());
             Assert.False(doc.RootElement.TryGetProperty("data", out _));
-            Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= 256_000);
+            Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= 1_000_000);
         }
     }
 }

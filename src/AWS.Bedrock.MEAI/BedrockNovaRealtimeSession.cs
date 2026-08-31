@@ -55,9 +55,6 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
     // bidirectional stream can't safely serve two concurrent readers.
     private int _activeStreamingEnumeration;
 
-    /// <summary>Maximum nesting depth for tool payloads to prevent stack overflow from malicious/malformed data.</summary>
-    private const int MaxToolPayloadDepth = 64;
-
     /// <summary>Initializes a new instance of the <see cref="BedrockNovaRealtimeSession"/> class.</summary>
     /// <param name="runtime">The Amazon Bedrock Runtime client.</param>
     /// <param name="modelId">The model ID to use.</param>
@@ -291,7 +288,7 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
             throw new InvalidOperationException("Session is not connected. Call ConnectAsync first.");
         }
 
-        if (Interlocked.CompareExchange(ref _activeStreamingEnumeration, 1, 0) != 0)
+        if (!RealtimeAudioProtocol.TryBeginExclusiveEnumeration(ref _activeStreamingEnumeration))
         {
             throw new InvalidOperationException(
                 "Only one active streaming enumeration is allowed at a time. " +
@@ -419,7 +416,7 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
                         var item = new RealtimeConversationItem(
                             new List<AIContent>(),
                             id: currentContentId,
-                            role: MapRole(currentRole));
+                            role: RealtimeAudioProtocol.MapRole(currentRole));
 
                         yield return new ResponseOutputItemRealtimeServerMessage(RealtimeServerMessageType.ResponseOutputItemAdded)
                         {
@@ -495,7 +492,7 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
                         var item = new RealtimeConversationItem(
                             itemContents,
                             id: currentContentId,
-                            role: MapRole(currentRole));
+                            role: RealtimeAudioProtocol.MapRole(currentRole));
 
                         yield return new ResponseOutputItemRealtimeServerMessage(RealtimeServerMessageType.ResponseOutputItemDone)
                         {
@@ -610,7 +607,7 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
                                         using var argDoc = JsonDocument.Parse(json);
                                         if (argDoc.RootElement.ValueKind == JsonValueKind.Object)
                                         {
-                                            return ConvertJsonElementToToolPayload(argDoc.RootElement, 0)
+                                            return RealtimeAudioProtocol.ConvertJsonElementToToolPayload(argDoc.RootElement, 0)
                                                 as Dictionary<string, object?>;
                                         }
                                     }
@@ -659,7 +656,7 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
         }
         finally
         {
-            Volatile.Write(ref _activeStreamingEnumeration, 0);
+            RealtimeAudioProtocol.EndExclusiveEnumeration(ref _activeStreamingEnumeration);
         }
     }
 
@@ -1511,16 +1508,6 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
             _ => RealtimeResponseStatus.Completed
         };
 
-    private static ChatRole? MapRole(string? role) =>
-        role?.ToUpperInvariant() switch
-        {
-            "USER" => ChatRole.User,
-            "ASSISTANT" => ChatRole.Assistant,
-            "SYSTEM" => ChatRole.System,
-            "TOOL" => ChatRole.Tool,
-            _ => null
-        };
-
     private static UsageDetails? ParseUsage(JsonElement usageElement)
     {
         int totalInputTokens = 0;
@@ -1557,7 +1544,7 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
     private static string SerializeToolResult(object? result)
     {
         // Normalize first to handle JsonElement, byte[], nested dicts, etc.
-        result = NormalizeToolPayload(result);
+        result = RealtimeAudioProtocol.NormalizeToolPayload(result);
 
         if (result is null)
         {
@@ -1590,7 +1577,7 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
             using var buffer = new MemoryStream();
             using (var writer = new Utf8JsonWriter(buffer))
             {
-                WriteNormalizedValue(dict, writer);
+                RealtimeAudioProtocol.WriteNormalizedValue(dict, writer);
             }
 
             return Encoding.UTF8.GetString(buffer.ToArray());
@@ -1602,181 +1589,11 @@ public sealed class BedrockNovaRealtimeSession : IRealtimeClientSession
         {
             writer.WriteStartObject();
             writer.WritePropertyName("result");
-            WriteNormalizedValue(result, writer);
+            RealtimeAudioProtocol.WriteNormalizedValue(result, writer);
             writer.WriteEndObject();
         }
 
         return Encoding.UTF8.GetString(wrapBuffer.ToArray());
-    }
-
-    /// <summary>
-    /// Writes a normalized value (produced by <see cref="NormalizeToolPayload"/>) to a <see cref="Utf8JsonWriter"/>.
-    /// Handles null, string, bool, numeric primitives, Dictionary, and List without reflection.
-    /// </summary>
-    private static void WriteNormalizedValue(object? value, Utf8JsonWriter writer)
-    {
-        switch (value)
-        {
-            case null:
-                writer.WriteNullValue();
-                break;
-            case string s:
-                writer.WriteStringValue(s);
-                break;
-            case bool b:
-                writer.WriteBooleanValue(b);
-                break;
-            case int i:
-                writer.WriteNumberValue(i);
-                break;
-            case long l:
-                writer.WriteNumberValue(l);
-                break;
-            case float f:
-                writer.WriteNumberValue(f);
-                break;
-            case double d:
-                writer.WriteNumberValue(d);
-                break;
-            case decimal m:
-                writer.WriteNumberValue(m);
-                break;
-            case Dictionary<string, object?> dict:
-                writer.WriteStartObject();
-                foreach (var kvp in dict)
-                {
-                    writer.WritePropertyName(kvp.Key);
-                    WriteNormalizedValue(kvp.Value, writer);
-                }
-                writer.WriteEndObject();
-                break;
-            case List<object?> list:
-                writer.WriteStartArray();
-                foreach (var item in list)
-                {
-                    WriteNormalizedValue(item, writer);
-                }
-                writer.WriteEndArray();
-                break;
-            default:
-                writer.WriteStringValue(value.ToString());
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Recursively normalizes a tool payload into a tree of primitives, dictionaries, and lists.
-    /// Handles JsonElement, byte[], nested dicts/lists, and enforces a maximum nesting depth.
-    /// </summary>
-    internal static object? NormalizeToolPayload(object? value, int depth = 0)
-    {
-        ValidateToolPayloadDepth(depth);
-
-        switch (value)
-        {
-            case null:
-                return null;
-            case byte[] bytes:
-                return Convert.ToBase64String(bytes);
-            case JsonElement element:
-                return ConvertJsonElementToToolPayload(element, depth + 1);
-            case JsonDocument document:
-                return ConvertJsonElementToToolPayload(document.RootElement, depth + 1);
-            case string:
-            case bool:
-            case int:
-            case long:
-            case float:
-            case double:
-            case decimal:
-                return value;
-            case IReadOnlyDictionary<string, object?> roDict:
-                return NormalizeToolArguments(roDict, depth + 1);
-            case IEnumerable<KeyValuePair<string, object?>> pairs:
-                return NormalizeToolArguments(
-                    new Dictionary<string, object?>(pairs.Select(p => p), StringComparer.Ordinal), depth + 1);
-            case IDictionary dict:
-                var mapped = new Dictionary<string, object?>(StringComparer.Ordinal);
-                foreach (DictionaryEntry entry in dict)
-                {
-                    string key = entry.Key.ToString()!;
-                    mapped[key] = NormalizeToolPayload(entry.Value, depth + 1);
-                }
-                return mapped;
-            case IEnumerable<AIContent> aiContents:
-                return aiContents.Select(content => NormalizeToolPayload(content, depth + 1)).ToList();
-            case IEnumerable<object?> enumerable:
-                var list = new List<object?>();
-                foreach (var item in enumerable)
-                {
-                    list.Add(NormalizeToolPayload(item, depth + 1));
-                }
-                return list;
-            default:
-                return value.ToString();
-        }
-    }
-
-    /// <summary>
-    /// Normalizes a dictionary of tool arguments, recursively normalizing each value.
-    /// </summary>
-    internal static Dictionary<string, object?> NormalizeToolArguments(IReadOnlyDictionary<string, object?> arguments, int depth = 0)
-    {
-        ValidateToolPayloadDepth(depth);
-
-        var normalized = new Dictionary<string, object?>(arguments.Count, StringComparer.Ordinal);
-        foreach (var pair in arguments)
-        {
-            normalized[pair.Key] = NormalizeToolPayload(pair.Value, depth + 1);
-        }
-        return normalized;
-    }
-
-    /// <summary>
-    /// Converts a <see cref="JsonElement"/> to a tree of primitives, dictionaries, and lists.
-    /// </summary>
-    private static object? ConvertJsonElementToToolPayload(JsonElement element, int depth)
-    {
-        ValidateToolPayloadDepth(depth);
-
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Object:
-                var dictionary = new Dictionary<string, object?>(StringComparer.Ordinal);
-                foreach (var property in element.EnumerateObject())
-                {
-                    dictionary[property.Name] = ConvertJsonElementToToolPayload(property.Value, depth + 1);
-                }
-                return dictionary;
-            case JsonValueKind.Array:
-                var arrayList = new List<object?>();
-                foreach (var item in element.EnumerateArray())
-                {
-                    arrayList.Add(ConvertJsonElementToToolPayload(item, depth + 1));
-                }
-                return arrayList;
-            case JsonValueKind.String:
-                return element.GetString();
-            case JsonValueKind.Number:
-                return element.TryGetInt64(out long l) ? l : element.GetDouble();
-            case JsonValueKind.True:
-                return true;
-            case JsonValueKind.False:
-                return false;
-            case JsonValueKind.Null:
-            case JsonValueKind.Undefined:
-            default:
-                return null;
-        }
-    }
-
-    private static void ValidateToolPayloadDepth(int depth)
-    {
-        if (depth > MaxToolPayloadDepth)
-        {
-            throw new InvalidOperationException(
-                $"Realtime tool payloads exceed the maximum supported nesting depth of {MaxToolPayloadDepth}.");
-        }
     }
 
     #endregion

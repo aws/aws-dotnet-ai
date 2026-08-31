@@ -1129,27 +1129,27 @@ public class BedrockRealtimeSessionTests
     [Fact]
     public void NormalizeToolPayload_Null_ReturnsNull()
     {
-        Assert.Null(BedrockNovaRealtimeSession.NormalizeToolPayload(null));
+        Assert.Null(RealtimeAudioProtocol.NormalizeToolPayload(null));
     }
 
     [Fact]
     public void NormalizeToolPayload_String_ReturnsString()
     {
-        Assert.Equal("hello", BedrockNovaRealtimeSession.NormalizeToolPayload("hello"));
+        Assert.Equal("hello", RealtimeAudioProtocol.NormalizeToolPayload("hello"));
     }
 
     [Fact]
     public void NormalizeToolPayload_ByteArray_ReturnsBase64()
     {
         var bytes = new byte[] { 1, 2, 3 };
-        Assert.Equal(Convert.ToBase64String(bytes), BedrockNovaRealtimeSession.NormalizeToolPayload(bytes));
+        Assert.Equal(Convert.ToBase64String(bytes), RealtimeAudioProtocol.NormalizeToolPayload(bytes));
     }
 
     [Fact]
     public void NormalizeToolPayload_JsonElement_ConvertsToNative()
     {
         using var doc = JsonDocument.Parse("{\"key\": \"value\", \"num\": 42}");
-        var result = BedrockNovaRealtimeSession.NormalizeToolPayload(doc.RootElement);
+        var result = RealtimeAudioProtocol.NormalizeToolPayload(doc.RootElement);
 
         var dict = Assert.IsType<Dictionary<string, object?>>(result);
         Assert.Equal("value", dict["key"]);
@@ -1169,7 +1169,7 @@ public class BedrockRealtimeSessionTests
         }
 
         Assert.Throws<InvalidOperationException>(() =>
-            BedrockNovaRealtimeSession.NormalizeToolPayload(current));
+            RealtimeAudioProtocol.NormalizeToolPayload(current));
     }
 
     [Fact]
@@ -1182,7 +1182,7 @@ public class BedrockRealtimeSessionTests
             ["nested"] = doc.RootElement.Clone()
         };
 
-        var normalized = BedrockNovaRealtimeSession.NormalizeToolArguments(args);
+        var normalized = RealtimeAudioProtocol.NormalizeToolArguments(args);
 
         Assert.Equal("test", normalized["name"]);
         var nestedDict = Assert.IsType<Dictionary<string, object?>>(normalized["nested"]);

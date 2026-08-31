@@ -38,6 +38,14 @@ public static class VoiceAgentServiceCollectionExtensions
         var options = new VoiceAgentOptions();
         configure?.Invoke(options);
 
+        // Mirror VoiceAgent.Create: the DI path can only build the pipeline backend today, so reject an
+        // unsupported backend here instead of silently resolving a pipeline agent for a NovaSonic request.
+        if (options.Backend != VoiceAgentBackend.Pipeline)
+        {
+            throw new NotSupportedException(
+                $"The {options.Backend} backend is not available yet in this preview. Use VoiceAgentBackend.Pipeline.");
+        }
+
         RegisterSpeechToText(services, options);
         RegisterChat(services, options);
         RegisterTextToSpeech(services, options);

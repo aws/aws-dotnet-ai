@@ -59,15 +59,17 @@ public class VoiceAgentBargeInTests
 
     [Fact]
     [Trait("UnitTest", "Speech")]
-    public async Task RunAsync_BargeInDisabled_ShortNoisePartial_DoesNotCancel()
+    public async Task RunAsync_BargeInDisabled_QualifyingPartialDuringTurn_DoesNotCancel()
     {
-        // Barge-in off and a below-threshold partial: the single turn completes normally.
-        var stt = new ScriptedNoGateStt(new[]
-        {
-            new SpeechToTextResponseUpdate("hi") { Kind = SpeechToTextResponseUpdateKind.TextUpdating },
-            new SpeechToTextResponseUpdate("hello") { Kind = SpeechToTextResponseUpdateKind.TextUpdated },
-        });
-        var chat = new QuickChat("Sure.");
+        // A *qualifying* partial (>= BargeInDetector threshold) arrives while turn 1 is in flight, but
+        // barge-in is disabled, so it must NOT cancel the turn. Turn 1 is gated to complete only after that
+        // partial has been delivered, which proves the partial was observed mid-turn yet ignored. If a
+        // regression made the pipeline ignore EnableBargeIn, the partial would cancel the turn and the chat's
+        // wait would throw, producing a Cancelled update and failing the assertions below.
+        var turnStartedGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var partialDelivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stt = new PartialDuringTurnStt(turnStartedGate, partialDelivered);
+        var chat = new GatedCompletionChat(partialDelivered);
         var tts = new EchoTts();
 
         var agent = new VoiceAgent(stt, chat, tts, new VoiceAgentOptions { EnableBargeIn = false });
@@ -75,13 +77,20 @@ public class VoiceAgentBargeInTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
 
         var updates = new List<VoiceAgentUpdate>();
+        bool released = false;
         await foreach (var update in agent.RunAsync(mic, timeout.Token))
         {
             updates.Add(update);
+            if (!released && update.Kind == VoiceAgentUpdateKind.TurnStarted)
+            {
+                released = true;
+                turnStartedGate.SetResult();   // let the interrupting partial flow during the active turn
+            }
         }
 
         Assert.DoesNotContain(updates, u => u.Kind == VoiceAgentUpdateKind.Cancelled);
         Assert.Contains(updates, u => u.Kind == VoiceAgentUpdateKind.TurnComplete);
+        Assert.Equal(1, chat.CallCount);   // the ignored partial never started a second turn
     }
 
     // ---- test doubles ----
@@ -113,10 +122,16 @@ public class VoiceAgentBargeInTests
         public void Dispose() { }
     }
 
-    private sealed class ScriptedNoGateStt : ISpeechToTextClient
+    private sealed class PartialDuringTurnStt : ISpeechToTextClient
     {
-        private readonly SpeechToTextResponseUpdate[] _updates;
-        public ScriptedNoGateStt(SpeechToTextResponseUpdate[] updates) => _updates = updates;
+        private readonly TaskCompletionSource _turnStarted;
+        private readonly TaskCompletionSource _partialDelivered;
+
+        public PartialDuringTurnStt(TaskCompletionSource turnStarted, TaskCompletionSource partialDelivered)
+        {
+            _turnStarted = turnStarted;
+            _partialDelivered = partialDelivered;
+        }
 
         public Task<SpeechToTextResponse> GetTextAsync(Stream a, SpeechToTextOptions? o, CancellationToken ct) =>
             throw new NotImplementedException();
@@ -125,12 +140,14 @@ public class VoiceAgentBargeInTests
             Stream audioSpeechStream, SpeechToTextOptions? options,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            foreach (var u in _updates)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                yield return u;
-                await Task.Yield();
-            }
+            yield return new SpeechToTextResponseUpdate("first question") { Kind = SpeechToTextResponseUpdateKind.TextUpdated };
+
+            // Wait until the caller has seen turn 1 start, then emit a qualifying partial *during* the turn.
+            await _turnStarted.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            yield return new SpeechToTextResponseUpdate("actually wait") { Kind = SpeechToTextResponseUpdateKind.TextUpdating };
+            _partialDelivered.TrySetResult();
+            // No second final utterance: the partial alone must not start or cancel a turn.
         }
 
         public object? GetService(System.Type serviceType, object? serviceKey = null) =>
@@ -169,10 +186,12 @@ public class VoiceAgentBargeInTests
         public void Dispose() { }
     }
 
-    private sealed class QuickChat : IChatClient
+    private sealed class GatedCompletionChat : IChatClient
     {
-        private readonly string _reply;
-        public QuickChat(string reply) => _reply = reply;
+        private readonly TaskCompletionSource _proceed;
+        public int CallCount { get; private set; }
+
+        public GatedCompletionChat(TaskCompletionSource proceed) => _proceed = proceed;
 
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> m, ChatOptions? o, CancellationToken ct) =>
             throw new NotImplementedException();
@@ -181,7 +200,15 @@ public class VoiceAgentBargeInTests
             IEnumerable<ChatMessage> messages, ChatOptions? options,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            yield return new ChatResponseUpdate(ChatRole.Assistant, _reply);
+            CallCount++;
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "Working on it. ");
+
+            // Complete only after the interrupting partial has been delivered, so the partial is guaranteed
+            // to have been processed mid-turn. With barge-in disabled the per-turn token is never cancelled,
+            // so this wait completes normally rather than throwing.
+            await _proceed.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "Done.");
             await Task.Yield();
         }
 

@@ -58,6 +58,13 @@ public class RealtimeAdapterIntegrationTests
             await foreach (var message in session.GetStreamingResponseAsync(timeout.Token))
             {
                 messages.Add(message);
+
+                // Stop once the response is done, as a real caller would, rather than draining until
+                // Amazon Transcribe's idle-input timeout ends the (finite) audio the session was fed.
+                if (message.Type.Value == RealtimeServerMessageType.ResponseDone.Value)
+                {
+                    break;
+                }
             }
         });
 

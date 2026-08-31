@@ -32,7 +32,33 @@ internal sealed class VoiceAgentRealtimeClient : IRealtimeClient
     public Task<IRealtimeClientSession> CreateSessionAsync(RealtimeSessionOptions? options = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IRealtimeClientSession session = new VoiceAgentRealtimeSession(_agent, options ?? new RealtimeSessionOptions());
+
+        var effectiveOptions = options ?? new RealtimeSessionOptions();
+
+        // Apply the adapter's default model when the session options omit one, matching the established
+        // Bedrock AsIRealtimeClient contract where the default backs a session that specifies no model.
+        // RealtimeSessionOptions properties are init-only, so carry the rest across into a copy.
+        if (string.IsNullOrEmpty(effectiveOptions.Model) && !string.IsNullOrEmpty(_defaultModelId))
+        {
+            effectiveOptions = new RealtimeSessionOptions
+            {
+                Model = _defaultModelId,
+                SessionKind = effectiveOptions.SessionKind,
+                InputAudioFormat = effectiveOptions.InputAudioFormat,
+                TranscriptionOptions = effectiveOptions.TranscriptionOptions,
+                OutputAudioFormat = effectiveOptions.OutputAudioFormat,
+                Voice = effectiveOptions.Voice,
+                Instructions = effectiveOptions.Instructions,
+                MaxOutputTokens = effectiveOptions.MaxOutputTokens,
+                OutputModalities = effectiveOptions.OutputModalities,
+                ToolMode = effectiveOptions.ToolMode,
+                Tools = effectiveOptions.Tools,
+                VoiceActivityDetection = effectiveOptions.VoiceActivityDetection,
+                RawRepresentationFactory = effectiveOptions.RawRepresentationFactory,
+            };
+        }
+
+        IRealtimeClientSession session = new VoiceAgentRealtimeSession(_agent, effectiveOptions);
         return Task.FromResult(session);
     }
 

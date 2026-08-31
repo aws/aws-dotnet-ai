@@ -41,6 +41,15 @@ internal static class RealtimeMessageMapper
             return new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.AssistantText, Text = text.Text, ResponseId = text.ResponseId };
         }
 
+        // Native Nova Sonic surfaces the assistant's spoken words as an audio-transcription delta rather than
+        // a text delta, so map it to AssistantText too; otherwise the Nova backend would drop every
+        // assistant-text update and its stream would not match the pipeline backend's.
+        if (type == RealtimeServerMessageType.OutputAudioTranscriptionDelta.Value &&
+            message is OutputTextAudioRealtimeServerMessage transcript)
+        {
+            return new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.AssistantText, Text = transcript.Text, ResponseId = transcript.ResponseId };
+        }
+
         if (type == RealtimeServerMessageType.OutputAudioDelta.Value && message is OutputTextAudioRealtimeServerMessage audio)
         {
             var bytes = string.IsNullOrEmpty(audio.Audio) ? Array.Empty<byte>() : Convert.FromBase64String(audio.Audio);

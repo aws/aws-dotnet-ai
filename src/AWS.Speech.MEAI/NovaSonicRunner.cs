@@ -6,6 +6,7 @@ using Microsoft.Extensions.AI;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,30 +31,63 @@ internal static class NovaSonicRunner
         {
             Model = options.ModelId,
             Instructions = options.Instructions,
-            Voice = options.Voice.Value,
+            // Nova Sonic voice IDs are lowercase (e.g. "matthew"); the Polly VoiceId wire value is PascalCase
+            // (e.g. "Matthew"), so normalize it or the service rejects an otherwise valid default.
+            Voice = options.Voice.Value.ToLowerInvariant(),
             InputAudioFormat = new RealtimeAudioFormat("audio/lpcm", options.InputSampleRateHertz),
             OutputAudioFormat = new RealtimeAudioFormat("audio/lpcm", options.OutputSampleRateHertz),
+            // Forward the configured tools so the Nova backend advertises/invokes the same tools as the
+            // pipeline backend (which passes them through ChatOptions.Tools).
+            Tools = options.Tools?.ToArray(),
         };
 
         var session = await client.CreateSessionAsync(sessionOptions, cancellationToken).ConfigureAwait(false);
-        using var pumpCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-        var pump = Task.Run(() => PumpAudioAsync(session, microphonePcm, pumpCts.Token), pumpCts.Token);
         try
         {
-            await foreach (var message in session.GetStreamingResponseAsync(cancellationToken).ConfigureAwait(false))
+            // A single cancellation source ties the audio pump to the response enumeration: if the pump
+            // faults (mic read or SendAsync), it cancels this source so the read loop below stops waiting for
+            // input that will never arrive instead of hanging indefinitely.
+            using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            var pump = Task.Run(async () =>
             {
-                if (RealtimeMessageMapper.ToVoiceAgentUpdate(message) is { } update)
+                try
                 {
-                    yield return update;
+                    await PumpAudioAsync(session, microphonePcm, sessionCts.Token).ConfigureAwait(false);
                 }
+                catch (OperationCanceledException)
+                {
+                    // Expected when the response stream ends first and cancels the pump on teardown.
+                }
+                catch
+                {
+                    sessionCts.Cancel();   // a real pump fault tears down the read loop, then is rethrown below
+                    throw;
+                }
+            }, sessionCts.Token);
+
+            try
+            {
+                await foreach (var message in session.GetStreamingResponseAsync(sessionCts.Token).ConfigureAwait(false))
+                {
+                    if (RealtimeMessageMapper.ToVoiceAgentUpdate(message) is { } update)
+                    {
+                        yield return update;
+                    }
+                }
+            }
+            finally
+            {
+                sessionCts.Cancel();
+                // Surfaces a non-cancellation pump fault (e.g. a microphone read error); a teardown
+                // cancellation is swallowed as expected.
+                try { await pump.ConfigureAwait(false); }
+                catch (OperationCanceledException) { /* expected on teardown */ }
             }
         }
         finally
         {
-            pumpCts.Cancel();
-            try { await pump.ConfigureAwait(false); }
-            catch (OperationCanceledException) { /* expected on teardown */ }
+            // Always dispose the session, even if the pump faulted before the read loop was entered.
             await session.DisposeAsync().ConfigureAwait(false);
         }
     }

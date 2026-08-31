@@ -119,7 +119,8 @@ internal sealed class PollyTextToSpeechClient : ITextToSpeechClient
             ?? new SynthesizeSpeechRequest();
 
         request.Text = text;
-        request.OutputFormat ??= OutputFormat.Pcm;
+        // Honor the MEAI-desired output format when the caller did not pin an OutputFormat via the raw request.
+        request.OutputFormat ??= MapAudioFormat(options?.AudioFormat) ?? OutputFormat.Pcm;
         request.Engine ??= _defaultEngine;
         request.VoiceId ??= ResolveVoice(options);
 
@@ -135,6 +136,42 @@ internal sealed class PollyTextToSpeechClient : ITextToSpeechClient
 
         ValidateSampleRate(request);
         return request;
+    }
+
+    // Translate the MEAI TextToSpeechOptions.AudioFormat (a media type such as "audio/mpeg" or a
+    // provider-specific name such as "mp3") into a Polly OutputFormat. Returns null when the caller
+    // left AudioFormat unset (so BuildRequest falls back to PCM); throws for unsupported values.
+    private static OutputFormat? MapAudioFormat(string? audioFormat)
+    {
+        if (string.IsNullOrWhiteSpace(audioFormat)) return null;
+
+        switch (audioFormat!.Trim().ToLowerInvariant())
+        {
+            case "audio/lpcm":
+            case "audio/pcm":
+            case "pcm":
+                return OutputFormat.Pcm;
+            case "audio/mpeg":
+            case "audio/mp3":
+            case "mp3":
+                return OutputFormat.Mp3;
+            case "ogg_vorbis":
+            case "ogg-vorbis":
+            case "vorbis":
+                return OutputFormat.Ogg_vorbis;
+            case "audio/ogg":
+            case "ogg":
+            case "ogg_opus":
+            case "ogg-opus":
+            case "opus":
+                return OutputFormat.Ogg_opus;
+            default:
+                throw new ArgumentException(
+                    $"Unsupported TextToSpeechOptions.AudioFormat '{audioFormat}'. Amazon Polly supports PCM " +
+                    $"(audio/lpcm), MP3 (audio/mpeg), and Ogg (audio/ogg). Supply a Polly OutputFormat directly " +
+                    $"via TextToSpeechOptions.RawRepresentationFactory for other formats.",
+                    nameof(audioFormat));
+        }
     }
 
     private VoiceId ResolveVoice(TextToSpeechOptions? options) =>

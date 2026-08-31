@@ -52,6 +52,20 @@ internal sealed class TranscribeSpeechToTextClient : ISpeechToTextClient
         await foreach (var update in GetStreamingTextAsync(audioSpeechStream, options, cancellationToken)
                            .ConfigureAwait(false))
         {
+            if (update.Kind == SpeechToTextResponseUpdateKind.Error)
+            {
+                // A stream failure is surfaced as an Error update (see GetStreamingTextAsync). The blocking
+                // caller has no update channel to inspect, so rethrow rather than returning a partial transcript
+                // as a successful response.
+                if (update.RawRepresentation is Exception ex)
+                {
+                    throw new InvalidOperationException(update.Text, ex);
+                }
+
+                throw new InvalidOperationException(
+                    string.IsNullOrEmpty(update.Text) ? "The speech-to-text stream reported an error." : update.Text);
+            }
+
             if (update.Kind == SpeechToTextResponseUpdateKind.TextUpdated && !string.IsNullOrEmpty(update.Text))
             {
                 if (transcript.Length > 0) transcript.Append(' ');

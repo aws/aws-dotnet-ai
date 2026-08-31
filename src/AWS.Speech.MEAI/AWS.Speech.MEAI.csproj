@@ -10,7 +10,7 @@
         <Product>AI Integrations on AWS for .NET</Product>
         <Authors>Amazon Web Services</Authors>
         <Company>Amazon Web Services</Company>
-        <Description>Microsoft.Extensions.AI speech clients over Amazon Transcribe and Amazon Polly, plus a VoiceAgent that composes speech-to-text, an IChatClient, and text-to-speech into a full-duplex voice loop.</Description>
+        <Description>Preview scaffold: Microsoft.Extensions.AI speech clients over Amazon Transcribe and Amazon Polly, plus a VoiceAgent that composes speech-to-text, an IChatClient, and text-to-speech into a full-duplex voice loop. The speech clients and VoiceAgent facade land in subsequent preview releases.</Description>
         <PackageTags>AWS;Amazon;Transcribe;Polly;Voice;Speech;AI;Microsoft.Extensions.AI;ISpeechToTextClient;ITextToSpeechClient</PackageTags>
         <PackageProjectUrl>https://github.com/aws/aws-dotnet-ai</PackageProjectUrl>
         <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>

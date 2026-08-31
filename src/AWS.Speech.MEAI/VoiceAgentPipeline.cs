@@ -69,8 +69,10 @@ internal static class VoiceAgentPipeline
         finally
         {
             linkedCts.Cancel();
-            failure = await AwaitAndCaptureAsync(sttTask, failure).ConfigureAwait(false);
+            // Await the reasoning worker first so its root failure wins over any secondary teardown
+            // exception (a cancellation/ChannelClosedException) that awaiting STT first could capture.
             failure = await AwaitAndCaptureAsync(reasoningTask, failure).ConfigureAwait(false);
+            failure = await AwaitAndCaptureAsync(sttTask, failure).ConfigureAwait(false);
         }
 
         // Cancellation is expected on caller-driven teardown; anything else is a real failure.
@@ -114,8 +116,16 @@ internal static class VoiceAgentPipeline
                 }
                 else if (update.Kind == SpeechToTextResponseUpdateKind.Error)
                 {
-                    // Resilience is a non-goal; a stream failure ends the STT half of the loop.
-                    break;
+                    // Resilience (reconnect/resume) is a non-goal, but a stream failure is a real error:
+                    // propagate it so RunAsync rethrows a non-cancellation failure instead of ending the
+                    // voice loop as if the user simply stopped talking.
+                    if (update.RawRepresentation is Exception ex)
+                    {
+                        ExceptionDispatchInfo.Capture(ex).Throw();
+                    }
+
+                    throw new InvalidOperationException(
+                        string.IsNullOrEmpty(update.Text) ? "The speech-to-text stream reported an error." : update.Text);
                 }
             }
         }

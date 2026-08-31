@@ -72,6 +72,13 @@ public class VoiceAgentLoopIntegrationTests
                     assistantAudioBytes += audio.Length;
                     break;
             }
+
+            // Stop once the agent has completed its turn, exactly as a real caller would, rather than
+            // draining until Amazon Transcribe's idle-input timeout ends the (finite) microphone stream.
+            if (update.Kind == VoiceAgentUpdateKind.TurnComplete)
+            {
+                break;
+            }
         }
 
         Assert.False(string.IsNullOrWhiteSpace(userFinal), "The caller's utterance was not transcribed.");

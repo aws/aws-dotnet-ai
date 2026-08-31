@@ -14,6 +14,11 @@
     {
       "Name": "AWS.Bedrock.MEAI",
       "Path": "src/AWS.Bedrock.MEAI/AWS.Bedrock.MEAI.csproj"
+    },
+    {
+      "Name": "AWS.Speech.MEAI",
+      "Path": "src/AWS.Speech.MEAI/AWS.Speech.MEAI.csproj",
+      "PrereleaseLabel": "preview"
     }
   ],
   "UseCommitsForChangelog": false,

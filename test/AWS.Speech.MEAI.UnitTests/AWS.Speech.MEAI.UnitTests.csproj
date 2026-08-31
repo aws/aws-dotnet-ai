@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <!--
+          net8.0 runs on the default (Linux) CI target; net472 is added on Windows, where it can
+          execute natively (Amazon Linux CI cannot run net472 without Mono). The aws-dotnet-ai
+          pipeline runs this project on a Windows testing target so the net472 tests are covered.
+        -->
+        <TargetFrameworks>net8.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">net472;net8.0</TargetFrameworks>
+        <Nullable>enable</Nullable>
+        <LangVersion>Latest</LangVersion>
+        <IsPackable>false</IsPackable>
+        <!-- MEAI001: uses evaluation-stage Microsoft.Extensions.AI APIs. -->
+        <NoWarn>$(NoWarn);MEAI001</NoWarn>
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.3" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
+        <PackageReference Include="Moq" Version="4.20.72" />
+        <PackageReference Include="xunit.v3" Version="3.2.2" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    </ItemGroup>
+
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\AWS.Speech.MEAI\AWS.Speech.MEAI.csproj" />
+    </ItemGroup>
+
+</Project>

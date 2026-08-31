@@ -19,25 +19,54 @@ internal static class Wav
             throw new InvalidDataException($"'{path}' is not a RIFF/WAVE file.");
         }
 
-        int sampleRate = 16000;
+        int? sampleRate = null;
+        bool fmtValidated = false;
         int offset = 12;
         while (offset + 8 <= bytes.Length)
         {
             var chunkId = Encoding.ASCII.GetString(bytes, offset, 4);
-            int chunkSize = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(offset + 4, 4));
+            // Chunk sizes are unsigned; reading them as signed Int32 would let a large value look negative
+            // and stall or rewind the loop. Read unsigned and bounds-check against the remaining bytes.
+            long chunkSize = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset + 4, 4));
             int chunkData = offset + 8;
+            if (chunkData + chunkSize > bytes.Length)
+            {
+                throw new InvalidDataException(
+                    $"'{path}' declares a '{chunkId.TrimEnd()}' chunk of {chunkSize} bytes that overruns the file.");
+            }
 
             if (chunkId == "fmt ")
             {
+                if (chunkSize < 16)
+                {
+                    throw new InvalidDataException($"'{path}' has a truncated fmt chunk.");
+                }
+
+                short audioFormat = BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(chunkData, 2));
+                short channels = BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(chunkData + 2, 2));
                 sampleRate = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(chunkData + 4, 4));
+                short bitsPerSample = BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(chunkData + 14, 2));
+
+                if (audioFormat != 1 || channels != 1 || bitsPerSample != 16)
+                {
+                    throw new InvalidDataException(
+                        $"'{path}' must be 16-bit signed little-endian mono PCM (format=1, channels=1, bits=16), " +
+                        $"but was format={audioFormat}, channels={channels}, bits={bitsPerSample}.");
+                }
+
+                fmtValidated = true;
             }
             else if (chunkId == "data")
             {
-                int length = Math.Min(chunkSize, bytes.Length - chunkData);
-                return (bytes.AsSpan(chunkData, length).ToArray(), sampleRate);
+                if (!fmtValidated || sampleRate is null)
+                {
+                    throw new InvalidDataException($"'{path}' has a data chunk before a valid fmt chunk.");
+                }
+
+                return (bytes.AsSpan(chunkData, (int)chunkSize).ToArray(), sampleRate.Value);
             }
 
-            offset = chunkData + chunkSize + (chunkSize % 2); // chunks are word-aligned
+            offset = chunkData + (int)chunkSize + (int)(chunkSize % 2); // chunks are word-aligned
         }
 
         throw new InvalidDataException($"'{path}' has no data chunk.");

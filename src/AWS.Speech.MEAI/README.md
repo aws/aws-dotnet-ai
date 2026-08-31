@@ -102,7 +102,7 @@ await using var agent = VoiceAgent.Create(o =>
 
 ## Audio format
 
-The whole path standardizes on **16 kHz, 16-bit signed little-endian, mono PCM** (`audio/lpcm`), the one sample rate common to Transcribe's recommended input and Polly's PCM output, so there is no resampling between microphone, model, and speaker.
+By default the whole path uses **16 kHz, 16-bit signed little-endian, mono PCM** (`audio/lpcm`) — the one rate common to Transcribe's recommended input and Polly's PCM output — so the default path needs no resampling between microphone, model, and speaker. The input and output rates are configurable through `VoiceAgentOptions.InputSampleRateHertz` and `VoiceAgentOptions.OutputSampleRateHertz` (Amazon Polly PCM output supports only 8000 Hz or 16000 Hz). The library does **not** resample, so your microphone and speaker must match the rates you configure.
 
 ## Sample
 

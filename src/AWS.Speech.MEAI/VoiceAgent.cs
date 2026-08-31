@@ -76,6 +76,17 @@ public sealed class VoiceAgent : IAsyncDisposable
                 $"The {options.Backend} backend is not available yet in this preview. Use VoiceAgentBackend.Pipeline.");
         }
 
+        // Fail fast: without a pre-built ChatClient the factory builds a Bedrock chat client, and Bedrock's
+        // streaming request requires a model. Validate here, before allocating any AWS clients, so the caller
+        // gets a clear error at construction instead of an opaque failure after transcription has started.
+        if (options.ChatClient is null && string.IsNullOrEmpty(options.ModelId))
+        {
+            throw new ArgumentException(
+                "A ModelId is required when no ChatClient is supplied, because the default Amazon Bedrock chat " +
+                "client needs a model to invoke. Set VoiceAgentOptions.ModelId or supply VoiceAgentOptions.ChatClient.",
+                nameof(configure));
+        }
+
         var owned = new List<IDisposable>();
 
         var stt = options.SpeechToTextClient;

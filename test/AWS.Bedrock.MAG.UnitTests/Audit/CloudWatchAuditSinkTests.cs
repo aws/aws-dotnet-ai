@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.CloudWatch;
@@ -186,6 +188,58 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
 
             // After dispose, further events are not forwarded to the logger.
             logger.Verify(l => l.AddMessage(It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public void OnEvent_emits_multiple_messages_for_an_oversized_record()
+        {
+            var logger = new Mock<IAWSLoggerCore>();
+            var captured = new List<string>();
+            logger.Setup(l => l.AddMessage(It.IsAny<string>())).Callback<string>(m => captured.Add(m));
+
+            using var sink = new CloudWatchAuditSink(Options(), logger.Object);
+            var emitter = new AuditEmitter();
+            sink.Subscribe(emitter);
+
+            emitter.Emit(new GovernanceEvent
+            {
+                Type = GovernanceEventType.PolicyViolation,
+                AgentId = "did:mesh:agent",
+                SessionId = "session-1",
+                Data = new Dictionary<string, object> { ["blob"] = new string('D', 2_000_000) }
+            });
+
+            // The oversized record is enqueued as several chunk lines, not one truncated line.
+            Assert.True(captured.Count > 1);
+            logger.Verify(l => l.AddMessage(It.IsAny<string>()), Times.Exactly(captured.Count));
+        }
+
+        [Fact]
+        public async Task Oversized_record_publishes_the_chunked_diagnostic_metric()
+        {
+            var logger = new Mock<IAWSLoggerCore>();
+            var metrics = Metrics();
+            PutMetricDataRequest? captured = null;
+            metrics.Setup(c => c.PutMetricDataAsync(It.IsAny<PutMetricDataRequest>(), It.IsAny<CancellationToken>()))
+                .Callback<PutMetricDataRequest, CancellationToken>((r, _) => captured = r)
+                .ReturnsAsync(new PutMetricDataResponse());
+
+            using var sink = new CloudWatchAuditSink(Options(emitMetrics: true), logger.Object, metrics.Object);
+            var emitter = new AuditEmitter();
+            sink.Subscribe(emitter);
+
+            emitter.Emit(new GovernanceEvent
+            {
+                Type = GovernanceEventType.PolicyViolation,
+                AgentId = "did:mesh:agent",
+                SessionId = "session-1",
+                Data = new Dictionary<string, object> { ["blob"] = new string('D', 2_000_000) }
+            });
+
+            await sink.FlushMetricsAsync();
+
+            Assert.NotNull(captured);
+            Assert.Contains(captured!.MetricData, d => d.MetricName == "AuditRecordsChunked");
         }
     }
 }

@@ -28,6 +28,13 @@ namespace AWS.Bedrock.MAG
         /// <summary>How often logs are pushed (AWS.Logger.Core batch interval) and metrics are flushed.</summary>
         public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(5);
 
+        /// <summary>
+        /// The chunk count above which a single oversized governance record is considered abnormal. Exceeding
+        /// it emits the <c>AuditRecordsExceededSoftLimit</c> diagnostic metric but never drops data — the
+        /// record is still written in full across as many chunks as it needs. Defaults to 32.
+        /// </summary>
+        public int SoftChunkLimit { get; set; } = 32;
+
         /// <summary>The region for the CloudWatch clients. Null uses the default credential/region chain.</summary>
         public RegionEndpoint? Region { get; set; }
 

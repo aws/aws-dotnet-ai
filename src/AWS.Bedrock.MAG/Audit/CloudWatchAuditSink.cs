@@ -89,19 +89,41 @@ namespace AWS.Bedrock.MAG.Audit
                 return;
             }
 
-            _logger.AddMessage(GovernanceEventSerializer.Serialize(governanceEvent));
+            // An oversized record is split into multiple independently-valid chunk lines (lossless); the
+            // common case is a single line. Enqueue each; AWS.Logger.Core batches them on background threads.
+            var lines = GovernanceEventSerializer.Serialize(governanceEvent);
+            for (var i = 0; i < lines.Count; i++)
+            {
+                _logger.AddMessage(lines[i]);
+            }
 
             if (_metrics is not null)
             {
                 var metric = MapMetricName(governanceEvent.Type);
                 if (metric is not null)
                 {
-                    var key = new MetricKey(metric, governanceEvent.AgentId, governanceEvent.PolicyName);
-                    lock (_metricLock)
+                    Increment(metric, governanceEvent.AgentId, governanceEvent.PolicyName);
+                }
+
+                // Diagnostics so operators can see (and alarm on) the rare chunked path without inspecting logs.
+                if (lines.Count > 1)
+                {
+                    Increment("AuditRecordsChunked", governanceEvent.AgentId, governanceEvent.PolicyName);
+                    if (lines.Count > _options.SoftChunkLimit)
                     {
-                        _metricCounts[key] = _metricCounts.TryGetValue(key, out var count) ? count + 1 : 1;
+                        Increment("AuditRecordsExceededSoftLimit", governanceEvent.AgentId, governanceEvent.PolicyName);
                     }
                 }
+            }
+        }
+
+        // Bumps an in-memory counter published on the next metric flush. No I/O, never throws.
+        private void Increment(string metric, string agentId, string? policyName)
+        {
+            var key = new MetricKey(metric, agentId, policyName);
+            lock (_metricLock)
+            {
+                _metricCounts[key] = _metricCounts.TryGetValue(key, out var count) ? count + 1 : 1;
             }
         }
 
@@ -215,9 +237,11 @@ namespace AWS.Bedrock.MAG.Audit
                 config.LogStreamName = options.LogStreamName;
             }
 
-            var logger = new AWSLoggerCore(config, LogType);
-            logger.StartMonitor();
-            return logger;
+            // AWSLoggerCore's constructor already starts the background delivery monitor. Do NOT call
+            // StartMonitor() again here: a second call spins up a second monitor task that races the first
+            // over the same in-memory batch/queue, which can drop log events (notably the tail of a burst,
+            // e.g. the final chunk of an oversized, chunked audit record).
+            return new AWSLoggerCore(config, LogType);
         }
 
         private static IAmazonCloudWatch CreateMetricsClient(RegionEndpoint? region, AWSCredentials? credentials)

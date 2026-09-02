@@ -1,7 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using AgentGovernance.Audit;
 using AWS.Bedrock.MAG.Audit;
@@ -11,6 +14,13 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
 {
     public class GovernanceEventSerializerTests
     {
+        // The common case emits exactly one line; unwrap it and assert that invariant.
+        private static string SerializeSingle(GovernanceEvent e)
+        {
+            var lines = GovernanceEventSerializer.Serialize(e);
+            return Assert.Single(lines);
+        }
+
         [Fact]
         public void Serialize_emits_core_fields()
         {
@@ -22,7 +32,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 PolicyName = "default.yaml"
             };
 
-            var json = GovernanceEventSerializer.Serialize(e);
+            var json = SerializeSingle(e);
 
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
@@ -44,7 +54,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 SessionId = "session-1"
             };
 
-            var json = GovernanceEventSerializer.Serialize(e);
+            var json = SerializeSingle(e);
 
             using var doc = JsonDocument.Parse(json);
             Assert.False(doc.RootElement.TryGetProperty("policyName", out _));
@@ -66,7 +76,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 }
             };
 
-            var json = GovernanceEventSerializer.Serialize(e);
+            var json = SerializeSingle(e);
 
             using var doc = JsonDocument.Parse(json);
             var data = doc.RootElement.GetProperty("data");
@@ -87,7 +97,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
             };
 
             // Must produce valid JSON rather than throwing (which would drop the whole audit batch).
-            var json = GovernanceEventSerializer.Serialize(e);
+            var json = SerializeSingle(e);
             using var doc = JsonDocument.Parse(json);
             Assert.True(doc.RootElement.TryGetProperty("data", out _));
         }
@@ -103,7 +113,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 Data = new Dictionary<string, object> { ["at"] = new System.DateTime(2026, 8, 17, 13, 5, 0, System.DateTimeKind.Utc) }
             };
 
-            var json = GovernanceEventSerializer.Serialize(e);
+            var json = SerializeSingle(e);
 
             using var doc = JsonDocument.Parse(json);
             var at = doc.RootElement.GetProperty("data").GetProperty("at").GetString();
@@ -135,7 +145,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 }
             };
 
-            var json = GovernanceEventSerializer.Serialize(e);
+            var json = SerializeSingle(e);
 
             using var doc = JsonDocument.Parse(json);
             var args = doc.RootElement.GetProperty("data").GetProperty("arguments");
@@ -146,28 +156,132 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
         }
 
         [Fact]
-        public void Serialize_replaces_oversized_record_with_a_valid_truncation_envelope()
+        public void Serialize_splits_oversized_record_into_multiple_valid_chunk_lines()
         {
-            // An over-cap record must stay a single valid JSON object (AWS.Logger.Core would otherwise split it
-            // into invalid-JSON fragments), preserving the routing/identity fields and dropping the huge data.
+            var e = OversizedEvent(out _);
+
+            var lines = GovernanceEventSerializer.Serialize(e);
+
+            Assert.True(lines.Count > 1, "an over-cap record should span multiple chunk lines");
+            for (var i = 0; i < lines.Count; i++)
+            {
+                // Each line is independently valid JSON and stays under the CloudWatch event cap.
+                using var doc = JsonDocument.Parse(lines[i]);
+                var root = doc.RootElement;
+                Assert.Equal("did:mesh:agent", root.GetProperty("agentId").GetString());
+                var chunk = root.GetProperty("chunk");
+                Assert.Equal(i, chunk.GetProperty("i").GetInt32());
+                Assert.Equal(lines.Count, chunk.GetProperty("n").GetInt32());
+                Assert.Equal("base64", chunk.GetProperty("enc").GetString());
+                Assert.True(root.TryGetProperty("payload", out _));
+                Assert.True(Encoding.UTF8.GetByteCount(lines[i]) <= 256_000);
+            }
+        }
+
+        [Fact]
+        public void Chunked_record_reassembles_byte_identical_to_the_unchunked_serialization()
+        {
+            var e = OversizedEvent(out var blob);
+            var lines = GovernanceEventSerializer.Serialize(e);
+            Assert.True(lines.Count > 1);
+
+            var record = Assert.Single(GovernanceAuditReader.Reassemble(lines));
+            Assert.True(record.IsComplete);
+            Assert.NotNull(record.Json);
+
+            // The reassembled record is exactly what a single-line serialization would have produced, so the
+            // full governance payload (including the large blob) is recovered losslessly.
+            using var doc = JsonDocument.Parse(record.Json!);
+            Assert.Equal(e.EventId, doc.RootElement.GetProperty("eventId").GetString());
+            Assert.Equal(blob, doc.RootElement.GetProperty("data").GetProperty("blob").GetString());
+        }
+
+        [Fact]
+        public void Chunking_preserves_multibyte_utf8_data()
+        {
+            // Emoji/CJK exercise the base64 path's immunity to multi-byte boundary splits.
+            var unit = "🌍你好-café ";
+            var big = string.Concat(Enumerable.Repeat(unit, 200_000)); // well over the 1 MB cap
             var e = new GovernanceEvent
             {
                 Type = GovernanceEventType.PolicyViolation,
                 AgentId = "did:mesh:agent",
                 SessionId = "session-1",
-                PolicyName = "big-policy",
-                Data = new Dictionary<string, object> { ["blob"] = new string('x', 1_200_000) }
+                Data = new Dictionary<string, object> { ["blob"] = big }
             };
 
-            var json = GovernanceEventSerializer.Serialize(e);
+            var lines = GovernanceEventSerializer.Serialize(e);
+            Assert.True(lines.Count > 1);
 
-            using var doc = JsonDocument.Parse(json);
-            Assert.True(doc.RootElement.GetProperty("truncated").GetBoolean());
-            Assert.True(doc.RootElement.GetProperty("originalBytes").GetInt32() > 1_000_000);
-            Assert.Equal("did:mesh:agent", doc.RootElement.GetProperty("agentId").GetString());
-            Assert.Equal("big-policy", doc.RootElement.GetProperty("policyName").GetString());
-            Assert.False(doc.RootElement.TryGetProperty("data", out _));
-            Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= 1_000_000);
+            var record = Assert.Single(GovernanceAuditReader.Reassemble(lines));
+            Assert.True(record.IsComplete);
+            using var doc = JsonDocument.Parse(record.Json!);
+            Assert.Equal(big, doc.RootElement.GetProperty("data").GetProperty("blob").GetString());
+        }
+
+        [Fact]
+        public void Small_record_passes_through_the_reader_unchanged()
+        {
+            var e = new GovernanceEvent
+            {
+                Type = GovernanceEventType.PolicyCheck,
+                AgentId = "did:mesh:agent",
+                SessionId = "session-1",
+                Data = new Dictionary<string, object> { ["kind"] = "ok" }
+            };
+            var lines = GovernanceEventSerializer.Serialize(e);
+
+            var record = Assert.Single(GovernanceAuditReader.Reassemble(lines));
+            Assert.True(record.IsComplete);
+            Assert.Equal(lines[0], record.Json);
+        }
+
+        [Fact]
+        public void Reader_reports_incomplete_when_a_chunk_is_missing()
+        {
+            var e = OversizedEvent(out _);
+            var lines = GovernanceEventSerializer.Serialize(e).ToList();
+            Assert.True(lines.Count > 1);
+
+            lines.RemoveAt(1); // drop one chunk
+
+            var record = Assert.Single(GovernanceAuditReader.Reassemble(lines));
+            Assert.False(record.IsComplete);
+            Assert.Null(record.Json);
+            Assert.Contains(1, record.MissingIndices);
+        }
+
+        [Fact]
+        public void Reader_reassembles_multiple_interleaved_records()
+        {
+            var a = OversizedEvent(out _);
+            var b = OversizedEvent(out _);
+            var linesA = GovernanceEventSerializer.Serialize(a);
+            var linesB = GovernanceEventSerializer.Serialize(b);
+
+            // Interleave the two records' chunks to prove reassembly is keyed on eventId + index, not order.
+            var mixed = linesA.Zip(linesB, (x, y) => new[] { x, y }).SelectMany(p => p).ToList();
+            if (linesA.Count > linesB.Count) mixed.AddRange(linesA.Skip(linesB.Count));
+            if (linesB.Count > linesA.Count) mixed.AddRange(linesB.Skip(linesA.Count));
+
+            var records = GovernanceAuditReader.Reassemble(mixed).ToList();
+            Assert.Equal(2, records.Count);
+            Assert.All(records, r => Assert.True(r.IsComplete));
+            Assert.Contains(records, r => r.EventId == a.EventId);
+            Assert.Contains(records, r => r.EventId == b.EventId);
+        }
+
+        private static GovernanceEvent OversizedEvent(out string blob)
+        {
+            blob = new string('D', 2_000_000); // ~2 MB payload -> multiple ~1 MB chunks
+            return new GovernanceEvent
+            {
+                Type = GovernanceEventType.PolicyViolation,
+                AgentId = "did:mesh:agent",
+                SessionId = "session-1",
+                PolicyName = "big-policy",
+                Data = new Dictionary<string, object> { ["blob"] = blob }
+            };
         }
     }
 }

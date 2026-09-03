@@ -142,6 +142,63 @@ namespace AWS.Bedrock.MAG.UnitTests.Policy
         }
 
         [Fact]
+        public async Task Allows_benign_content_filter_response_with_per_category_null_severity_entries()
+        {
+            // Regression: content-filter results are PER-EVALUATED-CATEGORY — InvokeGuardrailChecks returns an
+            // entry for every category asked, even on benign input, with a null severity. Treating a null
+            // severity as tripped denied ALL benign traffic. A null-severity entry (plus one below threshold)
+            // must NOT deny.
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    ContentFilter = new GuardrailChecksContentFilterResult
+                    {
+                        Results = new List<GuardrailChecksContentFilterResultEntry>
+                        {
+                            new() { Category = "HATE" },                    // null severity => benign
+                            new() { Category = "VIOLENCE", SeverityScore = 0.1 } // below threshold => benign
+                        }
+                    }
+                }
+            };
+
+            var backend = new BedrockGuardrailsPolicyBackend(ContentFilterOptions(severityThreshold: 0.5), Mock(response).Object);
+
+            var decision = await backend.EvaluateAsync(Context);
+
+            Assert.True(decision.Allowed, decision.Reason);
+            Assert.Null(decision.Error);
+        }
+
+        [Fact]
+        public async Task Allows_benign_prompt_attack_response_with_per_category_null_severity_entries()
+        {
+            // Prompt-attack analog of the benign content-filter regression above.
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    PromptAttack = new GuardrailChecksPromptAttackResult
+                    {
+                        Results = new List<GuardrailChecksPromptAttackResultEntry>
+                        {
+                            new() { Category = "PROMPT_INJECTION" },              // null severity => benign
+                            new() { Category = "PROMPT_INJECTION", SeverityScore = 0.1 } // below threshold => benign
+                        }
+                    }
+                }
+            };
+
+            var backend = new BedrockGuardrailsPolicyBackend(PromptAttackOptions(severityThreshold: 0.5), Mock(response).Object);
+
+            var decision = await backend.EvaluateAsync(Context);
+
+            Assert.True(decision.Allowed, decision.Reason);
+            Assert.Null(decision.Error);
+        }
+
+        [Fact]
         public async Task Emits_prompt_attack_config_and_denies_on_severity()
         {
             InvokeGuardrailChecksRequest? captured = null;
@@ -167,6 +224,24 @@ namespace AWS.Bedrock.MAG.UnitTests.Policy
             // An unenforced threshold > 1 (or NaN) can never be met and would silently allow every detection.
             Assert.Throws<ArgumentOutOfRangeException>(() => new GuardrailChecksOptions { SeverityThreshold = bad });
             Assert.Throws<ArgumentOutOfRangeException>(() => new GuardrailChecksOptions { ConfidenceThreshold = bad });
+        }
+
+        [Fact]
+        public async Task Throws_when_inline_checks_are_emptied_after_construction()
+        {
+            // The ctor validated HasAnyCheck, but the config and its lists are mutable. Emptying them after
+            // construction leaves nothing to evaluate; that must surface as a loud InvalidOperationException,
+            // NOT be swallowed by the fail-open catch into an allow-all. FailClosed=false makes the point: a
+            // fail-open backend must still refuse to evaluate an empty config rather than allow everything.
+            var options = ContentFilterOptions();
+            options.FailClosed = false;
+            var mock = Mock(new InvokeGuardrailChecksResponse { Results = new GuardrailChecksResults() });
+            var backend = new BedrockGuardrailsPolicyBackend(options, mock.Object);
+
+            options.InlineChecks!.ContentFilterCategories.Clear();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => backend.EvaluateAsync(Context));
+            mock.Verify(c => c.InvokeGuardrailChecksAsync(It.IsAny<InvokeGuardrailChecksRequest>(), It.IsAny<CancellationToken>()), Times.Never);
         }
     }
 }

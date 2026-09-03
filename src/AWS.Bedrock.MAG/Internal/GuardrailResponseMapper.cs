@@ -60,10 +60,14 @@ namespace AWS.Bedrock.MAG.Internal
         }
 
         /// <summary>
-        /// Evaluates an inline-checks (InvokeGuardrailChecks) response. A content-filter or prompt-attack
-        /// finding trips when its severity meets <paramref name="severityThreshold"/>; a PII finding trips
-        /// when its confidence meets <paramref name="confidenceThreshold"/>. A finding with no score is
-        /// treated as tripped (fail-safe). Returns true when any check tripped, with a summary of which.
+        /// Evaluates an inline-checks (InvokeGuardrailChecks) response. Content-filter and prompt-attack
+        /// results are PER-EVALUATED-CATEGORY: InvokeGuardrailChecks returns one entry for every category you
+        /// asked it to check, present even on benign input, with a nullable severity — so such a finding trips
+        /// ONLY when its severity is present and meets <paramref name="severityThreshold"/>; a missing/absent
+        /// severity does NOT trip (treating it as tripped would deny all benign traffic). Sensitive-information
+        /// results are DETECTION-ONLY: an entry appears only when PII was actually found, so a PII finding trips
+        /// when its confidence meets <paramref name="confidenceThreshold"/> OR is absent (fail-safe — a detected
+        /// entity with no confidence must still deny). Returns true when any check tripped, with a summary of which.
         /// </summary>
         public static bool ChecksTripped(
             InvokeGuardrailChecksResponse response,
@@ -76,7 +80,7 @@ namespace AWS.Bedrock.MAG.Internal
 
             if (results?.ContentFilter?.Results is { } contentFilter)
             {
-                foreach (var entry in contentFilter.Where(e => Meets(e.SeverityScore, severityThreshold)))
+                foreach (var entry in contentFilter.Where(e => MeetsSeverity(e.SeverityScore, severityThreshold)))
                 {
                     tripped.Add($"content:{entry.Category}");
                 }
@@ -84,7 +88,7 @@ namespace AWS.Bedrock.MAG.Internal
 
             if (results?.PromptAttack?.Results is { } promptAttack)
             {
-                foreach (var entry in promptAttack.Where(e => Meets(e.SeverityScore, severityThreshold)))
+                foreach (var entry in promptAttack.Where(e => MeetsSeverity(e.SeverityScore, severityThreshold)))
                 {
                     tripped.Add($"promptAttack:{entry.Category}");
                 }
@@ -92,7 +96,7 @@ namespace AWS.Bedrock.MAG.Internal
 
             if (results?.SensitiveInformation?.Results is { } sensitive)
             {
-                foreach (var entry in sensitive.Where(e => Meets(e.ConfidenceScore, confidenceThreshold)))
+                foreach (var entry in sensitive.Where(e => DetectedPii(e.ConfidenceScore, confidenceThreshold)))
                 {
                     tripped.Add($"pii:{entry.Type}");
                 }
@@ -102,10 +106,16 @@ namespace AWS.Bedrock.MAG.Internal
             return tripped.Count > 0;
         }
 
-        // A finding with no score is treated as meeting the threshold. This is deliberate: an entry only
-        // appears in the results when the guardrail flagged something, so a missing score denies (fail-safe)
-        // rather than risk letting a real detection through. The trade-off is possible over-blocking if the
-        // API ever returns a flagged entry without a score.
-        private static bool Meets(double? score, double threshold) => !score.HasValue || score.Value >= threshold;
+        // Content-filter / prompt-attack: results are PER-EVALUATED-CATEGORY. An entry is returned for every
+        // category requested, even for benign input, and its severity is nullable. So a finding trips ONLY when
+        // a severity is present AND meets the threshold; a missing/absent severity must NOT trip — otherwise
+        // every benign request (which still carries an entry per category) would deny-all.
+        private static bool MeetsSeverity(double? score, double threshold) => score.HasValue && score.Value >= threshold;
+
+        // Sensitive-information: results are DETECTION-ONLY. An entry appears only when the guardrail actually
+        // detected a PII entity, so its mere presence is the signal. It trips when confidence meets the
+        // threshold, and also when confidence is absent (fail-safe: a real detection with no score must still
+        // deny rather than slip through).
+        private static bool DetectedPii(double? score, double threshold) => !score.HasValue || score.Value >= threshold;
     }
 }

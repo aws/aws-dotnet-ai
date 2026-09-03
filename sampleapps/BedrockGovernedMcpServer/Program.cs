@@ -37,7 +37,10 @@ builder.Services
     // Microsoft's toolkit: loads YAML policy and stands up the GovernanceKernel this server governs with.
     .WithGovernance(o =>
     {
-        o.PolicyPaths.Add("policies/mcp.yaml");
+        // Resolve against the assembly base dir (not the launcher's cwd) so the csproj's
+        // CopyToOutputDirectory copy is the file that loads, regardless of where an MCP client
+        // launches the built binary from.
+        o.PolicyPaths.Add(System.IO.Path.Combine(AppContext.BaseDirectory, "policies", "mcp.yaml"));
         o.ServerName = "bedrock-governed-sample";
         o.DefaultAgentId = "did:mcp:sample-agent";
 
@@ -49,7 +52,8 @@ builder.Services
     // AWS backends. Two modes, chosen by whether you supply a pre-created guardrail:
     //   MAG_GUARDRAIL_ID set   -> full path: guardrail-based policy + PII sanitization of tool output + audit.
     //   MAG_GUARDRAIL_ID unset -> inline-checks policy (InvokeGuardrailChecks, no guardrail resource) with
-    //                             PII sanitization off, since inline checks detect but do not mask text.
+    //                             PII sanitization off (inline checks detect but do not mask text) and audit
+    //                             off, so the default mode needs no AWS resources beyond IAM.
     .WithBedrockGovernance(o =>
     {
         o.Region = region;
@@ -62,6 +66,12 @@ builder.Services
         }
         else
         {
+            // Inline-checks mode is the "minimal, no AWS resources" default. EnableAudit defaults to true
+            // and would otherwise spin up the CloudWatch sink (logs:CreateLogGroup/CreateLogStream/
+            // PutLogEvents, cloudwatch:PutMetricData) even here — turn it off so the default mode truly
+            // needs only bedrock:InvokeGuardrailChecks, as the README advertises.
+            o.EnableAudit = false;
+
             o.EnablePiiSanitization = false;
             o.Policy.InlineChecks = new AWS.Bedrock.MAG.GuardrailChecksOptions
             {

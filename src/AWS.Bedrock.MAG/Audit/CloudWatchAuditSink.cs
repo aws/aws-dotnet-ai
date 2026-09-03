@@ -89,31 +89,40 @@ namespace AWS.Bedrock.MAG.Audit
                 return;
             }
 
-            // An oversized record is split into multiple independently-valid chunk lines (lossless); the
-            // common case is a single line. Enqueue each; AWS.Logger.Core batches them on background threads.
-            var lines = GovernanceEventSerializer.Serialize(governanceEvent);
-            for (var i = 0; i < lines.Count; i++)
+            try
             {
-                _logger.AddMessage(lines[i]);
-            }
-
-            if (_metrics is not null)
-            {
-                var metric = MapMetricName(governanceEvent.Type);
-                if (metric is not null)
+                // An oversized record is split into multiple independently-valid chunk lines (lossless); the
+                // common case is a single line. Enqueue each; AWS.Logger.Core batches them on background threads.
+                var lines = GovernanceEventSerializer.Serialize(governanceEvent);
+                for (var i = 0; i < lines.Count; i++)
                 {
-                    Increment(metric, governanceEvent.AgentId, governanceEvent.PolicyName);
+                    _logger.AddMessage(lines[i]);
                 }
 
-                // Diagnostics so operators can see (and alarm on) the rare chunked path without inspecting logs.
-                if (lines.Count > 1)
+                if (_metrics is not null)
                 {
-                    Increment("AuditRecordsChunked", governanceEvent.AgentId, governanceEvent.PolicyName);
-                    if (lines.Count > _options.SoftChunkLimit)
+                    var metric = MapMetricName(governanceEvent.Type);
+                    if (metric is not null)
                     {
-                        Increment("AuditRecordsExceededSoftLimit", governanceEvent.AgentId, governanceEvent.PolicyName);
+                        Increment(metric, governanceEvent.AgentId, governanceEvent.PolicyName);
+                    }
+
+                    // Diagnostics so operators can see (and alarm on) the rare chunked path without inspecting logs.
+                    if (lines.Count > 1)
+                    {
+                        Increment("AuditRecordsChunked", governanceEvent.AgentId, governanceEvent.PolicyName);
+                        if (lines.Count > _options.SoftChunkLimit)
+                        {
+                            Increment("AuditRecordsExceededSoftLimit", governanceEvent.AgentId, governanceEvent.PolicyName);
+                        }
                     }
                 }
+            }
+            catch
+            {
+                // The audit handler must never throw back into the governance loop. Serialization edge cases,
+                // or a logger disposed by a concurrent Dispose(), are swallowed here so a sink hiccup can't
+                // break the governed operation. Delivery failures are already handled by AWS.Logger.Core.
             }
         }
 
@@ -185,24 +194,38 @@ namespace AWS.Bedrock.MAG.Audit
 
         private async Task FlushMetricsGuardedAsync()
         {
-            // Skip this tick if a flush is already running, so a slow/throttled endpoint can't pile up
-            // overlapping PutMetricData calls. The next timer tick picks up whatever accumulated.
-            if (!await _flushGate.WaitAsync(0).ConfigureAwait(false))
+            // A timer callback can still be queued when Dispose() runs; bail before touching the gate/client.
+            if (Volatile.Read(ref _disposed) != 0)
             {
                 return;
             }
 
             try
             {
-                await FlushMetricsAsync().ConfigureAwait(false);
+                // Skip this tick if a flush is already running, so a slow/throttled endpoint can't pile up
+                // overlapping PutMetricData calls. The next timer tick picks up whatever accumulated.
+                if (!await _flushGate.WaitAsync(0).ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                try
+                {
+                    await FlushMetricsAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Audit must never break the governance loop. Drop the metric batch on persistent failure.
+                }
+                finally
+                {
+                    _flushGate.Release();
+                }
             }
-            catch
+            catch (ObjectDisposedException)
             {
-                // Audit must never break the governance loop. Drop the metric batch on persistent failure.
-            }
-            finally
-            {
-                _flushGate.Release();
+                // Dispose() raced this callback and disposed the gate/client after our _disposed check.
+                // Nothing left to flush here; Dispose() runs the final flush under the gate.
             }
         }
 

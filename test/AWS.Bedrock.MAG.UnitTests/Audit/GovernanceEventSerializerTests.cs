@@ -201,7 +201,8 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
         {
             // Emoji/CJK exercise the base64 path's immunity to multi-byte boundary splits.
             var unit = "🌍你好-café ";
-            var big = string.Concat(Enumerable.Repeat(unit, 200_000)); // well over the 1 MB cap
+            // ~20K repeats (~340 KB) — just enough to exceed the 256 KB per-message limit and force chunking.
+            var big = string.Concat(Enumerable.Repeat(unit, 20_000));
             var e = new GovernanceEvent
             {
                 Type = GovernanceEventType.PolicyViolation,
@@ -273,7 +274,9 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
 
         private static GovernanceEvent OversizedEvent(out string blob)
         {
-            blob = new string('D', 2_000_000); // ~2 MB payload -> multiple ~1 MB chunks
+            // ~300 KB — just over the 256 KB AWS.Logger.Core per-message limit, so the record spans a few chunks
+            // without allocating multi-MB strings in CI.
+            blob = new string('D', 300_000);
             return new GovernanceEvent
             {
                 Type = GovernanceEventType.PolicyViolation,

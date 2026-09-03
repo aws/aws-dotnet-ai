@@ -206,7 +206,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 Type = GovernanceEventType.PolicyViolation,
                 AgentId = "did:mesh:agent",
                 SessionId = "session-1",
-                Data = new Dictionary<string, object> { ["blob"] = new string('D', 2_000_000) }
+                Data = new Dictionary<string, object> { ["blob"] = new string('D', 300_000) }
             });
 
             // The oversized record is enqueued as several chunk lines, not one truncated line.
@@ -233,7 +233,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 Type = GovernanceEventType.PolicyViolation,
                 AgentId = "did:mesh:agent",
                 SessionId = "session-1",
-                Data = new Dictionary<string, object> { ["blob"] = new string('D', 2_000_000) }
+                Data = new Dictionary<string, object> { ["blob"] = new string('D', 300_000) }
             });
 
             await sink.FlushMetricsAsync();

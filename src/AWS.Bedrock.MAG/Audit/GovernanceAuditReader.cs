@@ -12,8 +12,8 @@ namespace AWS.Bedrock.MAG.Audit
     /// <summary>
     /// Reassembles governance audit records from CloudWatch Logs lines produced by the audit sink. Most
     /// records are written as a single JSON line and pass through unchanged; a record that exceeded the
-    /// CloudWatch event cap is split into multiple base64 "chunk" lines, which this reader stitches back into
-    /// the original record losslessly.
+    /// AWS.Logger.Core per-message limit (256,000 bytes in 4.0.3) is split into multiple base64 "chunk" lines,
+    /// which this reader stitches back into the original record losslessly.
     /// <para>
     /// Reassembly is by the <c>chunk.i</c> index, never by log order: chunks of one record may share a
     /// timestamp or land in different batches. A record whose chunks are not all present is reported as

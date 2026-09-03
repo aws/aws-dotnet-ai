@@ -28,6 +28,7 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         public async Task Delivers_a_governance_event_to_cloudwatch_logs()
         {
             var eventId = $"evt-int-{Guid.NewGuid():N}";
+            var start = DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeMilliseconds();
             var options = new CloudWatchAuditOptions
             {
                 LogGroupName = _fx.LogGroupName,
@@ -52,7 +53,7 @@ namespace AWS.Bedrock.MAG.IntegrationTests
             }
 
             using var logs = new AmazonCloudWatchLogsClient(_fx.Region);
-            var found = await WaitForLogAsync(logs, _fx.LogGroupName, eventId, TimeSpan.FromSeconds(90));
+            var found = await WaitForLogAsync(logs, _fx.LogGroupName, eventId, start, TimeSpan.FromSeconds(90));
 
             Assert.True(found, $"event {eventId} did not appear in {_fx.LogGroupName} within the timeout");
         }
@@ -61,7 +62,8 @@ namespace AWS.Bedrock.MAG.IntegrationTests
         public async Task Delivers_an_oversized_governance_event_as_reassemblable_chunks()
         {
             var eventId = $"evt-int-big-{Guid.NewGuid():N}";
-            var blob = new string('D', 2_000_000); // ~2 MB -> multiple ~1 MB chunk lines
+            var blob = new string('D', 300_000); // ~300 KB -> multiple chunk lines over the 256 KB limit
+            var start = DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeMilliseconds();
             var options = new CloudWatchAuditOptions
             {
                 LogGroupName = _fx.LogGroupName,
@@ -87,7 +89,7 @@ namespace AWS.Bedrock.MAG.IntegrationTests
             }
 
             using var logs = new AmazonCloudWatchLogsClient(_fx.Region);
-            var reassembled = await WaitForReassembledAsync(logs, _fx.LogGroupName, eventId, TimeSpan.FromSeconds(120));
+            var reassembled = await WaitForReassembledAsync(logs, _fx.LogGroupName, eventId, start, TimeSpan.FromSeconds(120));
 
             Assert.NotNull(reassembled);
             // The full payload survives the CloudWatch round-trip losslessly, across multiple log events.
@@ -98,7 +100,7 @@ namespace AWS.Bedrock.MAG.IntegrationTests
 
         // Polls the log group, collecting every event message that carries the eventId (paging as needed), and
         // returns the reassembled record once all of its chunks have arrived.
-        private static async Task<string?> WaitForReassembledAsync(IAmazonCloudWatchLogs logs, string logGroup, string eventId, TimeSpan timeout)
+        private static async Task<string?> WaitForReassembledAsync(IAmazonCloudWatchLogs logs, string logGroup, string eventId, long startTimeMs, TimeSpan timeout)
         {
             var deadline = DateTime.UtcNow + timeout;
             while (DateTime.UtcNow < deadline)
@@ -112,6 +114,10 @@ namespace AWS.Bedrock.MAG.IntegrationTests
                         var response = await logs.FilterLogEventsAsync(new FilterLogEventsRequest
                         {
                             LogGroupName = logGroup,
+                            // Scope the scan server-side: only events since the test started that carry this
+                            // eventId, instead of reading the whole group and filtering client-side.
+                            StartTime = startTimeMs,
+                            FilterPattern = $"\"{eventId}\"",
                             NextToken = nextToken
                         });
 
@@ -144,14 +150,19 @@ namespace AWS.Bedrock.MAG.IntegrationTests
             return null;
         }
 
-        private static async Task<bool> WaitForLogAsync(IAmazonCloudWatchLogs logs, string logGroup, string needle, TimeSpan timeout)
+        private static async Task<bool> WaitForLogAsync(IAmazonCloudWatchLogs logs, string logGroup, string needle, long startTimeMs, TimeSpan timeout)
         {
             var deadline = DateTime.UtcNow + timeout;
             while (DateTime.UtcNow < deadline)
             {
                 try
                 {
-                    var response = await logs.FilterLogEventsAsync(new FilterLogEventsRequest { LogGroupName = logGroup });
+                    var response = await logs.FilterLogEventsAsync(new FilterLogEventsRequest
+                    {
+                        LogGroupName = logGroup,
+                        StartTime = startTimeMs,
+                        FilterPattern = $"\"{needle}\""
+                    });
                     if (response.Events is not null && response.Events.Any(e => e.Message is not null && e.Message.Contains(needle, StringComparison.Ordinal)))
                     {
                         return true;

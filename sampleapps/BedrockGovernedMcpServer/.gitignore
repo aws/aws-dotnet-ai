@@ -1,0 +1,2 @@
+# Fallback error log written by AWS.Logger.Core (the CloudWatch audit sink) when it can't reach CloudWatch.
+aws-logger-errors.txt

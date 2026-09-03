@@ -1,0 +1,12 @@
+# Microsoft Agent Governance Toolkit policy for the MCP server.
+#
+# This baseline lets every tool call through at the toolkit layer (default_action: allow) and leaves the
+# real decisions to the AWS Bedrock policy backend added by .WithBedrockGovernance(...): guardrail /
+# inline-check evaluation of each tool call. That keeps the sample focused on the Bedrock integration.
+#
+# To also gate tools at the toolkit layer, add entries under `rules:` (see the toolkit docs for the rule
+# schema: name, action, priority, condition).
+apiVersion: governance.toolkit/v1
+name: bedrock-governed-sample
+default_action: allow
+rules: []

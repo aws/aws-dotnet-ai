@@ -66,6 +66,19 @@ namespace AWS.Bedrock.MAG.Policy
         {
             ArgumentNullException.ThrowIfNull(context);
 
+            // Guard against post-construction mutation. InlineChecks and its category/entity lists are mutable,
+            // so a caller can empty the config after the ctor validated it. When we're on the inline-checks path
+            // (no GuardrailId), an empty config would send InvokeGuardrailChecks nothing to evaluate and allow
+            // everything. This is a programming error, not a runtime guardrail failure, so surface it loudly
+            // BEFORE the try — do NOT let the fail-open catch (FailClosed == false) turn an evaluate-nothing
+            // config into allow-all.
+            if (string.IsNullOrWhiteSpace(_options.GuardrailId) && _options.InlineChecks?.HasAnyCheck != true)
+            {
+                throw new InvalidOperationException(
+                    "InlineChecks has no content-filter category, prompt-attack category, or sensitive-information entity " +
+                    "configured; there is nothing to evaluate. Configure at least one check before evaluating.");
+            }
+
             try
             {
                 // Serialize inside the try so a throwing ContextSerializer still fails closed/open per policy

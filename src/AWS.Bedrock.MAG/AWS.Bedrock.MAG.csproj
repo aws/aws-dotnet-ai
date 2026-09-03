@@ -29,6 +29,8 @@
 
     <ItemGroup>
         <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.17.5" />
+        <PackageReference Include="AWS.Logger.Core" Version="4.0.3" />
+        <PackageReference Include="AWSSDK.CloudWatch" Version="4.0.103.2" />
         <PackageReference Include="Microsoft.AgentGovernance" Version="5.0.0" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
     </ItemGroup>

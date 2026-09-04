@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using System.Collections.Concurrent;
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockAgentCore.Model;
 using AWS.AgentCore.Hosting.Internal;
@@ -27,6 +28,32 @@ internal sealed class AgentCoreMemoryProvider(
 {
     /// <inheritdoc/>
     public override IReadOnlyList<string> StateKeys => ["AgentCore.Memory"];
+
+    /// <summary>
+    /// Tracks the last <see cref="DateTime"/> stamped on an event per session so that
+    /// timestamps issued within a single session are strictly increasing. AgentCore
+    /// Memory replays events ordered by <c>EventTimestamp</c>, and <see cref="DateTime.UtcNow"/>
+    /// has coarse resolution and is not monotonic, so two messages saved in the same
+    /// <see cref="StoreChatHistoryAsync"/> loop (a user turn and the assistant reply)
+    /// can otherwise receive the same timestamp and be replayed out of order.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, long> _lastEventTicks = new();
+
+    /// <summary>
+    /// Returns a strictly-increasing UTC timestamp for the given session. If the wall clock
+    /// has not advanced past the previously issued timestamp for the session (equal or, due to
+    /// clock skew, earlier), the returned value is nudged one tick beyond the last one so that
+    /// events saved back-to-back always sort deterministically on replay.
+    /// </summary>
+    internal DateTime NextEventTimestamp(string sessionId, DateTime now)
+    {
+        var ticks = _lastEventTicks.AddOrUpdate(
+            sessionId,
+            now.Ticks,
+            (_, previous) => Math.Max(now.Ticks, previous + 1));
+
+        return new DateTime(ticks, DateTimeKind.Utc);
+    }
 
     /// <summary>
     /// Resolves the effective MemoryId from options or environment variable.
@@ -224,7 +251,7 @@ internal sealed class AgentCoreMemoryProvider(
             // memory implementation, the session IS the actor scope. A future long-term memory
             // feature may introduce a separate ActorId/UserId concept.
             ActorId = sessionId,
-            EventTimestamp = DateTime.UtcNow,
+            EventTimestamp = NextEventTimestamp(sessionId, DateTime.UtcNow),
             Payload = [
                 new PayloadType
                 {

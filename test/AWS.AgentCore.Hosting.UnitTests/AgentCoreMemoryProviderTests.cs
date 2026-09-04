@@ -292,6 +292,86 @@ public class AgentCoreMemoryProviderTests
 
         Assert.False(AgentCoreMemoryProvider.HasToolContent(message));
     }
+
+    // ──────────────────────────────────────────────────────────────────
+    // NextEventTimestamp (monotonic per-session ordering) tests
+    // ──────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void NextEventTimestamp_WhenClockDoesNotAdvance_ReturnsStrictlyIncreasingValues()
+    {
+        var provider = CreateProvider();
+        var now = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        // Same wall-clock instant for both saves (the coarse-resolution / non-monotonic case).
+        var first = provider.NextEventTimestamp("session-a", now);
+        var second = provider.NextEventTimestamp("session-a", now);
+
+        Assert.True(second > first,
+            "Second timestamp must be strictly greater than the first even when the clock does not advance.");
+    }
+
+    [Fact]
+    public void NextEventTimestamp_PreservesUserThenAssistantOrder()
+    {
+        var provider = CreateProvider();
+        var now = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        // Mirrors StoreChatHistoryAsync saving a user turn then the assistant reply in one loop.
+        var userTs = provider.NextEventTimestamp("session-a", now);
+        var assistantTs = provider.NextEventTimestamp("session-a", now);
+
+        // A stable OrderBy on replay will keep user before assistant only if the timestamps differ.
+        Assert.True(assistantTs > userTs);
+    }
+
+    [Fact]
+    public void NextEventTimestamp_WhenClockAdvances_UsesWallClock()
+    {
+        var provider = CreateProvider();
+        var first = provider.NextEventTimestamp("session-a", new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var laterNow = new DateTime(2024, 1, 1, 0, 0, 5, DateTimeKind.Utc);
+
+        var second = provider.NextEventTimestamp("session-a", laterNow);
+
+        Assert.Equal(laterNow, second);
+    }
+
+    [Fact]
+    public void NextEventTimestamp_WhenClockGoesBackward_StillStrictlyIncreasing()
+    {
+        var provider = CreateProvider();
+        var first = provider.NextEventTimestamp("session-a", new DateTime(2024, 1, 1, 0, 0, 5, DateTimeKind.Utc));
+
+        // Simulate NTP correction / clock skew moving the wall clock backward.
+        var second = provider.NextEventTimestamp("session-a", new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        Assert.True(second > first);
+    }
+
+    [Fact]
+    public void NextEventTimestamp_TracksSessionsIndependently()
+    {
+        var provider = CreateProvider();
+        var now = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var sessionA = provider.NextEventTimestamp("session-a", now);
+        var sessionB = provider.NextEventTimestamp("session-b", now);
+
+        // A different session must not be nudged forward by another session's activity.
+        Assert.Equal(now, sessionA);
+        Assert.Equal(now, sessionB);
+    }
+
+    [Fact]
+    public void NextEventTimestamp_ReturnsUtcKind()
+    {
+        var provider = CreateProvider();
+
+        var result = provider.NextEventTimestamp("session-a", new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(DateTimeKind.Utc, result.Kind);
+    }
 }
 
 public class AgentCoreMemoryDIRegistrationTests

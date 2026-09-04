@@ -22,10 +22,6 @@
         <WarningsAsErrors>true</WarningsAsErrors>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <IncludeSymbols>true</IncludeSymbols>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
 
     <ItemGroup>
@@ -34,7 +30,6 @@
         <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.17.5" />
         <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.35" />
         <PackageReference Include="Microsoft.Agents.AI" Version="1.3.0" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
         <PackageReference Include="OpenTelemetry" Version="1.16.0" />
     </ItemGroup>
 

@@ -77,9 +77,12 @@ namespace Microsoft.Extensions.DependencyInjection
 
         internal static void Validate(BedrockGovernanceOptions options, bool validateSanitization)
         {
-            if (options.EnablePolicy && string.IsNullOrWhiteSpace(options.Policy.GuardrailId))
+            if (options.EnablePolicy
+                && string.IsNullOrWhiteSpace(options.Policy.GuardrailId)
+                && options.Policy.InlineChecks?.HasAnyCheck != true)
             {
-                throw new InvalidOperationException("EnablePolicy is true but Policy.GuardrailId is not set.");
+                throw new InvalidOperationException(
+                    "EnablePolicy is true but neither Policy.GuardrailId nor Policy.InlineChecks is configured.");
             }
 
             if (validateSanitization && options.EnablePiiSanitization && string.IsNullOrWhiteSpace(options.Sanitization.GuardrailId))

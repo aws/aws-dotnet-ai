@@ -13,11 +13,21 @@ namespace AWS.Bedrock.MAG
     /// </summary>
     public sealed class BedrockGuardrailsPolicyOptions
     {
-        /// <summary>The guardrail identifier (ID or ARN) to evaluate tool-call context against. Required.</summary>
+        /// <summary>
+        /// The guardrail identifier (ID or ARN) to evaluate tool-call context against via ApplyGuardrail.
+        /// Set this or <see cref="InlineChecks"/>. When both are set, the configured guardrail wins.
+        /// </summary>
         public string? GuardrailId { get; set; }
 
         /// <summary>The guardrail version to apply. Defaults to the mutable working draft.</summary>
         public string GuardrailVersion { get; set; } = "DRAFT";
+
+        /// <summary>
+        /// Inline guardrail checks (InvokeGuardrailChecks), used when <see cref="GuardrailId"/> is not set.
+        /// The checks are defined in the request, so no pre-created guardrail is required. Detection only:
+        /// a tripped check denies the call (this mode does not mask text).
+        /// </summary>
+        public GuardrailChecksOptions? InlineChecks { get; set; }
 
         /// <summary>
         /// Serializes the tool-call context (tool name and arguments the toolkit passes) into the text

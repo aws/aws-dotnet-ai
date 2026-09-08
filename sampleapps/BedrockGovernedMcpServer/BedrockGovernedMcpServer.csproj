@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <!-- net8.0 to match AWS.Bedrock.MAG, which is net8.0-only (the toolkit targets net8.0). -->
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\AWS.Bedrock.MAG\AWS.Bedrock.MAG.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Microsoft's toolkit MCP adapter: provides .WithGovernance() on IMcpServerBuilder. -->
+        <PackageReference Include="Microsoft.AgentGovernance.Extensions.ModelContextProtocol" Version="5.0.0" />
+        <!-- Generic host so the MCP stdio transport and MAG's startup hosted service run. -->
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="policies\mcp.yaml" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+</Project>

@@ -312,6 +312,27 @@ public class AgentCoreMemoryProviderTests
     }
 
     [Fact]
+    public void NextEventTimestamp_WhenClockDoesNotAdvance_SeparatesEventsByAtLeastOneMillisecond()
+    {
+        var provider = CreateProvider();
+        var now = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        // AgentCore keys its event id on epoch-millis, so a sub-millisecond nudge collapses onto
+        // the same id on the wire (see aws/aws-sdk-net#4496). Consecutive saves in the same
+        // millisecond must therefore land in distinct milliseconds to replay deterministically.
+        var timestamps = Enumerable.Range(0, 5)
+            .Select(_ => provider.NextEventTimestamp("session-a", now))
+            .ToList();
+
+        var distinctMillis = timestamps
+            .Select(ts => new DateTimeOffset(ts).ToUnixTimeMilliseconds())
+            .Distinct()
+            .Count();
+
+        Assert.Equal(timestamps.Count, distinctMillis);
+    }
+
+    [Fact]
     public void NextEventTimestamp_PreservesUserThenAssistantOrder()
     {
         var provider = CreateProvider();

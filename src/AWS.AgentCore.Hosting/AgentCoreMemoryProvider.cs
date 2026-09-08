@@ -42,15 +42,22 @@ internal sealed class AgentCoreMemoryProvider(
     /// <summary>
     /// Returns a strictly-increasing UTC timestamp for the given session. If the wall clock
     /// has not advanced past the previously issued timestamp for the session (equal or, due to
-    /// clock skew, earlier), the returned value is nudged one tick beyond the last one so that
-    /// events saved back-to-back always sort deterministically on replay.
+    /// clock skew, earlier), the returned value is nudged one millisecond beyond the last one so
+    /// that events saved back-to-back always sort deterministically on replay.
+    ///
+    /// The nudge is a full millisecond (not a single tick) on purpose: AgentCore Memory keys its
+    /// event id on <c>epoch-millis</c>, so anything finer than a millisecond collapses onto the
+    /// same id on the wire and the collision this method exists to prevent would reappear. This
+    /// only became observable end-to-end once aws/aws-sdk-net#4496 stopped truncating
+    /// <c>eventTimestamp</c> to whole seconds; before that fix, even a millisecond nudge was lost
+    /// during marshalling.
     /// </summary>
     internal DateTime NextEventTimestamp(string sessionId, DateTime now)
     {
         var ticks = _lastEventTicks.AddOrUpdate(
             sessionId,
             now.Ticks,
-            (_, previous) => Math.Max(now.Ticks, previous + 1));
+            (_, previous) => Math.Max(now.Ticks, previous + TimeSpan.TicksPerMillisecond));
 
         return new DateTime(ticks, DateTimeKind.Utc);
     }

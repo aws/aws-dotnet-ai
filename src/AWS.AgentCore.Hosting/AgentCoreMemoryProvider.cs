@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+using System.Collections.Concurrent;
 using Amazon.BedrockAgentCore;
 using Amazon.BedrockAgentCore.Model;
 using AWS.AgentCore.Hosting.Internal;
@@ -27,6 +28,39 @@ internal sealed class AgentCoreMemoryProvider(
 {
     /// <inheritdoc/>
     public override IReadOnlyList<string> StateKeys => ["AgentCore.Memory"];
+
+    /// <summary>
+    /// Tracks the last <see cref="DateTime"/> stamped on an event per session so that
+    /// timestamps issued within a single session are strictly increasing. AgentCore
+    /// Memory replays events ordered by <c>EventTimestamp</c>, and <see cref="DateTime.UtcNow"/>
+    /// has coarse resolution and is not monotonic, so two messages saved in the same
+    /// <see cref="StoreChatHistoryAsync"/> loop (a user turn and the assistant reply)
+    /// can otherwise receive the same timestamp and be replayed out of order.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, long> _lastEventTicks = new();
+
+    /// <summary>
+    /// Returns a strictly-increasing UTC timestamp for the given session. If the wall clock
+    /// has not advanced past the previously issued timestamp for the session (equal or, due to
+    /// clock skew, earlier), the returned value is nudged one millisecond beyond the last one so
+    /// that events saved back-to-back always sort deterministically on replay.
+    ///
+    /// The nudge is a full millisecond (not a single tick) on purpose: AgentCore Memory keys its
+    /// event id on <c>epoch-millis</c>, so anything finer than a millisecond collapses onto the
+    /// same id on the wire and the collision this method exists to prevent would reappear. This
+    /// only became observable end-to-end once aws/aws-sdk-net#4496 stopped truncating
+    /// <c>eventTimestamp</c> to whole seconds; before that fix, even a millisecond nudge was lost
+    /// during marshalling.
+    /// </summary>
+    internal DateTime NextEventTimestamp(string sessionId, DateTime now)
+    {
+        var ticks = _lastEventTicks.AddOrUpdate(
+            sessionId,
+            now.Ticks,
+            (_, previous) => Math.Max(now.Ticks, previous + TimeSpan.TicksPerMillisecond));
+
+        return new DateTime(ticks, DateTimeKind.Utc);
+    }
 
     /// <summary>
     /// Resolves the effective MemoryId from options or environment variable.
@@ -224,7 +258,7 @@ internal sealed class AgentCoreMemoryProvider(
             // memory implementation, the session IS the actor scope. A future long-term memory
             // feature may introduce a separate ActorId/UserId concept.
             ActorId = sessionId,
-            EventTimestamp = DateTime.UtcNow,
+            EventTimestamp = NextEventTimestamp(sessionId, DateTime.UtcNow),
             Payload = [
                 new PayloadType
                 {

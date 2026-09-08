@@ -12,8 +12,9 @@ namespace AWS.Bedrock.MAG.Audit
     /// <summary>
     /// Reassembles governance audit records from CloudWatch Logs lines produced by the audit sink. Most
     /// records are written as a single JSON line and pass through unchanged; a record that exceeded the
-    /// AWS.Logger.Core per-message limit (256,000 bytes in 4.0.3) is split into multiple base64 "chunk" lines,
-    /// which this reader stitches back into the original record losslessly.
+    /// AWS.Logger.Core per-message limit (256,000 bytes in 4.0.3) is split into multiple plain-text "chunk"
+    /// lines, which this reader stitches back into the original record losslessly by concatenating their
+    /// <c>payload</c>s in <c>chunk.i</c> order.
     /// <para>
     /// Reassembly is by the <c>chunk.i</c> index, never by log order: chunks of one record may share a
     /// timestamp or land in different batches. A record whose chunks are not all present is reported as
@@ -163,23 +164,16 @@ namespace AWS.Bedrock.MAG.Audit
                     builder.Append(_parts[i]);
                 }
 
-                byte[] decoded;
-                try
-                {
-                    decoded = Convert.FromBase64String(builder.ToString());
-                }
-                catch (FormatException)
+                var joined = builder.ToString();
+
+                // The concatenated payloads ARE the original record JSON. Validate against len (the record's
+                // UTF-8 byte length); a mismatch means a chunk was corrupted or lost.
+                if (_length > 0 && Encoding.UTF8.GetByteCount(joined) != _length)
                 {
                     return new ReassembledRecord(eventId, null, false, Array.Empty<int>());
                 }
 
-                // The len field is the original record's byte length; a mismatch means corruption/loss.
-                if (_length > 0 && decoded.Length != _length)
-                {
-                    return new ReassembledRecord(eventId, null, false, Array.Empty<int>());
-                }
-
-                return new ReassembledRecord(eventId, Encoding.UTF8.GetString(decoded), true, Array.Empty<int>());
+                return new ReassembledRecord(eventId, joined, true, Array.Empty<int>());
             }
         }
     }

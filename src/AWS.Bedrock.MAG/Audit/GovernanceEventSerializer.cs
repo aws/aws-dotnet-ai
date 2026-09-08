@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 using AgentGovernance.Audit;
 
 namespace AWS.Bedrock.MAG.Audit
@@ -17,12 +18,14 @@ namespace AWS.Bedrock.MAG.Audit
     /// CloudWatch Logs. Written with <see cref="Utf8JsonWriter"/> (no reflection) so it stays AOT and
     /// trimming safe.
     /// <para>
-    /// A record that fits under the single-event cap is emitted as exactly one line, byte-for-byte the same
-    /// as before. A record that exceeds the cap is split, losslessly, into N independently-valid JSON
-    /// "chunk" lines: the full record is base64-encoded and sliced across the lines' <c>payload</c> fields,
-    /// each line also carrying the routing/identity fields (so it stays findable in Logs Insights) plus a
-    /// <c>chunk</c> descriptor (<c>i</c>, <c>n</c>, <c>len</c>). A consumer reassembles the original record
-    /// with <see cref="GovernanceAuditReader"/>. Governance data is never dropped.
+    /// A record that fits under the single-event cap is emitted as exactly one line. A record that exceeds
+    /// the cap is split, losslessly, into N JSON "chunk" lines: the record's readable JSON text is sliced on
+    /// UTF-8 code-point boundaries (never mid-character) across the lines' <c>payload</c> fields as
+    /// <em>plain text</em> — not base64 — so the logs stay legible in any viewer. Each line also carries the
+    /// routing/identity fields (so it stays findable in Logs Insights) plus a <c>chunk</c> descriptor
+    /// (<c>v</c>, <c>i</c>, <c>n</c>, <c>len</c>). Reassembly is trivial and library-independent — group by
+    /// <c>eventId</c>, order by <c>chunk.i</c>, concatenate the <c>payload</c>s — and
+    /// <see cref="GovernanceAuditReader"/> does exactly that. Governance data is never dropped.
     /// </para>
     /// </summary>
     internal static class GovernanceEventSerializer
@@ -47,14 +50,15 @@ namespace AWS.Bedrock.MAG.Audit
         // Bounds recursion into caller-supplied Data so pathological nesting can't overflow the stack.
         private const int MaxDepth = 32;
 
-        // Relaxed escaping for chunk lines keeps the base64 alphabet (+ / =) verbatim, so the payload's UTF-8
-        // byte length equals its character count and the budget math stays exact. The output is still valid
-        // JSON (only ", \\ and control chars must be escaped); JsonDocument reassembles it faithfully.
-        private static readonly JsonWriterOptions ChunkWriterOptions =
-            new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+        // Emits non-ASCII (emoji, CJK, accents) verbatim so the logs are human-readable, while still escaping
+        // the JSON-required characters (", \\, control chars) AND the HTML-sensitive set (&lt; &gt; &amp; etc.),
+        // so untrusted audit content can't inject markup or control characters into a log viewer. Used for
+        // both the single-line record and the chunk lines.
+        private static readonly JsonWriterOptions ReadableWriterOptions =
+            new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
 
         /// <summary>
-        /// Serializes an event to one JSON line when it fits under the CloudWatch event cap, or to N base64
+        /// Serializes an event to one JSON line when it fits under the CloudWatch event cap, or to N plain-text
         /// chunk lines when it does not. The common case returns a single-element list.
         /// </summary>
         public static IReadOnlyList<string> Serialize(GovernanceEvent e)
@@ -71,11 +75,11 @@ namespace AWS.Bedrock.MAG.Audit
             return Chunk(e, buffer.WrittenSpan);
         }
 
-        // Writes the full record: identity fields followed by the optional Data object. Uses the default
-        // encoder so single-line output is byte-identical to previous behavior.
+        // Writes the full record: identity fields followed by the optional Data object. Uses the readable
+        // encoder so non-ASCII content is legible in the logs; the chunk path slices this same output.
         private static void WriteRecord(IBufferWriter<byte> buffer, GovernanceEvent e)
         {
-            using var writer = new Utf8JsonWriter(buffer);
+            using var writer = new Utf8JsonWriter(buffer, ReadableWriterOptions);
             writer.WriteStartObject();
             WriteIdentity(writer, e);
 
@@ -95,13 +99,14 @@ namespace AWS.Bedrock.MAG.Audit
             writer.WriteEndObject();
         }
 
-        // Splits an over-cap record losslessly across N chunk lines. The base64 of the ENTIRE record is sliced
-        // across payloads; concatenating the payloads in index order and base64-decoding reproduces the exact
-        // original record bytes. Never truncates: N grows as large as the record requires.
-        private static IReadOnlyList<string> Chunk(GovernanceEvent e, ReadOnlySpan<byte> record)
+        // Splits an over-cap record losslessly across N plain-text chunk lines. The record's readable JSON text
+        // is sliced on UTF-8 code-point boundaries across the lines' payloads; concatenating the payloads in
+        // index order reproduces the exact original record text (valid JSON). Never truncates: N grows as large
+        // as the record requires.
+        private static IReadOnlyList<string> Chunk(GovernanceEvent e, ReadOnlySpan<byte> recordUtf8)
         {
-            var recordLength = record.Length;
-            var base64 = Convert.ToBase64String(record);
+            var recordLength = recordUtf8.Length;
+            var record = Encoding.UTF8.GetString(recordUtf8);
 
             // Measure this event's envelope (identity + chunk descriptor, empty payload) so the payload budget
             // accounts for caller-supplied identity fields of any size. Index/count digit growth is covered by
@@ -116,17 +121,50 @@ namespace AWS.Bedrock.MAG.Audit
                 return new[] { WriteChunkingFailedMarker(e, recordLength) };
             }
 
-            // Payload is base64 (ASCII), so one character is one UTF-8 byte: slice by character count == bytes.
-            var chunkCount = (base64.Length + budget - 1) / budget;
-            var lines = new List<string>(chunkCount);
-            for (var i = 0; i < chunkCount; i++)
+            var fragments = SplitOnCodePointBoundaries(record, budget);
+            var lines = new List<string>(fragments.Count);
+            for (var i = 0; i < fragments.Count; i++)
             {
-                var start = i * budget;
-                var take = Math.Min(budget, base64.Length - start);
-                lines.Add(WriteChunkLine(e, i, chunkCount, recordLength, base64.AsSpan(start, take)));
+                lines.Add(WriteChunkLine(e, i, fragments.Count, recordLength, fragments[i].AsSpan()));
             }
 
             return lines;
+        }
+
+        // Greedily packs the record text into fragments that never split a code point and whose JSON-escaped
+        // size stays within the per-chunk byte budget. When a fragment is embedded as a JSON string only '"'
+        // and '\\' expand (to two bytes); the record text carries no raw control or HTML-sensitive characters
+        // because WriteRecord already escaped those, so a fragment's escaped size is its UTF-8 byte length plus
+        // the count of those two characters. A single code point is at most 4 bytes, far below the budget, so
+        // every fragment makes progress.
+        private static List<string> SplitOnCodePointBoundaries(string record, int budget)
+        {
+            var fragments = new List<string>();
+            var sb = new StringBuilder();
+            var cost = 0;
+            Span<char> utf16 = stackalloc char[2];
+
+            foreach (var rune in record.EnumerateRunes())
+            {
+                var add = rune.Utf8SequenceLength + (rune.Value is '"' or '\\' ? 1 : 0);
+                if (cost + add > budget && sb.Length > 0)
+                {
+                    fragments.Add(sb.ToString());
+                    sb.Clear();
+                    cost = 0;
+                }
+
+                var written = rune.EncodeToUtf16(utf16);
+                sb.Append(utf16[..written]);
+                cost += add;
+            }
+
+            if (sb.Length > 0)
+            {
+                fragments.Add(sb.ToString());
+            }
+
+            return fragments;
         }
 
         private static int MeasureChunkEnvelopeBytes(GovernanceEvent e, int recordLength)
@@ -145,7 +183,7 @@ namespace AWS.Bedrock.MAG.Audit
 
         private static void WriteChunkLine(IBufferWriter<byte> buffer, GovernanceEvent e, int index, int count, int recordLength, ReadOnlySpan<char> payload)
         {
-            using var writer = new Utf8JsonWriter(buffer, ChunkWriterOptions);
+            using var writer = new Utf8JsonWriter(buffer, ReadableWriterOptions);
             writer.WriteStartObject();
             WriteIdentity(writer, e);
 
@@ -154,8 +192,7 @@ namespace AWS.Bedrock.MAG.Audit
             writer.WriteNumber("v", 1);                 // envelope schema version
             writer.WriteNumber("i", index);             // zero-based chunk index
             writer.WriteNumber("n", count);             // total chunk count
-            writer.WriteString("enc", "base64");        // payload encoding
-            writer.WriteNumber("len", recordLength);    // total decoded record byte length (integrity check)
+            writer.WriteNumber("len", recordLength);    // total record UTF-8 byte length (integrity check)
             writer.WriteEndObject();
 
             writer.WriteString("payload", payload);
@@ -167,7 +204,7 @@ namespace AWS.Bedrock.MAG.Audit
         private static string WriteChunkingFailedMarker(GovernanceEvent e, int originalBytes)
         {
             var buffer = new ArrayBufferWriter<byte>();
-            using (var writer = new Utf8JsonWriter(buffer, ChunkWriterOptions))
+            using (var writer = new Utf8JsonWriter(buffer, ReadableWriterOptions))
             {
                 writer.WriteStartObject();
                 WriteIdentity(writer, e);

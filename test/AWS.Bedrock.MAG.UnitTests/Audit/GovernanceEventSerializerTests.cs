@@ -172,7 +172,6 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
                 var chunk = root.GetProperty("chunk");
                 Assert.Equal(i, chunk.GetProperty("i").GetInt32());
                 Assert.Equal(lines.Count, chunk.GetProperty("n").GetInt32());
-                Assert.Equal("base64", chunk.GetProperty("enc").GetString());
                 Assert.True(root.TryGetProperty("payload", out _));
                 Assert.True(Encoding.UTF8.GetByteCount(lines[i]) <= 256_000);
             }
@@ -199,7 +198,7 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
         [Fact]
         public void Chunking_preserves_multibyte_utf8_data()
         {
-            // Emoji/CJK exercise the base64 path's immunity to multi-byte boundary splits.
+            // Emoji/CJK exercise the code-point-boundary split: chunks never cut a multi-byte character.
             var unit = "🌍你好-café ";
             // ~20K repeats (~340 KB) — just enough to exceed the 256 KB per-message limit and force chunking.
             var big = string.Concat(Enumerable.Repeat(unit, 20_000));
@@ -213,6 +212,10 @@ namespace AWS.Bedrock.MAG.UnitTests.Audit
 
             var lines = GovernanceEventSerializer.Serialize(e);
             Assert.True(lines.Count > 1);
+
+            // The payloads are human-readable plain text, not base64: the multi-byte content appears verbatim
+            // in the log lines (a reader/operator can see it without decoding).
+            Assert.Contains(lines, line => line.Contains("你好", StringComparison.Ordinal));
 
             var record = Assert.Single(GovernanceAuditReader.Reassemble(lines));
             Assert.True(record.IsComplete);

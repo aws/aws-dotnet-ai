@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore.Hosting",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Ensure AgentCore memory events saved within a session receive strictly-increasing timestamps so conversation history replays in chronological order."
+      ]
+    }
+  ]
+}

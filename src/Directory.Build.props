@@ -1,0 +1,28 @@
+<Project>
+
+    <!-- Shared Source Link / deterministic-build settings for all packable src projects.
+         Scoped to src/ (not the repo root) so it does not apply to sampleapps/ or test/.
+         SourceRoot points at the repository root ("../") because this file lives in src/. -->
+    <PropertyGroup>
+        <RepositoryUrl>https://github.com/aws/aws-dotnet-ai</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <Deterministic>true</Deterministic>
+        <ContinuousIntegrationBuild Condition="'$(CI)' == 'true' or '$(TF_BUILD)' == 'true' or '$(CODEBUILD_BUILD_ID)' != ''">true</ContinuousIntegrationBuild>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
+    </ItemGroup>
+
+    <!-- Explicit SourceRoot so AWS release pipelines (which pack from a .git-less
+         source archive) still emit Source Link metadata. Guarded on SourceRevisionId
+         so local dev builds are unaffected. -->
+    <ItemGroup Condition="'$(SourceRevisionId)' != ''">
+        <SourceRoot Include="$(MSBuildThisFileDirectory)../" SourceControl="git" RepositoryUrl="$(RepositoryUrl)" RevisionId="$(SourceRevisionId)" />
+    </ItemGroup>
+
+</Project>

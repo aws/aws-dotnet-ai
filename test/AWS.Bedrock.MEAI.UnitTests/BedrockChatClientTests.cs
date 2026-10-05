@@ -3830,6 +3830,51 @@ public class BedrockChatClientTests
         FunctionCallContent functionCall = (FunctionCallContent)functionCallUpdate.Contents.First(c => c is FunctionCallContent);
         Assert.Equal("bad_tool", functionCall.Name);
         Assert.NotNull(functionCall.Exception);  // Should have parse error
+        // The outer message must not echo the raw tool input (issue #80).
+        Assert.DoesNotContain("not valid json", functionCall.Exception!.Message);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetStreamingResponseAsync_InvalidToolJson_ExceptionMessageDoesNotLeakRawInput()
+    {
+        // Issue #80: the parse-error exception attached to FunctionCallContent must not embed the
+        // raw, model-generated tool arguments, which a caller may log. Here the input carries a
+        // sentinel standing in for sensitive conversation data.
+        const string sensitiveMarker = "SYNTHETIC-PARTIAL-OUTPUT";
+        string truncatedInput = $"{{\"city\":\"Springfield\",\"note\":\"{sensitiveMarker}";
+
+        IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
+        {
+            var stream = CreateEventStream(
+                CreateMessageStartEvent(),
+                CreateContentBlockStartEventWithToolUse(0, "call-1", "get_weather"),
+                CreateContentBlockDeltaEventWithToolUse(0, truncatedInput),
+                CreateContentBlockStopEvent(0),
+                CreateMessageStopEvent("max_tokens"),
+                CreateMetadataEvent(10, 5)
+            );
+            return new ConverseStreamResponse { Stream = new ConverseStreamOutput(stream) };
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "weather?")], cancellationToken: TestContext.Current.CancellationToken))
+        {
+            updates.Add(update);
+        }
+
+        FunctionCallContent call = updates.SelectMany(u => u.Contents).OfType<FunctionCallContent>().Single();
+        Assert.NotNull(call.Exception);
+
+        // Neither the outer message nor the full ToString() (which includes the inner exception)
+        // may contain the raw model output.
+        Assert.DoesNotContain(sensitiveMarker, call.Exception!.Message);
+        Assert.DoesNotContain(sensitiveMarker, call.Exception.ToString());
+
+        // The underlying parse exception is still preserved for diagnostics.
+        Assert.NotNull(call.Exception.InnerException);
     }
 
     [Fact]

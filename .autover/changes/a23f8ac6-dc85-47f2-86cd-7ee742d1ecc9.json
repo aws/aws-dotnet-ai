@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Bedrock.MEAI",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Fixed BedrockChatClient embedding raw streamed tool input in the parse-error Exception.Message attached to FunctionCallContent; it now uses a generic message and preserves the parser exception as the inner exception (#80)"
+      ]
+    }
+  ]
+}

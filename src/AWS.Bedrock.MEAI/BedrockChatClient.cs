@@ -537,7 +537,12 @@ internal sealed partial class BedrockChatClient : IChatClient
             }
             catch (Exception e)
             {
-                parseError = new InvalidOperationException($"Unable to parse input: {jsonInput}", e);
+                // Use a generic message and do NOT interpolate jsonInput: the raw, model-generated
+                // tool arguments may contain conversation data, and this message is surfaced on
+                // FunctionCallContent.Exception where callers routinely log it (issue #80). The
+                // underlying parser exception is preserved as the inner exception for diagnostics;
+                // it reports the parse error (e.g. position) without echoing the full payload.
+                parseError = new InvalidOperationException("Unable to parse tool input.", e);
             }
         }
 

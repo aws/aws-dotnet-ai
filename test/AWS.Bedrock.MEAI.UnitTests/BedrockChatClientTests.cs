@@ -2554,7 +2554,7 @@ public class BedrockChatClientTests
         List<Message>? captured = null;
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
 
-        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+        IChatClient chatClient = mock.AsIChatClient("claude", new BedrockChatClientOptions { CoalesceConsecutiveMessages = true });
 
         await chatClient.GetResponseAsync(ToolHistory(), cancellationToken: TestContext.Current.CancellationToken);
 
@@ -2581,7 +2581,7 @@ public class BedrockChatClientTests
             return new ConverseStreamResponse { Stream = new ConverseStreamOutput(stream) };
         });
 
-        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+        IChatClient chatClient = mock.AsIChatClient("claude", new BedrockChatClientOptions { CoalesceConsecutiveMessages = true });
 
         await foreach (var _ in chatClient.GetStreamingResponseAsync(ToolHistory(), cancellationToken: TestContext.Current.CancellationToken)) { }
 
@@ -2599,7 +2599,7 @@ public class BedrockChatClientTests
         List<Message>? captured = null;
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
 
-        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+        IChatClient chatClient = mock.AsIChatClient("claude", new BedrockChatClientOptions { CoalesceConsecutiveMessages = true });
 
         await chatClient.GetResponseAsync([new(ChatRole.User, "first"), new(ChatRole.User, "second")], cancellationToken: TestContext.Current.CancellationToken);
 
@@ -2618,7 +2618,7 @@ public class BedrockChatClientTests
         List<Message>? captured = null;
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
 
-        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+        IChatClient chatClient = mock.AsIChatClient("claude", new BedrockChatClientOptions { CoalesceConsecutiveMessages = true });
 
         ChatMessage[] history =
         [
@@ -2648,7 +2648,7 @@ public class BedrockChatClientTests
         List<Message>? captured = null;
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
 
-        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+        IChatClient chatClient = mock.AsIChatClient("claude", new BedrockChatClientOptions { CoalesceConsecutiveMessages = true });
 
         // A caller-supplied raw user message; the first converted message is also a user message.
         var rawMessage = new Message { Role = ConversationRole.User, Content = [new() { Text = "raw" }] };

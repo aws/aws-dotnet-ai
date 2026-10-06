@@ -56,24 +56,28 @@ internal sealed partial class BedrockChatClient : IChatClient
     /// <param name="runtime">The <see cref="IAmazonBedrockRuntime"/> instance to wrap.</param>
     /// <param name="defaultModelId">Model ID to use as the default when no model ID is specified in a request.</param>
     /// <param name="structuredOutputMode">How <see cref="ChatOptions.ResponseFormat"/> is realized against the Converse API.</param>
-    /// <param name="coalesceConsecutiveMessages">
-    /// When <see langword="true"/>, consecutive request messages that map to the same Converse role
-    /// (for example a <see cref="ChatRole.Tool"/> message followed by a <see cref="ChatRole.User"/>
-    /// message, both of which map to the Converse <c>user</c> role) are combined into a single message,
-    /// preserving content-block order. Messages separated by a cache point are never combined, and
-    /// caller-supplied messages (from <see cref="ChatOptions.RawRepresentationFactory"/>) are not
-    /// modified. Defaults to <see langword="false"/>.
-    /// </param>
     public BedrockChatClient(IAmazonBedrockRuntime runtime, string? defaultModelId,
-        BedrockStructuredOutputMode structuredOutputMode = BedrockStructuredOutputMode.SyntheticTool,
-        bool coalesceConsecutiveMessages = false)
+        BedrockStructuredOutputMode structuredOutputMode = BedrockStructuredOutputMode.SyntheticTool)
+        : this(runtime, defaultModelId, new BedrockChatClientOptions { StructuredOutputMode = structuredOutputMode })
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BedrockChatClient"/> class.
+    /// </summary>
+    /// <param name="runtime">The <see cref="IAmazonBedrockRuntime"/> instance to wrap.</param>
+    /// <param name="defaultModelId">Model ID to use as the default when no model ID is specified in a request.</param>
+    /// <param name="options">Optional settings controlling request/response mapping. When <see langword="null"/>, defaults are used.</param>
+    public BedrockChatClient(IAmazonBedrockRuntime runtime, string? defaultModelId, BedrockChatClientOptions? options)
     {
         Debug.Assert(runtime is not null);
 
+        options ??= new BedrockChatClientOptions();
+
         _runtime = runtime!;
         _modelId = defaultModelId;
-        _structuredOutputMode = structuredOutputMode;
-        _coalesceConsecutiveMessages = coalesceConsecutiveMessages;
+        _structuredOutputMode = options.StructuredOutputMode;
+        _coalesceConsecutiveMessages = options.CoalesceConsecutiveMessages;
 
         _metadata = new(AmazonBedrockRuntimeExtensions.ProviderName, defaultModelId: defaultModelId);
     }

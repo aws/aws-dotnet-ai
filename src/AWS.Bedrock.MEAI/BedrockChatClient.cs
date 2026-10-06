@@ -197,7 +197,7 @@ internal sealed partial class BedrockChatClient : IChatClient
 
                 // A ReasoningContentBlock is a union: it carries EITHER reasoningText (optionally
                 // with a signature) OR redactedContent. Map the block whenever either member is
-                // present, so a redacted-only block is not silently dropped (issue #76 case b).
+                // present, so a redacted-only block is not silently dropped.
                 if (content.ReasoningContent is { } reasoningContent &&
                     (reasoningContent.ReasoningText?.Text is not null || reasoningContent.RedactedContent is not null))
                 {
@@ -318,15 +318,15 @@ internal sealed partial class BedrockChatClient : IChatClient
         ChatFinishReason? finishReason = null;
         // Buffers redacted reasoning bytes per content-block index. Redacted bytes for a single block
         // can arrive across multiple deltas; emitting each delta separately lets the downstream MEAI
-        // coalescer merge them and keep only the first item's bytes, truncating the payload (issue #76
-        // case a). We accumulate here and emit the complete payload once at the block's stop event.
+        // coalescer merge them and keep only the first item's bytes, truncating the payload. We
+        // accumulate here and emit the complete payload once at the block's stop event.
         Dictionary<int, List<byte>>? redactedReasoningBuffers = null;
         // Tracks whether the most recently emitted reasoning item was unsigned (no ProtectedData).
         // The MEAI coalescer merges an adjacent reasoning item INTO a preceding unsigned one, keeping
         // only the first item's AdditionalProperties -- which would drop a following redacted item's
         // bytes. When the preceding item was unsigned we separate it from the flushed redacted item
         // with an empty TextContent (dropped outbound for assistant messages) so the merge cannot
-        // happen (issue #76, review follow-up).
+        // happen.
         bool lastReasoningWasUnsigned = false;
         string messageId = Guid.NewGuid().ToString("N");
         string responseId = Guid.NewGuid().ToString("N");
@@ -704,7 +704,7 @@ internal sealed partial class BedrockChatClient : IChatClient
 
                     // ReasoningContentBlock is a union; set EXACTLY ONE member. Prefer redacted
                     // content when present (its text is a placeholder), otherwise send reasoningText.
-                    // Emitting both members produces an invalid union the service rejects (issue #76 c/d).
+                    // Emitting both members produces an invalid union the service rejects.
                     // For a redacted item ProtectedData holds the base64 payload (used only to block
                     // coalescer merges) and is not sent; the reasoningText branch sends the real signature.
                     contents.Add(new()
@@ -944,7 +944,7 @@ internal sealed partial class BedrockChatClient : IChatClient
     /// <see cref="AIContent.AdditionalProperties"/>. The value is <see cref="T:byte[]"/> when the
     /// content was produced in-process, but becomes a base64 <see cref="JsonElement"/> (or a plain
     /// base64 string) after a System.Text.Json round-trip of persisted history. All three forms are
-    /// accepted so the redacted payload survives serialization (issue #76 case d).
+    /// accepted so the redacted payload survives serialization.
     /// </summary>
     private static byte[]? TryGetRedactedBytes(object? value)
     {

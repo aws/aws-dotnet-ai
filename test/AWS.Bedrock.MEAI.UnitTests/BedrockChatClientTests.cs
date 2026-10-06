@@ -1873,13 +1873,13 @@ public class BedrockChatClientTests
         Assert.True(received.SequenceEqual(redactedData));
     }
 
-    // ----- Regression tests for issue #76: redacted reasoning preservation -----
+    // ----- Regression tests: redacted reasoning preservation -----
 
     [Fact]
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetStreamingResponseAsync_RedactedReasoning_MultipleDeltasOneBlock_PreservesAllBytes()
     {
-        // Issue #76 (a): redacted bytes for ONE block arrive across two deltas. They must emit as a
+        // Redacted bytes for ONE block arrive across two deltas. They must emit as a
         // SINGLE reasoning item carrying the full payload, so the MEAI coalescer cannot truncate it.
         byte[] part1 = Encoding.ASCII.GetBytes("AAAA-");
         byte[] part2 = Encoding.ASCII.GetBytes("BBBB");
@@ -1931,8 +1931,8 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_NonStreaming_RedactedOnlyBlock_IsPreserved()
     {
-        // Issue #76 (b): a reasoning block carrying ONLY redactedContent (no reasoningText) must not
-        // be dropped. The old guard required ReasoningText.Text != null and silently omitted it.
+        // A reasoning block carrying ONLY redactedContent (no reasoningText) must not
+        // be dropped. An earlier guard required ReasoningText.Text != null and silently omitted it.
         byte[] redactedData = [10, 20, 30, 40];
 
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => new ConverseResponse
@@ -1971,7 +1971,7 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_Outbound_RedactedReasoning_SetsOnlyRedactedUnionMember()
     {
-        // Issue #76 (c): replaying a TextReasoningContent that holds redacted bytes must set ONLY
+        // Replaying a TextReasoningContent that holds redacted bytes must set ONLY
         // ReasoningContent.RedactedContent, never also an (empty) ReasoningText -- the union permits one.
         byte[] redactedData = Encoding.ASCII.GetBytes("AAAA-BBBB");
         ReasoningContentBlock? sentReasoning = null;
@@ -2011,7 +2011,7 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_Outbound_RedactedReasoning_SurvivesJsonHistoryRoundTrip()
     {
-        // Issue #76 (d): after a System.Text.Json round-trip of persisted history, the redacted bytes
+        // After a System.Text.Json round-trip of persisted history, the redacted bytes
         // deserialize as a base64 JsonElement. The outbound mapper must still recover and send them.
         byte[] redactedData = Encoding.ASCII.GetBytes("AAAA-BBBB");
         ReasoningContentBlock? sentReasoning = null;
@@ -2057,7 +2057,7 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetStreamingResponseAsync_RedactedReasoning_AdjacentBlocks_PreserveEachPayload()
     {
-        // Issue #76 (a) hardening: two adjacent, distinct redacted reasoning blocks must each retain
+        // Two adjacent, distinct redacted reasoning blocks must each retain
         // their own bytes through streaming and coalescing.
         byte[] first = Encoding.ASCII.GetBytes("FIRST");
         byte[] second = Encoding.ASCII.GetBytes("SECOND");
@@ -2101,7 +2101,7 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetStreamingResponseAsync_RedactedReasoning_AfterUnsignedReasoning_IsNotAbsorbed()
     {
-        // Issue #76 review follow-up: an unsigned reasoning item has no ProtectedData, so the MEAI
+        // An unsigned reasoning item has no ProtectedData, so the MEAI
         // coalescer would merge the FOLLOWING redacted item into it and keep only the unsigned item's
         // AdditionalProperties, dropping the bytes. The flush path must prevent that absorption.
         byte[] redactedData = Encoding.ASCII.GetBytes("REDACTED");
@@ -3935,8 +3935,8 @@ public class BedrockChatClientTests
         var reasoningUpdate = updates.FirstOrDefault(u => u.Contents.Any(c => c is TextReasoningContent));
         Assert.NotNull(reasoningUpdate);
 
-        // Redacted bytes are buffered per block and flushed as their own reasoning item at block stop
-        // (issue #76), so locate the reasoning item that carries the RedactedContent payload.
+        // Redacted bytes are buffered per block and flushed as their own reasoning item at block stop,
+        // so locate the reasoning item that carries the RedactedContent payload.
         TextReasoningContent? redactedItem = updates
             .SelectMany(u => u.Contents)
             .OfType<TextReasoningContent>()

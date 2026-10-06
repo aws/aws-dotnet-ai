@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Bedrock.MEAI",
+      "Type": "Minor",
+      "ChangelogMessages": [
+        "Added opt-in coalescing of consecutive request messages that map to the same Converse role, via the new coalesceConsecutiveMessages option on AsIChatClient / BedrockChatClient (#77)"
+      ]
+    }
+  ]
+}

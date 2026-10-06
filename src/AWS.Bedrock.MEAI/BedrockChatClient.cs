@@ -42,6 +42,11 @@ internal sealed partial class BedrockChatClient : IChatClient
     private readonly string? _modelId;
     /// <summary>How <see cref="ChatOptions.ResponseFormat"/> is realized against the Converse API.</summary>
     private readonly BedrockStructuredOutputMode _structuredOutputMode;
+    /// <summary>
+    /// Whether to coalesce consecutive request messages that map to the same Converse role into a
+    /// single message. Opt-in; defaults to <see langword="false"/>.
+    /// </summary>
+    private readonly bool _coalesceConsecutiveMessages;
     /// <summary>Metadata describing the chat client.</summary>
     private readonly ChatClientMetadata _metadata;
 
@@ -51,14 +56,24 @@ internal sealed partial class BedrockChatClient : IChatClient
     /// <param name="runtime">The <see cref="IAmazonBedrockRuntime"/> instance to wrap.</param>
     /// <param name="defaultModelId">Model ID to use as the default when no model ID is specified in a request.</param>
     /// <param name="structuredOutputMode">How <see cref="ChatOptions.ResponseFormat"/> is realized against the Converse API.</param>
+    /// <param name="coalesceConsecutiveMessages">
+    /// When <see langword="true"/>, consecutive request messages that map to the same Converse role
+    /// (for example a <see cref="ChatRole.Tool"/> message followed by a <see cref="ChatRole.User"/>
+    /// message, both of which map to the Converse <c>user</c> role) are combined into a single message,
+    /// preserving content-block order. Messages separated by a cache point are never combined, and
+    /// caller-supplied messages (from <see cref="ChatOptions.RawRepresentationFactory"/>) are not
+    /// modified. Defaults to <see langword="false"/>.
+    /// </param>
     public BedrockChatClient(IAmazonBedrockRuntime runtime, string? defaultModelId,
-        BedrockStructuredOutputMode structuredOutputMode = BedrockStructuredOutputMode.SyntheticTool)
+        BedrockStructuredOutputMode structuredOutputMode = BedrockStructuredOutputMode.SyntheticTool,
+        bool coalesceConsecutiveMessages = false)
     {
         Debug.Assert(runtime is not null);
 
         _runtime = runtime!;
         _modelId = defaultModelId;
         _structuredOutputMode = structuredOutputMode;
+        _coalesceConsecutiveMessages = coalesceConsecutiveMessages;
 
         _metadata = new(AmazonBedrockRuntimeExtensions.ProviderName, defaultModelId: defaultModelId);
     }
@@ -106,7 +121,7 @@ internal sealed partial class BedrockChatClient : IChatClient
 
         ConverseRequest request = options?.RawRepresentationFactory?.Invoke(this) as ConverseRequest ?? new();
         request.ModelId ??= options?.ModelId ?? _modelId;
-        request.Messages = CreateMessages(request.Messages, messages);
+        request.Messages = CreateMessages(request.Messages, messages, _coalesceConsecutiveMessages);
         request.System = CreateSystem(request.System, messages, options);
         request.ToolConfig = CreateToolConfig(request.ToolConfig, options, _structuredOutputMode);
         request.OutputConfig = CreateOutputConfig(request.OutputConfig, options, _structuredOutputMode);
@@ -292,7 +307,7 @@ internal sealed partial class BedrockChatClient : IChatClient
 
         ConverseStreamRequest request = options?.RawRepresentationFactory?.Invoke(this) as ConverseStreamRequest ?? new();
         request.ModelId ??= options?.ModelId ?? _modelId;
-        request.Messages = CreateMessages(request.Messages, messages);
+        request.Messages = CreateMessages(request.Messages, messages, _coalesceConsecutiveMessages);
         request.System = CreateSystem(request.System, messages, options);
         request.ToolConfig = CreateToolConfig(request.ToolConfig, options, _structuredOutputMode);
         request.OutputConfig = CreateOutputConfig(request.OutputConfig, options, _structuredOutputMode);
@@ -550,9 +565,22 @@ internal sealed partial class BedrockChatClient : IChatClient
     }
 
     /// <summary>Creates a list of <see cref="Message"/> from the provided <paramref name="chatMessages"/>.</summary>
-    private static List<Message> CreateMessages(List<Message>? rawMessages, IEnumerable<ChatMessage> chatMessages)
+    /// <param name="rawMessages">Caller-supplied messages (from a raw request) to append to; never modified.</param>
+    /// <param name="chatMessages">The chat messages to convert and append.</param>
+    /// <param name="coalesceConsecutiveMessages">
+    /// When <see langword="true"/>, an appended message whose Converse role matches the immediately
+    /// preceding appended message is merged into it (content blocks appended in order) instead of
+    /// being added as a separate message. Messages separated by a cache point are not merged, and
+    /// caller-supplied <paramref name="rawMessages"/> are never merged into.
+    /// </param>
+    private static List<Message> CreateMessages(List<Message>? rawMessages, IEnumerable<ChatMessage> chatMessages,
+        bool coalesceConsecutiveMessages = false)
     {
         List<Message> messages = rawMessages ?? [];
+
+        // Only messages this call appends may be merged into. Caller-supplied raw messages (indices
+        // below this mark) are passed through untouched, so coalescing never mutates them.
+        int appendStart = messages.Count;
 
         foreach (ChatMessage chatMessage in chatMessages)
         {
@@ -579,11 +607,29 @@ internal sealed partial class BedrockChatClient : IChatClient
                     }
                 }
 
-                messages.Add(new()
+                ConversationRole role = chatMessage.Role == ChatRole.Assistant ? ConversationRole.Assistant : ConversationRole.User;
+
+                // Merge into the previous message when enabled and safe to do so. We only merge into a
+                // message this call appended (index >= appendStart), only when the Converse roles match,
+                // and never across a cache point: a cache point marks a prompt-cache boundary, so folding
+                // across it would silently move where the cache breaks.
+                if (coalesceConsecutiveMessages &&
+                    messages.Count > appendStart &&
+                    messages[messages.Count - 1] is { } previous &&
+                    previous.Role == role &&
+                    !ContainsCachePoint(previous.Content) &&
+                    !ContainsCachePoint(contents))
                 {
-                    Role = chatMessage.Role == ChatRole.Assistant ? ConversationRole.Assistant : ConversationRole.User,
-                    Content = contents,
-                });
+                    previous.Content.AddRange(contents);
+                }
+                else
+                {
+                    messages.Add(new()
+                    {
+                        Role = role,
+                        Content = contents,
+                    });
+                }
             }
         }
 
@@ -598,6 +644,20 @@ internal sealed partial class BedrockChatClient : IChatClient
         }
 
         return messages;
+    }
+
+    /// <summary>Returns whether any content block in the list is a cache point.</summary>
+    private static bool ContainsCachePoint(List<ContentBlock> content)
+    {
+        foreach (ContentBlock block in content)
+        {
+            if (block.CachePoint is not null)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Creates a list of <see cref="ContentBlock"/>s from a <see cref="ChatMessage"/>.</summary>

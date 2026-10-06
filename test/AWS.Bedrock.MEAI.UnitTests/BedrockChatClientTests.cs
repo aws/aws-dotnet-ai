@@ -2525,6 +2525,158 @@ public class BedrockChatClientTests
         Assert.NotNull(result);
     }
 
+    // ----- Issue #77: opt-in coalescing of consecutive same-role messages -----
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_CoalesceDisabledByDefault_KeepsSeparateMessages()
+    {
+        List<Message>? captured = null;
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
+
+        // Default overload: coalescing is off.
+        IChatClient chatClient = mock.AsIChatClient("claude");
+
+        await chatClient.GetResponseAsync(ToolHistory(), cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Equal(4, captured!.Count);
+        Assert.Equal(ConversationRole.User, captured[2].Role);   // tool result -> user
+        Assert.Equal(ConversationRole.User, captured[3].Role);   // follow-up user text (separate message)
+        Assert.NotNull(captured[2].Content[0].ToolResult);
+        Assert.NotNull(captured[3].Content[0].Text);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_CoalesceEnabled_MergesAdjacentSameRole()
+    {
+        List<Message>? captured = null;
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
+
+        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+
+        await chatClient.GetResponseAsync(ToolHistory(), cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Equal(3, captured!.Count);
+        Assert.Equal(ConversationRole.User, captured[0].Role);
+        Assert.Equal(ConversationRole.Assistant, captured[1].Role);
+        // tool result and the following user text are merged into one user message, order preserved.
+        Assert.Equal(ConversationRole.User, captured[2].Role);
+        Assert.Equal(2, captured[2].Content.Count);
+        Assert.NotNull(captured[2].Content[0].ToolResult);
+        Assert.NotNull(captured[2].Content[1].Text);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetStreamingResponseAsync_CoalesceEnabled_MergesAdjacentSameRole()
+    {
+        List<Message>? captured = null;
+        IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
+        {
+            captured = request.Messages;
+            var stream = CreateEventStream(CreateMessageStartEvent(), CreateContentBlockDeltaEvent(0, "ok"), CreateContentBlockStopEvent(0), CreateMessageStopEvent("end_turn"), CreateMetadataEvent(1, 1));
+            return new ConverseStreamResponse { Stream = new ConverseStreamOutput(stream) };
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+
+        await foreach (var _ in chatClient.GetStreamingResponseAsync(ToolHistory(), cancellationToken: TestContext.Current.CancellationToken)) { }
+
+        Assert.NotNull(captured);
+        Assert.Equal(3, captured!.Count);
+        Assert.Equal(2, captured[2].Content.Count);
+        Assert.NotNull(captured[2].Content[0].ToolResult);
+        Assert.NotNull(captured[2].Content[1].Text);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_CoalesceEnabled_MergesAdjacentUserMessages()
+    {
+        List<Message>? captured = null;
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
+
+        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+
+        await chatClient.GetResponseAsync([new(ChatRole.User, "first"), new(ChatRole.User, "second")], cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Message merged = Assert.Single(captured!);
+        Assert.Equal(ConversationRole.User, merged.Role);
+        Assert.Equal(2, merged.Content.Count);
+        Assert.Equal("first", merged.Content[0].Text);
+        Assert.Equal("second", merged.Content[1].Text);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_CoalesceEnabled_DoesNotMergeAcrossCachePoint()
+    {
+        List<Message>? captured = null;
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
+
+        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+
+        ChatMessage[] history =
+        [
+            new(ChatRole.User, "What is the weather in Paris?"),
+            new(ChatRole.Assistant, [new FunctionCallContent("call-1", "get_weather", new Dictionary<string, object?> { ["city"] = "Paris" })]),
+            new(ChatRole.Tool, [new FunctionResultContent("call-1", "18C, sunny")])
+            {
+                AdditionalProperties = new() { [nameof(ContentBlock.CachePoint)] = new CachePointBlock { Type = CachePointType.Default } }
+            },
+            new(ChatRole.User, "And in Berlin?"),
+        ];
+
+        await chatClient.GetResponseAsync(history, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        // A cache point marks a prompt-cache boundary, so the tool-result message (which ends with the
+        // cache point) must NOT absorb the following user text.
+        Assert.Equal(4, captured!.Count);
+        Assert.NotNull(captured[2].Content.Last().CachePoint);
+        Assert.NotNull(captured[3].Content[0].Text);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_CoalesceEnabled_DoesNotMutateRawMessages()
+    {
+        List<Message>? captured = null;
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => { captured = request.Messages; return CreateResponse("OK"); });
+
+        IChatClient chatClient = mock.AsIChatClient("claude", BedrockStructuredOutputMode.SyntheticTool, coalesceConsecutiveMessages: true);
+
+        // A caller-supplied raw user message; the first converted message is also a user message.
+        var rawMessage = new Message { Role = ConversationRole.User, Content = [new() { Text = "raw" }] };
+
+        ChatOptions options = new()
+        {
+            RawRepresentationFactory = _ => new ConverseRequest { Messages = [rawMessage] },
+        };
+
+        await chatClient.GetResponseAsync([new(ChatRole.User, "converted")], options, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        // The raw message must be left untouched (still a single "raw" block); the converted user
+        // message is appended separately rather than merged into the caller's message.
+        Assert.Equal(2, captured!.Count);
+        Assert.Single(rawMessage.Content);
+        Assert.Equal("raw", captured[0].Content[0].Text);
+        Assert.Equal("converted", captured[1].Content[0].Text);
+    }
+
+    private static ChatMessage[] ToolHistory() =>
+    [
+        new(ChatRole.User, "What is the weather in Paris?"),
+        new(ChatRole.Assistant, [new FunctionCallContent("call-1", "get_weather", new Dictionary<string, object?> { ["city"] = "Paris" })]),
+        new(ChatRole.Tool, [new FunctionResultContent("call-1", "18C, sunny")]),
+        new(ChatRole.User, "And in Berlin?"),
+    ];
+
     [Fact]
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_CachePointBlock_InSystemMessages()

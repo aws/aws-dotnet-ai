@@ -55,6 +55,12 @@ var embeddings = await generator.GenerateAsync(["Hello world"]);
   - `SyntheticTool` (default) — works across the broadest set of models.
   - `Native` — uses Bedrock native structured outputs on models that support it; composes with
     user-provided tools and supports streaming.
+- **Message coalescing** (opt-in) — pass `coalesceConsecutiveMessages: true` to `AsIChatClient` to
+  combine consecutive request messages that map to the same Converse role (for example a tool-result
+  message followed by a user message, both of which map to the Converse `user` role) into a single
+  message, giving replayed histories a normalized request shape. Content-block order is preserved,
+  messages separated by a cache point are never combined, and caller-supplied raw messages are not
+  modified. Defaults to `false` (each message is sent separately).
 - **Embeddings** (`AsIEmbeddingGenerator`).
 - **Image generation** (`AsIImageGenerator`) for Stability and Amazon Titan / Nova Canvas models.
   *(Experimental — `MEAI001`.)*

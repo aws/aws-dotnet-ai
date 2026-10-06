@@ -64,6 +64,36 @@ public static class AmazonBedrockRuntimeExtensions
         runtime is not null ? new BedrockChatClient(runtime, defaultModelId, structuredOutputMode) :
         throw new ArgumentNullException(nameof(runtime));
 
+    /// <summary>Gets an <see cref="IChatClient"/> for the specified <see cref="IAmazonBedrockRuntime"/> instance.</summary>
+    /// <param name="runtime">The runtime instance to be represented as an <see cref="IChatClient"/>.</param>
+    /// <param name="defaultModelId">
+    /// The default model ID to use when no model is specified in a request. If not specified,
+    /// a model must be provided in the <see cref="ChatOptions.ModelId"/> passed to <see cref="IChatClient.GetResponseAsync"/>
+    /// or <see cref="IChatClient.GetStreamingResponseAsync"/>.
+    /// </param>
+    /// <param name="structuredOutputMode">
+    /// Controls how <see cref="ChatOptions.ResponseFormat"/> is realized.
+    /// <see cref="BedrockStructuredOutputMode.Native"/> uses Bedrock native structured outputs
+    /// (composes with user-provided tools and supports streaming) and requires a model that supports
+    /// the feature. Use <see cref="BedrockStructuredOutputMode.SyntheticTool"/> for models without
+    /// native support.
+    /// </param>
+    /// <param name="coalesceConsecutiveMessages">
+    /// When <see langword="true"/>, consecutive request messages that map to the same Converse role
+    /// (for example a <see cref="ChatRole.Tool"/> message followed immediately by a <see cref="ChatRole.User"/>
+    /// message, both of which map to the Converse <c>user</c> role) are combined into a single message,
+    /// preserving content-block order. This yields a normalized request shape for histories that store
+    /// tool results and user text in separate messages. Messages separated by a cache point are never
+    /// combined, and caller-supplied messages (from <see cref="ChatOptions.RawRepresentationFactory"/>)
+    /// are not modified. Defaults to <see langword="false"/>.
+    /// </param>
+    /// <returns>A <see cref="IChatClient"/> instance representing the <see cref="IAmazonBedrockRuntime"/> instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="runtime"/> is <see langword="null"/>.</exception>
+    public static IChatClient AsIChatClient(this IAmazonBedrockRuntime runtime, string? defaultModelId,
+        BedrockStructuredOutputMode structuredOutputMode, bool coalesceConsecutiveMessages) =>
+        runtime is not null ? new BedrockChatClient(runtime, defaultModelId, structuredOutputMode, coalesceConsecutiveMessages) :
+        throw new ArgumentNullException(nameof(runtime));
+
     /// <summary>Gets an <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/> for the specified <see cref="IAmazonBedrockRuntime"/> instance.</summary>
     /// <param name="runtime">The runtime instance to be represented as an <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/>.</param>
     /// <param name="defaultModelId">

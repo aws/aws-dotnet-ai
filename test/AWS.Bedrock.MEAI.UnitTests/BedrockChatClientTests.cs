@@ -1280,6 +1280,186 @@ public class BedrockChatClientTests
         Assert.Equal("custom_reason", result.FinishReason?.Value);
     }
 
+    // --- Issue #79: surface native StopReason and guardrail Trace on AdditionalProperties ---
+
+    [Theory]
+    [InlineData("guardrail_intervened")]
+    [InlineData("content_filtered")]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_SurfacesNativeStopReason(string nativeStopReason)
+    {
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var response = CreateResponse("blocked");
+            response.StopReason = new StopReason(nativeStopReason);
+            return response;
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
+
+        // Both native reasons collapse to ChatFinishReason.ContentFilter, so the native string on
+        // AdditionalProperties is the only way to disambiguate them.
+        Assert.Equal(ChatFinishReason.ContentFilter, result.FinishReason);
+        Assert.NotNull(result.AdditionalProperties);
+        Assert.True(result.AdditionalProperties!.TryGetValue(AmazonBedrockRuntimeExtensions.StopReasonKey, out object? sr));
+        Assert.Equal(nativeStopReason, sr);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_SurfacesGuardrailTrace()
+    {
+        var trace = new ConverseTrace();
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var response = CreateResponse("blocked");
+            response.StopReason = new StopReason("guardrail_intervened");
+            response.Trace = trace;
+            return response;
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result.AdditionalProperties);
+        Assert.True(result.AdditionalProperties!.TryGetValue(AmazonBedrockRuntimeExtensions.TraceKey, out object? t));
+        Assert.Same(trace, t); // surfaced as the SDK object as-is
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_NoStopReasonOrTrace_LeavesResponseAdditionalPropertiesNull()
+    {
+        // CreateResponse sets no StopReason/Trace; the response-level dictionary should not be created.
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request => CreateResponse("OK"));
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Null(result.AdditionalProperties);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetStreamingResponseAsync_SurfacesStopReasonOnStopUpdate()
+    {
+        IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
+        {
+            var stream = CreateEventStream(
+                CreateMessageStartEvent(),
+                CreateContentBlockStartEvent(0),
+                CreateContentBlockDeltaEvent(0, "blocked"),
+                CreateContentBlockStopEvent(0),
+                CreateMessageStopEvent("guardrail_intervened"),
+                CreateMetadataEvent(10, 5));
+            return new ConverseStreamResponse { Stream = new ConverseStreamOutput(stream) };
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var u in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
+        {
+            updates.Add(u);
+        }
+
+        // Select by RawRepresentation type rather than positionally; the stop update carries StopReason.
+        var stopUpdate = updates.Single(u => u.RawRepresentation is MessageStopEvent);
+        Assert.NotNull(stopUpdate.AdditionalProperties);
+        Assert.True(stopUpdate.AdditionalProperties!.TryGetValue(AmazonBedrockRuntimeExtensions.StopReasonKey, out object? sr));
+        Assert.Equal("guardrail_intervened", sr);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetStreamingResponseAsync_SurfacesTraceOnMetadataWithUsage()
+    {
+        IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
+        {
+            var stream = CreateEventStream(
+                CreateMessageStartEvent(),
+                CreateContentBlockStartEvent(0),
+                CreateContentBlockDeltaEvent(0, "blocked"),
+                CreateContentBlockStopEvent(0),
+                CreateMessageStopEvent("guardrail_intervened"),
+                CreateMetadataEventWithTrace(10, 5));
+            return new ConverseStreamResponse { Stream = new ConverseStreamOutput(stream) };
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var u in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
+        {
+            updates.Add(u);
+        }
+
+        var metadataUpdate = updates.Single(u => u.RawRepresentation is ConverseStreamMetadataEvent);
+        // Usage still flows as UsageContent, and the trace is now surfaced alongside it.
+        Assert.Contains(metadataUpdate.Contents, c => c is UsageContent);
+        Assert.NotNull(metadataUpdate.AdditionalProperties);
+        Assert.True(metadataUpdate.AdditionalProperties!.TryGetValue(AmazonBedrockRuntimeExtensions.TraceKey, out object? t));
+        Assert.IsType<ConverseStreamTrace>(t);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetStreamingResponseAsync_SurfacesTraceOnlyMetadata()
+    {
+        IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
+        {
+            var stream = CreateEventStream(
+                CreateMessageStartEvent(),
+                CreateContentBlockStartEvent(0),
+                CreateContentBlockDeltaEvent(0, "blocked"),
+                CreateContentBlockStopEvent(0),
+                CreateMessageStopEvent("guardrail_intervened"),
+                CreateTraceOnlyMetadataEvent());
+            return new ConverseStreamResponse { Stream = new ConverseStreamOutput(stream) };
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var u in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
+        {
+            updates.Add(u);
+        }
+
+        // A trace-only metadata event previously produced NO update (handler was gated on usage).
+        // It now yields exactly one metadata update carrying the trace and no UsageContent.
+        var metadataUpdate = updates.Single(u => u.RawRepresentation is ConverseStreamMetadataEvent);
+        Assert.DoesNotContain(metadataUpdate.Contents, c => c is UsageContent);
+        Assert.NotNull(metadataUpdate.AdditionalProperties);
+        Assert.True(metadataUpdate.AdditionalProperties!.ContainsKey(AmazonBedrockRuntimeExtensions.TraceKey));
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_ModelResponseField_DoesNotBlockResponseStopReason()
+    {
+        // A model AdditionalModelResponseField named "StopReason" lands on the MESSAGE dictionary;
+        // the adapter's response-level StopReason must still be surfaced on the RESPONSE dictionary.
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var response = CreateResponse("blocked");
+            response.StopReason = new StopReason("guardrail_intervened");
+            response.AdditionalModelResponseFields = Document.FromObject(new Dictionary<string, object?>
+            {
+                [AmazonBedrockRuntimeExtensions.StopReasonKey] = "model-defined-value",
+            });
+            return response;
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
+
+        // Response-level dict carries the native reason.
+        Assert.Equal("guardrail_intervened", result.AdditionalProperties?[AmazonBedrockRuntimeExtensions.StopReasonKey]);
+        // Message-level dict preserves the model's own identically-named field (not overwritten).
+        // The model field is flattened from a Document, so compare its string form rather than its boxed type.
+        Assert.Equal("model-defined-value",
+            result.Messages[^1].AdditionalProperties?[AmazonBedrockRuntimeExtensions.StopReasonKey]?.ToString());
+    }
+
     [Fact]
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_StopSequences_MergesWithExisting()
@@ -4421,6 +4601,18 @@ public class BedrockChatClientTests
 
     private static byte[] CreateMetadataEvent(int inputTokens, int outputTokens) =>
         CreateEventMessage("Metadata", Encoding.UTF8.GetBytes($"{{\"usage\":{{\"inputTokens\":{inputTokens},\"outputTokens\":{outputTokens}}}}}"));
+
+    // Metadata event carrying a guardrail trace alongside usage (the normal service contract shape).
+    private static byte[] CreateMetadataEventWithTrace(int inputTokens, int outputTokens) =>
+        CreateEventMessage("Metadata", Encoding.UTF8.GetBytes(
+            $"{{\"usage\":{{\"inputTokens\":{inputTokens},\"outputTokens\":{outputTokens}}}," +
+            "\"trace\":{\"guardrail\":{\"modelOutput\":[\"blocked\"]}}}"));
+
+    // Metadata event carrying ONLY a guardrail trace and no usage (the defensive case that was dropped
+    // entirely before this change because the handler was gated on usage).
+    private static byte[] CreateTraceOnlyMetadataEvent() =>
+        CreateEventMessage("Metadata", Encoding.UTF8.GetBytes(
+            "{\"trace\":{\"guardrail\":{\"modelOutput\":[\"blocked\"]}}}"));
 
     private static byte[] GetUtf8(string s) => Encoding.UTF8.GetBytes(s);
 

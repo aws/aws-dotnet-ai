@@ -56,6 +56,11 @@ var embeddings = await generator.GenerateAsync(["Hello world"]);
   - `Native` — uses Bedrock native structured outputs on models that support it; composes with
     user-provided tools and supports streaming.
 - **Embeddings** (`AsIEmbeddingGenerator`).
+- **Native stop reason and guardrail trace** surfaced on `ChatResponse.AdditionalProperties`
+  (and the matching streaming updates) under the `AmazonBedrockRuntimeExtensions.StopReasonKey`
+  (`"StopReason"`) and `TraceKey` (`"Trace"`) keys. Because multiple native stop reasons map to one
+  `ChatFinishReason` (both `guardrail_intervened` and `content_filtered` map to `ContentFilter`), the
+  `StopReason` string lets you tell them apart; `Trace` carries the SDK guardrail trace object as-is.
 - **Image generation** (`AsIImageGenerator`) for Stability and Amazon Titan / Nova Canvas models.
   *(Experimental — `MEAI001`.)*
 - **Realtime audio** (`AsIRealtimeClient`) for Amazon Nova Sonic bidirectional streaming, on

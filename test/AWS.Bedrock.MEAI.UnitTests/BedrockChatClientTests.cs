@@ -2099,6 +2099,65 @@ public class BedrockChatClientTests
 
     [Fact]
     [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetStreamingResponseAsync_RedactedReasoning_AfterUnsignedReasoning_IsNotAbsorbed()
+    {
+        // Issue #76 review follow-up: an unsigned reasoning item has no ProtectedData, so the MEAI
+        // coalescer would merge the FOLLOWING redacted item into it and keep only the unsigned item's
+        // AdditionalProperties, dropping the bytes. The flush path must prevent that absorption.
+        byte[] redactedData = Encoding.ASCII.GetBytes("REDACTED");
+
+        IAmazonBedrockRuntime mock = CreateMock(
+            onConverseStreamRequest: request =>
+            {
+                var stream = CreateEventStream(
+                    CreateMessageStartEvent(),
+                    CreateContentBlockStartEvent(0),
+                    CreateContentBlockDeltaEventWithReasoning(0, "Thinking...", null, null),
+                    CreateContentBlockStopEvent(0),
+                    CreateContentBlockStartEvent(1),
+                    CreateContentBlockDeltaEventWithReasoning(1, "", null, Convert.ToBase64String(redactedData)),
+                    CreateContentBlockStopEvent(1),
+                    CreateMessageStopEvent("end_turn"),
+                    CreateMetadataEvent(10, 5)
+                );
+                return new ConverseStreamResponse { Stream = new ConverseStreamOutput(stream) };
+            },
+            onConverseRequest: request =>
+            {
+                List<ReasoningContentBlock> sent = request.Messages[1].Content.Select(c => c.ReasoningContent).Where(r => r is not null).ToList();
+                Assert.Equal(2, sent.Count);
+                Assert.Equal("Thinking...", sent[0].ReasoningText.Text);
+                Assert.Null(sent[0].ReasoningText.Signature);
+                Assert.Null(sent[0].RedactedContent);
+                Assert.Null(sent[1].ReasoningText);
+                Assert.True(sent[1].RedactedContent.ToArray().SequenceEqual(redactedData));
+                return CreateResponse("ok");
+            });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
+        {
+            updates.Add(update);
+        }
+
+        ChatResponse response = updates.ToChatResponse();
+        List<TextReasoningContent> reasoning = response.Messages.SelectMany(m => m.Contents).OfType<TextReasoningContent>().ToList();
+        Assert.Equal(2, reasoning.Count);
+        Assert.Equal("Thinking...", reasoning[0].Text);
+        Assert.Null(reasoning[0].ProtectedData);
+        byte[] received = Assert.IsType<byte[]>(reasoning[1].AdditionalProperties![nameof(ReasoningContentBlock.RedactedContent)]);
+        Assert.True(received.SequenceEqual(redactedData));
+        // The redacted item carries the base64 payload in ProtectedData (not a private sentinel).
+        Assert.Equal(Convert.ToBase64String(redactedData), reasoning[1].ProtectedData);
+
+        // Replaying the coalesced history sends each block with exactly one union member.
+        await chatClient.GetResponseAsync([new(ChatRole.User, "Test"), .. response.Messages, new(ChatRole.User, "Next")], cancellationToken: TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_WithCitationMetadata()
     {
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>

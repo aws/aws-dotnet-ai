@@ -2653,14 +2653,23 @@ public class BedrockChatClientTests
         // A caller-supplied raw user message; the first converted message is also a user message.
         var rawMessage = new Message { Role = ConversationRole.User, Content = [new() { Text = "raw" }] };
 
+        // The caller's list instance (as a RawRepresentationFactory may return a reused/cached list).
+        var rawList = new List<Message> { rawMessage };
+
         ChatOptions options = new()
         {
-            RawRepresentationFactory = _ => new ConverseRequest { Messages = [rawMessage] },
+            RawRepresentationFactory = _ => new ConverseRequest { Messages = rawList },
         };
 
         await chatClient.GetResponseAsync([new(ChatRole.User, "converted")], options, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(captured);
+        // The converted message is appended on a copy, so the caller's list instance must be
+        // unchanged (still exactly its one raw message) and must not be the same instance that was
+        // sent to the service.
+        Assert.Single(rawList);
+        Assert.Same(rawMessage, rawList[0]);
+        Assert.NotSame(rawList, captured);
         // The raw message must be left untouched (still a single "raw" block); the converted user
         // message is appended separately rather than merged into the caller's message.
         Assert.Equal(2, captured!.Count);

@@ -580,7 +580,10 @@ internal sealed partial class BedrockChatClient : IChatClient
     private static List<Message> CreateMessages(List<Message>? rawMessages, IEnumerable<ChatMessage> chatMessages,
         bool coalesceConsecutiveMessages = false)
     {
-        List<Message> messages = rawMessages ?? [];
+        // Copy into a new list rather than appending to the caller-supplied instance: rawMessages may
+        // be a reused/cached RawRepresentationFactory result, and both messages.Add below and the
+        // coalescing AddRange would otherwise mutate it, producing cross-request side effects.
+        List<Message> messages = rawMessages is null ? [] : [.. rawMessages];
 
         // Only messages this call appends may be merged into. Caller-supplied raw messages (indices
         // below this mark) are passed through untouched, so coalescing never mutates them.

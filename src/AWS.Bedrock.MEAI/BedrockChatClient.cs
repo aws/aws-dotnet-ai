@@ -195,18 +195,29 @@ internal sealed partial class BedrockChatClient : IChatClient
                     }
                 }
 
-                if (content.ReasoningContent is { ReasoningText.Text: not null } reasoningContent)
+                // A ReasoningContentBlock is a union: it carries EITHER reasoningText (optionally
+                // with a signature) OR redactedContent. Map the block whenever either member is
+                // present, so a redacted-only block is not silently dropped.
+                if (content.ReasoningContent is { } reasoningContent &&
+                    (reasoningContent.ReasoningText?.Text is not null || reasoningContent.RedactedContent is not null))
                 {
-                    TextReasoningContent trc = new(reasoningContent.ReasoningText.Text) { RawRepresentation = content };
+                    // TextReasoningContent requires non-null text; a redacted-only block has no text.
+                    TextReasoningContent trc = new(reasoningContent.ReasoningText?.Text ?? string.Empty) { RawRepresentation = content };
 
-                    if (reasoningContent.ReasoningText.Signature is string signature)
+                    if (reasoningContent.ReasoningText?.Signature is string signature)
                     {
                         trc.ProtectedData = signature;
                     }
 
                     if (reasoningContent.RedactedContent is { } redactedContent)
                     {
-                        (trc.AdditionalProperties ??= [])[nameof(reasoningContent.RedactedContent)] = redactedContent.ToArray();
+                        byte[] redactedBytes = redactedContent.ToArray();
+                        (trc.AdditionalProperties ??= [])[nameof(reasoningContent.RedactedContent)] = redactedBytes;
+
+                        // Match the streaming path: when the block carries no signature, store the redacted
+                        // payload (base64) in ProtectedData so streaming and non-streaming produce the same
+                        // shape and a following reasoning item cannot coalesce this one away.
+                        trc.ProtectedData ??= Convert.ToBase64String(redactedBytes);
                     }
 
                     result.Contents.Add(trc);
@@ -305,6 +316,18 @@ internal sealed partial class BedrockChatClient : IChatClient
         string? toolId = null;
         StringBuilder? toolInput = null;
         ChatFinishReason? finishReason = null;
+        // Buffers redacted reasoning bytes per content-block index. Redacted bytes for a single block
+        // can arrive across multiple deltas; emitting each delta separately lets the downstream MEAI
+        // coalescer merge them and keep only the first item's bytes, truncating the payload. We
+        // accumulate here and emit the complete payload once at the block's stop event.
+        Dictionary<int, List<byte>>? redactedReasoningBuffers = null;
+        // Tracks whether the most recently emitted reasoning item was unsigned (no ProtectedData).
+        // The MEAI coalescer merges an adjacent reasoning item INTO a preceding unsigned one, keeping
+        // only the first item's AdditionalProperties -- which would drop a following redacted item's
+        // bytes. When the preceding item was unsigned we separate it from the flushed redacted item
+        // with an empty TextContent (dropped outbound for assistant messages) so the merge cannot
+        // happen.
+        bool lastReasoningWasUnsigned = false;
         string messageId = Guid.NewGuid().ToString("N");
         string responseId = Guid.NewGuid().ToString("N");
         await foreach (var update in result.Stream.WithCancellation(cancellationToken).ConfigureAwait(false))
@@ -360,19 +383,72 @@ internal sealed partial class BedrockChatClient : IChatClient
 
                     if (contentBlockDelta.Delta.ReasoningContent is { } reasoningContent)
                     {
-                        TextReasoningContent trc = new(reasoningContent.Text);
-
-                        if (reasoningContent.Signature is not null)
-                        {
-                            trc.ProtectedData = reasoningContent.Signature;
-                        }
-
+                        // Buffer redacted bytes by block index; they are emitted whole at block stop.
                         if (reasoningContent.RedactedContent is { } redactedContent)
                         {
-                            (trc.AdditionalProperties ??= [])[nameof(reasoningContent.RedactedContent)] = redactedContent.ToArray();
+                            int blockIndex = contentBlockDelta.ContentBlockIndex ?? 0;
+                            (redactedReasoningBuffers ??= [])
+                                .TryGetValue(blockIndex, out List<byte>? buffer);
+                            if (buffer is null)
+                            {
+                                redactedReasoningBuffers[blockIndex] = buffer = [];
+                            }
+
+                            buffer.AddRange(redactedContent.ToArray());
                         }
 
-                        yield return new(ChatRole.Assistant, [trc])
+                        // Reasoning text (and its signature) still streams incrementally, as before.
+                        // A delta with no signature and no non-empty text carries nothing to stream
+                        // (e.g. a redacted-only delta, whose bytes are buffered above), so skip it to
+                        // avoid emitting empty reasoning items the coalescer would merge.
+                        if (reasoningContent.Signature is not null || !string.IsNullOrEmpty(reasoningContent.Text))
+                        {
+                            TextReasoningContent trc = new(reasoningContent.Text ?? string.Empty);
+
+                            if (reasoningContent.Signature is not null)
+                            {
+                                trc.ProtectedData = reasoningContent.Signature;
+                            }
+
+                            yield return new(ChatRole.Assistant, [trc])
+                            {
+                                CreatedAt = DateTimeOffset.UtcNow,
+                                MessageId = messageId,
+                                FinishReason = finishReason,
+                                RawRepresentation = update,
+                                ResponseId = responseId,
+                            };
+
+                            // Record whether this item is absorbable by the coalescer (unsigned).
+                            lastReasoningWasUnsigned = trc.ProtectedData is null;
+                        }
+                    }
+                    break;
+
+                case ContentBlockStopEvent contentBlockStop:
+                    // Flush any redacted reasoning bytes buffered for this block as a single item
+                    // carrying the complete payload, so no bytes are lost to delta aggregation.
+                    if (redactedReasoningBuffers is not null &&
+                        redactedReasoningBuffers.TryGetValue(contentBlockStop.ContentBlockIndex ?? 0, out List<byte>? redactedBuffer))
+                    {
+                        redactedReasoningBuffers.Remove(contentBlockStop.ContentBlockIndex ?? 0);
+
+                        // Carry the redacted payload in ProtectedData (MEAI's slot for opaque reasoning
+                        // data). It is genuine opaque data -- not a private sentinel -- so it round-trips
+                        // through other providers and JSON without being mistaken for a signature, and
+                        // being non-empty it also stops a FOLLOWING reasoning block merging into this one
+                        // (the coalescer only merges when the first item's ProtectedData is empty).
+                        byte[] redactedBytes = redactedBuffer.ToArray();
+                        TextReasoningContent trc = new(string.Empty) { ProtectedData = Convert.ToBase64String(redactedBytes) };
+                        (trc.AdditionalProperties ??= [])[nameof(ReasoningContentBlock.RedactedContent)] = redactedBytes;
+
+                        // A PRECEDING unsigned reasoning item would otherwise absorb this one (the merge
+                        // keeps the first item's AdditionalProperties, dropping these bytes). Separate them
+                        // with an empty TextContent, which the outbound mapper drops for assistant messages.
+                        List<AIContent> flushed = lastReasoningWasUnsigned ? [new TextContent(string.Empty), trc] : [trc];
+                        lastReasoningWasUnsigned = false;
+
+                        yield return new(ChatRole.Assistant, flushed)
                         {
                             CreatedAt = DateTimeOffset.UtcNow,
                             MessageId = messageId,
@@ -381,9 +457,7 @@ internal sealed partial class BedrockChatClient : IChatClient
                             ResponseId = responseId,
                         };
                     }
-                    break;
 
-                case ContentBlockStopEvent contentBlockStop:
                     if (toolName is not null && toolId is not null)
                     {
                         Dictionary<string, object?>? inputs = ParseToolInputs(toolInput?.ToString(), out Exception? parseError);
@@ -631,17 +705,25 @@ internal sealed partial class BedrockChatClient : IChatClient
                 case TextReasoningContent trc:
                     object? redactedContent = null;
                     trc.AdditionalProperties?.TryGetValue(nameof(ReasoningContentBlock.RedactedContent), out redactedContent);
+                    byte[]? redactedBytes = TryGetRedactedBytes(redactedContent);
+
+                    // ReasoningContentBlock is a union; set EXACTLY ONE member. Prefer redacted
+                    // content when present (its text is a placeholder), otherwise send reasoningText.
+                    // Emitting both members produces an invalid union the service rejects.
+                    // For a redacted item ProtectedData holds the base64 payload (used only to block
+                    // coalescer merges) and is not sent; the reasoningText branch sends the real signature.
                     contents.Add(new()
                     {
-                        ReasoningContent = new()
-                        {
-                            ReasoningText = new()
+                        ReasoningContent = redactedBytes is not null
+                            ? new() { RedactedContent = new(redactedBytes) }
+                            : new()
                             {
-                                Text = trc.Text,
-                                Signature = trc.ProtectedData,
-                            },
-                            RedactedContent = redactedContent is byte[] array ? new(array) : null,
-                        }
+                                ReasoningText = new()
+                                {
+                                    Text = trc.Text,
+                                    Signature = trc.ProtectedData,
+                                },
+                            }
                     });
                     break;
 
@@ -864,6 +946,37 @@ internal sealed partial class BedrockChatClient : IChatClient
         }
 
         return inputs;
+    }
+
+    /// <summary>
+    /// Extracts redacted reasoning bytes from a value stored in
+    /// <see cref="AIContent.AdditionalProperties"/>. The value is <see cref="T:byte[]"/> when the
+    /// content was produced in-process, but becomes a base64 <see cref="JsonElement"/> (or a plain
+    /// base64 string) after a System.Text.Json round-trip of persisted history. All three forms are
+    /// accepted so the redacted payload survives serialization.
+    /// </summary>
+    private static byte[]? TryGetRedactedBytes(object? value)
+    {
+        switch (value)
+        {
+            case null:
+                return null;
+            case byte[] bytes:
+                return bytes;
+            case JsonElement { ValueKind: JsonValueKind.String } element:
+                return element.TryGetBytesFromBase64(out byte[]? decoded) ? decoded : null;
+            case string s:
+                try
+                {
+                    return Convert.FromBase64String(s);
+                }
+                catch (FormatException)
+                {
+                    return null;
+                }
+            default:
+                return null;
+        }
     }
 
     /// <summary>Converts a <see cref="Document"/> to a <see cref="Dictionary{String, Object}"/>.</summary>

@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Bedrock.MEAI",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Fixed BedrockChatClient dropping or truncating redacted reasoning content and sending an invalid ReasoningContentBlock union on replay (#76)"
+      ]
+    }
+  ]
+}

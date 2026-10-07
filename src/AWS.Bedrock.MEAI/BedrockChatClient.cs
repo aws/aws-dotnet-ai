@@ -299,7 +299,7 @@ internal sealed partial class BedrockChatClient : IChatClient
         request.InferenceConfig = CreateInferenceConfiguration(request.InferenceConfig, options);
         request.AdditionalModelRequestFields = ApplyReasoningConfig(request.AdditionalModelRequestFields, request.InferenceConfig, options);
 
-        var result = await _runtime.ConverseStreamAsync(request, cancellationToken).ConfigureAwait(false);
+        using var result = await _runtime.ConverseStreamAsync(request, cancellationToken).ConfigureAwait(false);
 
         string? toolName = null;
         string? toolId = null;
@@ -307,7 +307,7 @@ internal sealed partial class BedrockChatClient : IChatClient
         ChatFinishReason? finishReason = null;
         string messageId = Guid.NewGuid().ToString("N");
         string responseId = Guid.NewGuid().ToString("N");
-        await foreach (var update in result.Stream.ConfigureAwait(false))
+        await foreach (var update in result.Stream.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
             switch (update)
             {

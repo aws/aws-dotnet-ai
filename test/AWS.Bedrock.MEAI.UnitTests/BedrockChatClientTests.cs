@@ -3625,6 +3625,40 @@ public class BedrockChatClientTests
 
     [Fact]
     [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetStreamingResponseAsync_HonorsCancellationAndDisposesResponse()
+    {
+        // Issue #75: cancellation was only passed to ConverseStreamAsync, not to the
+        // event-stream enumerator, and ConverseStreamResponse was never disposed.
+        var pipe = new System.IO.Pipes.AnonymousPipeServerStream(System.IO.Pipes.PipeDirection.Out);
+        var reader = new System.IO.Pipes.AnonymousPipeClientStream(
+            System.IO.Pipes.PipeDirection.In, pipe.ClientSafePipeHandle);
+        var tracking = new TrackingConverseStreamResponse
+        {
+            Stream = new ConverseStreamOutput(reader),
+        };
+
+        IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: _ => tracking);
+        IChatClient chatClient = mock.AsIChatClient("claude");
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
+        {
+            await foreach (var _ in chatClient.GetStreamingResponseAsync(
+                [new(ChatRole.User, "hang")], cancellationToken: cts.Token))
+            {
+            }
+        });
+
+        Assert.True(
+            ex is OperationCanceledException
+            || ex is Amazon.BedrockRuntime.BedrockRuntimeEventStreamException { InnerException: OperationCanceledException },
+            $"Unexpected exception: {ex.GetType().FullName}: {ex}");
+        Assert.True(tracking.DisposeCalls > 0, "ConverseStreamResponse should be disposed");
+        pipe.Dispose();
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetStreamingResponseAsync_WithUsageMetadata()
     {
         IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
@@ -4443,6 +4477,21 @@ public class BedrockChatClientTests
         ];
 
         return new EventStreamMessage(headers, payload).ToByteArray();
+    }
+
+    private sealed class TrackingConverseStreamResponse : ConverseStreamResponse
+    {
+        public int DisposeCalls { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                DisposeCalls++;
+            }
+
+            base.Dispose(disposing);
+        }
     }
 
     private static IAmazonBedrockRuntime CreateMock(

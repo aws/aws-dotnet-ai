@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Bedrock.MEAI",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Fix issue with ConverseStreamResponse not honoring cancellation and handling a disposable object"
+      ]
+    }
+  ]
+}

@@ -26,8 +26,11 @@ public static class AmazonBedrockRuntimeExtensions
     /// <summary>
     /// Key under which the Bedrock guardrail trace is placed in <see cref="ChatResponse.AdditionalProperties"/>
     /// (and on the streaming metadata <see cref="ChatResponseUpdate.AdditionalProperties"/>) when present. The
-    /// value is the SDK trace object as-is (<c>ConverseTrace</c> for non-streaming, <c>ConverseStreamTrace</c>
-    /// for streaming); it is a live object and is not guaranteed to survive JSON serialization of the response.
+    /// value is a <see cref="System.Text.Json.JsonElement"/> serialized from the SDK trace object
+    /// (<c>ConverseTrace</c> for non-streaming, <c>ConverseStreamTrace</c> for streaming) using
+    /// source-generated metadata, so it is safe to serialize when the containing <see cref="ChatResponse"/> is
+    /// persisted, including under trimming and Native AOT. New properties added to the SDK trace types in a
+    /// future SDK version are surfaced automatically when this library is rebuilt against that SDK.
     /// </summary>
     public const string TraceKey = "Trace";
 

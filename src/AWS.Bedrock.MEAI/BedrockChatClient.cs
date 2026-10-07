@@ -452,7 +452,7 @@ internal sealed partial class BedrockChatClient : IChatClient
                     AdditionalPropertiesDictionary? metadataProps = null;
                     if (metadata.Trace is { } streamTrace)
                     {
-                        metadataProps = new() { [AmazonBedrockRuntimeExtensions.TraceKey] = streamTrace };
+                        metadataProps = new() { [AmazonBedrockRuntimeExtensions.TraceKey] = TraceToJsonElement(streamTrace) };
                     }
 
                     if (metadataContents.Count > 0 || metadataProps is not null)
@@ -524,8 +524,9 @@ internal sealed partial class BedrockChatClient : IChatClient
     /// Builds the response-level <see cref="ChatResponse.AdditionalProperties"/> carrying the native
     /// <paramref name="stopReason"/> string and guardrail <paramref name="trace"/>. The native stop reason
     /// disambiguates reasons that collapse to one <see cref="ChatFinishReason"/> (e.g. guardrail vs content
-    /// filter), and the trace is surfaced as the SDK object as-is. Returns <see langword="null"/> when neither
-    /// is present so callers see no empty dictionary.
+    /// filter). The trace is serialized to a <see cref="JsonElement"/> (see <see cref="TraceToJsonElement{T}"/>)
+    /// rather than stored as the raw SDK object, so the value serializes safely under trimming/Native AOT.
+    /// Returns <see langword="null"/> when neither is present so callers see no empty dictionary.
     /// </summary>
     private static AdditionalPropertiesDictionary? CreateResponseAdditionalProperties(StopReason? stopReason, ConverseTrace? trace)
     {
@@ -538,11 +539,21 @@ internal sealed partial class BedrockChatClient : IChatClient
 
         if (trace is not null)
         {
-            (properties ??= [])[AmazonBedrockRuntimeExtensions.TraceKey] = trace;
+            (properties ??= [])[AmazonBedrockRuntimeExtensions.TraceKey] = TraceToJsonElement(trace);
         }
 
         return properties;
     }
+
+    /// <summary>
+    /// Serializes a Bedrock guardrail trace (<c>ConverseTrace</c> or <c>ConverseStreamTrace</c>) to a
+    /// <see cref="JsonElement"/> using the source-generated <see cref="BedrockJsonContext"/>. Using the
+    /// source-generated metadata keeps the conversion reflection-free so the resulting value is safe to
+    /// serialize under trimming/Native AOT, while automatically reflecting any properties the SDK type
+    /// gains in a future SDK version (picked up when this library is rebuilt).
+    /// </summary>
+    private static JsonElement TraceToJsonElement<T>(T trace) =>
+        JsonSerializer.SerializeToElement(trace, BedrockJsonContext.DefaultOptions.GetTypeInfo(typeof(T)));
 
     /// <summary>Creates a list of <see cref="SystemContentBlock"/> from the system messages in the provided <paramref name="messages"/>.</summary>
     private static List<SystemContentBlock> CreateSystem(List<SystemContentBlock>? rawMessages, IEnumerable<ChatMessage> messages, ChatOptions? options)

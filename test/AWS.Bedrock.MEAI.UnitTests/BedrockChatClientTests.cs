@@ -1310,7 +1310,13 @@ public class BedrockChatClientTests
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_SurfacesGuardrailTrace()
     {
-        var trace = new ConverseTrace();
+        var trace = new ConverseTrace
+        {
+            Guardrail = new GuardrailTraceAssessment
+            {
+                ModelOutput = new List<string> { "blocked-output" },
+            },
+        };
         IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
         {
             var response = CreateResponse("blocked");
@@ -1324,7 +1330,51 @@ public class BedrockChatClientTests
 
         Assert.NotNull(result.AdditionalProperties);
         Assert.True(result.AdditionalProperties!.TryGetValue(AmazonBedrockRuntimeExtensions.TraceKey, out object? t));
-        Assert.Same(trace, t); // surfaced as the SDK object as-is
+        // The trace is surfaced as a JsonElement serialized (reflection-free) from the SDK object, so it is
+        // safe to serialize when the response is persisted. The nested guardrail content round-trips.
+        var traceElement = Assert.IsType<JsonElement>(t);
+        Assert.Equal(JsonValueKind.Object, traceElement.ValueKind);
+        Assert.Equal(
+            "blocked-output",
+            traceElement.GetProperty("guardrail").GetProperty("modelOutput")[0].GetString());
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_SurfacedTrace_IsJsonSerializable()
+    {
+        // Regression guard: the surfaced trace must be a JSON-serializable value, not the raw SDK object.
+        // A caller serializing the response (including through a source-generated, reflection-disabled
+        // JsonSerializerContext as used under trimming/Native AOT) must not hit a "metadata not provided"
+        // runtime failure. Because the value is a JsonElement, it serializes with the primitive metadata
+        // every context already carries.
+        var trace = new ConverseTrace
+        {
+            Guardrail = new GuardrailTraceAssessment
+            {
+                ModelOutput = new List<string> { "blocked-output" },
+            },
+        };
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var response = CreateResponse("blocked");
+            response.StopReason = new StopReason("guardrail_intervened");
+            response.Trace = trace;
+            return response;
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        ChatResponse result = await chatClient.GetResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken);
+
+        object? traceValue = result.AdditionalProperties![AmazonBedrockRuntimeExtensions.TraceKey];
+        // Serialize the surfaced value through a source-generated, reflection-disabled context (the shape
+        // used under trimming/Native AOT). JsonElement is handled by the generator, so this must not throw.
+        var options = new JsonSerializerOptions { TypeInfoResolver = TraceSerializationTestContext.Default };
+        string json = JsonSerializer.Serialize(traceValue, traceValue!.GetType(), options);
+        using var parsed = JsonDocument.Parse(json);
+        Assert.Equal(
+            "blocked-output",
+            parsed.RootElement.GetProperty("guardrail").GetProperty("modelOutput")[0].GetString());
     }
 
     [Fact]
@@ -1398,7 +1448,7 @@ public class BedrockChatClientTests
         Assert.Contains(metadataUpdate.Contents, c => c is UsageContent);
         Assert.NotNull(metadataUpdate.AdditionalProperties);
         Assert.True(metadataUpdate.AdditionalProperties!.TryGetValue(AmazonBedrockRuntimeExtensions.TraceKey, out object? t));
-        Assert.IsType<ConverseStreamTrace>(t);
+        Assert.IsType<JsonElement>(t);
     }
 
     [Fact]
@@ -4674,4 +4724,14 @@ public class BedrockChatClientTests
         };
         return response;
     }
+}
+
+/// <summary>
+/// A source-generated, reflection-disabled context used by the trace serialization-safety test to prove the
+/// surfaced trace value (a <see cref="System.Text.Json.JsonElement"/>) serializes without a runtime failure
+/// under the metadata-only resolver used for trimming/Native AOT.
+/// </summary>
+[System.Text.Json.Serialization.JsonSerializable(typeof(System.Text.Json.JsonElement))]
+internal partial class TraceSerializationTestContext : System.Text.Json.Serialization.JsonSerializerContext
+{
 }

@@ -1507,7 +1507,7 @@ public class BedrockChatClientTests
         // Message-level dict preserves the model's own identically-named field (not overwritten).
         // The model field is flattened from a Document, so compare its string form rather than its boxed type.
         Assert.Equal("model-defined-value",
-            result.Messages[^1].AdditionalProperties?[AmazonBedrockRuntimeExtensions.StopReasonKey]?.ToString());
+            result.Messages[result.Messages.Count - 1].AdditionalProperties?[AmazonBedrockRuntimeExtensions.StopReasonKey]?.ToString());
     }
 
     [Fact]
@@ -4303,12 +4303,11 @@ public class BedrockChatClientTests
     {
         // Issue #75: cancellation was only passed to ConverseStreamAsync, not to the
         // event-stream enumerator, and ConverseStreamResponse was never disposed.
-        var pipe = new System.IO.Pipes.AnonymousPipeServerStream(System.IO.Pipes.PipeDirection.Out);
-        var reader = new System.IO.Pipes.AnonymousPipeClientStream(
-            System.IO.Pipes.PipeDirection.In, pipe.ClientSafePipeHandle);
+        // Use a stream whose reads only complete on cancellation. Anonymous pipes can't be used
+        // here because their ReadAsync ignores the cancellation token on .NET Framework.
         var tracking = new TrackingConverseStreamResponse
         {
-            Stream = new ConverseStreamOutput(reader),
+            Stream = new ConverseStreamOutput(new NeverCompletingStream()),
         };
 
         IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: _ => tracking);
@@ -4328,7 +4327,6 @@ public class BedrockChatClientTests
             || ex is Amazon.BedrockRuntime.BedrockRuntimeEventStreamException { InnerException: OperationCanceledException },
             $"Unexpected exception: {ex.GetType().FullName}: {ex}");
         Assert.True(tracking.DisposeCalls > 0, "ConverseStreamResponse should be disposed");
-        pipe.Dispose();
     }
 
     [Fact]
@@ -5174,6 +5172,36 @@ public class BedrockChatClientTests
         ];
 
         return new EventStreamMessage(headers, payload).ToByteArray();
+    }
+
+    /// <summary>A readable stream whose reads never complete until the supplied token is canceled.</summary>
+    private sealed class NeverCompletingStream : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            return 0;
+        }
+
+#if NET8_0_OR_GREATER
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            return 0;
+        }
+#endif
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private sealed class TrackingConverseStreamResponse : ConverseStreamResponse

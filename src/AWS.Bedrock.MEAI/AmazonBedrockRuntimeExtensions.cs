@@ -64,6 +64,26 @@ public static class AmazonBedrockRuntimeExtensions
         runtime is not null ? new BedrockChatClient(runtime, defaultModelId, structuredOutputMode) :
         throw new ArgumentNullException(nameof(runtime));
 
+    /// <summary>Gets an <see cref="IChatClient"/> for the specified <see cref="IAmazonBedrockRuntime"/> instance.</summary>
+    /// <param name="runtime">The runtime instance to be represented as an <see cref="IChatClient"/>.</param>
+    /// <param name="defaultModelId">
+    /// The default model ID to use when no model is specified in a request. If not specified,
+    /// a model must be provided in the <see cref="ChatOptions.ModelId"/> passed to <see cref="IChatClient.GetResponseAsync"/>
+    /// or <see cref="IChatClient.GetStreamingResponseAsync"/>.
+    /// </param>
+    /// <param name="options">
+    /// Optional settings controlling request/response mapping, such as
+    /// <see cref="BedrockChatClientOptions.StructuredOutputMode"/> and
+    /// <see cref="BedrockChatClientOptions.CoalesceConsecutiveMessages"/>. When <see langword="null"/>,
+    /// defaults are used.
+    /// </param>
+    /// <returns>A <see cref="IChatClient"/> instance representing the <see cref="IAmazonBedrockRuntime"/> instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="runtime"/> is <see langword="null"/>.</exception>
+    public static IChatClient AsIChatClient(this IAmazonBedrockRuntime runtime, string? defaultModelId,
+        BedrockChatClientOptions? options) =>
+        runtime is not null ? new BedrockChatClient(runtime, defaultModelId, options) :
+        throw new ArgumentNullException(nameof(runtime));
+
     /// <summary>Gets an <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/> for the specified <see cref="IAmazonBedrockRuntime"/> instance.</summary>
     /// <param name="runtime">The runtime instance to be represented as an <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/>.</param>
     /// <param name="defaultModelId">

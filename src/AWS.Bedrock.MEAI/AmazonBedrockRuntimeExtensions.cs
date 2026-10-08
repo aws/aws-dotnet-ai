@@ -14,6 +14,26 @@ public static class AmazonBedrockRuntimeExtensions
     /// <summary>The provider name to use in metadata.</summary>
     internal const string ProviderName = "aws.bedrock";
 
+    /// <summary>
+    /// Key under which the native Bedrock stop-reason string (e.g. <c>"guardrail_intervened"</c> or
+    /// <c>"content_filtered"</c>) is placed in <see cref="ChatResponse.AdditionalProperties"/> (and on the
+    /// corresponding streaming <see cref="ChatResponseUpdate.AdditionalProperties"/>). Multiple native stop
+    /// reasons map to a single <see cref="ChatFinishReason"/> (both guardrail/content-filter cases map to
+    /// <see cref="ChatFinishReason.ContentFilter"/>), so this preserves the exact reason the service returned.
+    /// </summary>
+    public const string StopReasonKey = "StopReason";
+
+    /// <summary>
+    /// Key under which the Bedrock guardrail trace is placed in <see cref="ChatResponse.AdditionalProperties"/>
+    /// (and on the streaming metadata <see cref="ChatResponseUpdate.AdditionalProperties"/>) when present. The
+    /// value is a <see cref="System.Text.Json.JsonElement"/> serialized from the SDK trace object
+    /// (<c>ConverseTrace</c> for non-streaming, <c>ConverseStreamTrace</c> for streaming) using
+    /// source-generated metadata, so it is safe to serialize when the containing <see cref="ChatResponse"/> is
+    /// persisted, including under trimming and Native AOT. New properties added to the SDK trace types in a
+    /// future SDK version are surfaced automatically when this library is rebuilt against that SDK.
+    /// </summary>
+    public const string TraceKey = "Trace";
+
 #if NET8_0_OR_GREATER
     /// <summary>Gets an <see cref="IRealtimeClient"/> for the specified <see cref="IAmazonBedrockRuntime"/> instance.</summary>
     /// <param name="runtime">The runtime instance to be represented as an <see cref="IRealtimeClient"/>.</param>

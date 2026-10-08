@@ -29,6 +29,13 @@ namespace AWS.Bedrock.MEAI;
 [JsonSerializable(typeof(JsonNode))]
 [JsonSerializable(typeof(EmbeddingRequest))]
 [JsonSerializable(typeof(EmbeddingResponse))]
+// The guardrail trace types are surfaced on AdditionalProperties as a serialized JsonElement.
+// Registering them here lets the source generator emit reflection-free metadata so the trace
+// serializes safely under trimming/Native AOT. New SDK properties on these types are picked up
+// automatically the next time this library is rebuilt against a newer SDK (the generator re-walks
+// the compiled type), so no hand-maintained mapping is required.
+[JsonSerializable(typeof(Amazon.BedrockRuntime.Model.ConverseTrace))]
+[JsonSerializable(typeof(Amazon.BedrockRuntime.Model.ConverseStreamTrace))]
 internal partial class BedrockJsonContext : JsonSerializerContext
 {
     /// <summary>Gets the <see cref="JsonSerializerOptions"/> singleton used as the default in JSON serialization operations.</summary>

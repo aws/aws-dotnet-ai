@@ -169,6 +169,7 @@ internal sealed partial class BedrockChatClient : IChatClient
 
                 return new(result)
                 {
+                    AdditionalProperties = CreateResponseAdditionalProperties(response.StopReason, response.Trace),
                     CreatedAt = result.CreatedAt,
                     FinishReason = response.StopReason is not null ? GetChatFinishReason(response.StopReason) : null,
                     Usage = response.Usage is TokenUsage tokenUsage ? CreateUsageDetails(tokenUsage) : null,
@@ -275,6 +276,7 @@ internal sealed partial class BedrockChatClient : IChatClient
 
         return new(result)
         {
+            AdditionalProperties = CreateResponseAdditionalProperties(response.StopReason, response.Trace),
             CreatedAt = result.CreatedAt,
             FinishReason = response.StopReason is not null ? GetChatFinishReason(response.StopReason) : null,
             RawRepresentation = response,
@@ -509,6 +511,15 @@ internal sealed partial class BedrockChatClient : IChatClient
                         additionalProps = new(responseFieldsDictionary);
                     }
 
+                    // Surface the native stop reason (e.g. "guardrail_intervened" vs "content_filtered",
+                    // which both collapse to ChatFinishReason.ContentFilter). Add-if-absent so a model's own
+                    // AdditionalModelResponseFields entry of the same name is never overwritten.
+                    if (messageStop.StopReason?.Value is { } streamStopReason)
+                    {
+                        (additionalProps ??= [])
+                            .TryAdd(AmazonBedrockRuntimeExtensions.StopReasonKey, streamStopReason);
+                    }
+
                     yield return new()
                     {
                         AdditionalProperties = additionalProps,
@@ -521,15 +532,34 @@ internal sealed partial class BedrockChatClient : IChatClient
                     };
                     break;
 
-                case ConverseStreamMetadataEvent metadata when metadata.Usage is TokenUsage usage:
-                    yield return new(ChatRole.Assistant, [new UsageContent(CreateUsageDetails(usage))])
+                case ConverseStreamMetadataEvent metadata:
+                    // Not gated on Usage: a metadata event may carry a guardrail Trace with or without
+                    // token usage. Emit an update only when there is something to carry (usage and/or
+                    // trace), so a truly empty metadata event still produces nothing.
+                    List<AIContent> metadataContents = [];
+                    if (metadata.Usage is TokenUsage metadataUsage)
                     {
-                        CreatedAt = DateTimeOffset.UtcNow,
-                        FinishReason = finishReason,
-                        MessageId = messageId,
-                        RawRepresentation = update,
-                        ResponseId = responseId,
-                    };
+                        metadataContents.Add(new UsageContent(CreateUsageDetails(metadataUsage)));
+                    }
+
+                    AdditionalPropertiesDictionary? metadataProps = null;
+                    if (metadata.Trace is { } streamTrace)
+                    {
+                        metadataProps = new() { [AmazonBedrockRuntimeExtensions.TraceKey] = TraceToJsonElement(streamTrace) };
+                    }
+
+                    if (metadataContents.Count > 0 || metadataProps is not null)
+                    {
+                        yield return new(ChatRole.Assistant, metadataContents)
+                        {
+                            AdditionalProperties = metadataProps,
+                            CreatedAt = DateTimeOffset.UtcNow,
+                            FinishReason = finishReason,
+                            MessageId = messageId,
+                            RawRepresentation = update,
+                            ResponseId = responseId,
+                        };
+                    }
                     break;
             }
         }
@@ -582,6 +612,41 @@ internal sealed partial class BedrockChatClient : IChatClient
             "tool_use" => ChatFinishReason.ToolCalls,
             _ => new(stopReason.Value),
         };
+
+    /// <summary>
+    /// Builds the response-level <see cref="ChatResponse.AdditionalProperties"/> carrying the native
+    /// <paramref name="stopReason"/> string and guardrail <paramref name="trace"/>. The native stop reason
+    /// disambiguates reasons that collapse to one <see cref="ChatFinishReason"/> (e.g. guardrail vs content
+    /// filter). The trace is serialized to a <see cref="JsonElement"/> (see <see cref="TraceToJsonElement{T}"/>)
+    /// rather than stored as the raw SDK object, so the value serializes safely under trimming/Native AOT.
+    /// Returns <see langword="null"/> when neither is present so callers see no empty dictionary.
+    /// </summary>
+    private static AdditionalPropertiesDictionary? CreateResponseAdditionalProperties(StopReason? stopReason, ConverseTrace? trace)
+    {
+        AdditionalPropertiesDictionary? properties = null;
+
+        if (stopReason?.Value is { } stopReasonValue)
+        {
+            properties = new() { [AmazonBedrockRuntimeExtensions.StopReasonKey] = stopReasonValue };
+        }
+
+        if (trace is not null)
+        {
+            (properties ??= [])[AmazonBedrockRuntimeExtensions.TraceKey] = TraceToJsonElement(trace);
+        }
+
+        return properties;
+    }
+
+    /// <summary>
+    /// Serializes a Bedrock guardrail trace (<c>ConverseTrace</c> or <c>ConverseStreamTrace</c>) to a
+    /// <see cref="JsonElement"/> using the source-generated <see cref="BedrockJsonContext"/>. Using the
+    /// source-generated metadata keeps the conversion reflection-free so the resulting value is safe to
+    /// serialize under trimming/Native AOT, while automatically reflecting any properties the SDK type
+    /// gains in a future SDK version (picked up when this library is rebuilt).
+    /// </summary>
+    private static JsonElement TraceToJsonElement<T>(T trace) =>
+        JsonSerializer.SerializeToElement(trace, BedrockJsonContext.DefaultOptions.GetTypeInfo(typeof(T)));
 
     /// <summary>Creates a list of <see cref="SystemContentBlock"/> from the system messages in the provided <paramref name="messages"/>.</summary>
     private static List<SystemContentBlock> CreateSystem(List<SystemContentBlock>? rawMessages, IEnumerable<ChatMessage> messages, ChatOptions? options)

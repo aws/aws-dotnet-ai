@@ -64,6 +64,13 @@ var embeddings = await generator.GenerateAsync(["Hello world"]);
   sent separately). Optional client settings live on `BedrockChatClientOptions` so future options can be
   added without new `AsIChatClient` overloads.
 - **Embeddings** (`AsIEmbeddingGenerator`).
+- **Native stop reason and guardrail trace** surfaced on `ChatResponse.AdditionalProperties`
+  (and the matching streaming updates) under the `AmazonBedrockRuntimeExtensions.StopReasonKey`
+  (`"StopReason"`) and `TraceKey` (`"Trace"`) keys. Because multiple native stop reasons map to one
+  `ChatFinishReason` (both `guardrail_intervened` and `content_filtered` map to `ContentFilter`), the
+  `StopReason` string lets you tell them apart; `Trace` carries the guardrail trace as a `JsonElement`
+  serialized from the SDK trace object, so it serializes safely when the response is persisted
+  (including under trimming / Native AOT).
 - **Image generation** (`AsIImageGenerator`) for Stability and Amazon Titan / Nova Canvas models.
   *(Experimental — `MEAI001`.)*
 - **Realtime audio** (`AsIRealtimeClient`) for Amazon Nova Sonic bidirectional streaming, on

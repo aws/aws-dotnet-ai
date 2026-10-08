@@ -1,3 +1,11 @@
+## Release 2026-10-08
+
+### AWS.Bedrock.MEAI (1.1.0)
+* Fixed BedrockChatClient dropping or truncating redacted reasoning content and sending an invalid ReasoningContentBlock union on replay (#76)
+* Fix issue with ConverseStreamResponse not honoring cancellation and handling a disposable object
+* Added opt-in coalescing of consecutive request messages that map to the same Converse role, configured via the new BedrockChatClientOptions passed to AsIChatClient / BedrockChatClient (#77)
+* Surface the native Bedrock stop reason and guardrail trace on ChatResponse.AdditionalProperties (and streaming updates) via AmazonBedrockRuntimeExtensions.StopReasonKey/TraceKey
+
 ## Release 2026-10-06
 
 ### AWS.Bedrock.MEAI (1.0.1)

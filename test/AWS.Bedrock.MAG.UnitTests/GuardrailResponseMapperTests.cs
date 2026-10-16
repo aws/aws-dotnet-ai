@@ -105,5 +105,220 @@ namespace AWS.Bedrock.MAG.UnitTests
             Assert.Contains("action=GUARDRAIL_INTERVENED", summary);
             Assert.Contains("NAME", summary);
         }
+
+        [Fact]
+        public void ChecksTripped_does_not_trip_on_a_content_finding_with_no_severity_score()
+        {
+            // Content-filter results are PER-EVALUATED-CATEGORY: an entry is returned for every category we
+            // asked to check, even for benign input, and its severity is nullable. A null severity means "no
+            // finding for this category", so it must NOT trip — treating it as tripped would deny-all benign
+            // traffic. (Contrast with the PII test below, where an entry only appears on an actual detection.)
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    ContentFilter = new GuardrailChecksContentFilterResult
+                    {
+                        Results = new List<GuardrailChecksContentFilterResultEntry>
+                        {
+                            new() { Category = "HATE" } // SeverityScore deliberately unset (null) => benign.
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 0.5, confidenceThreshold: 0.5, out var summary);
+
+            Assert.False(tripped);
+            Assert.Equal("no checks tripped", summary);
+        }
+
+        [Fact]
+        public void ChecksTripped_does_not_trip_on_a_content_finding_below_the_severity_threshold()
+        {
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    ContentFilter = new GuardrailChecksContentFilterResult
+                    {
+                        Results = new List<GuardrailChecksContentFilterResultEntry>
+                        {
+                            new() { Category = "HATE", SeverityScore = 0.2 }
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 0.5, confidenceThreshold: 0.5, out _);
+
+            Assert.False(tripped);
+        }
+
+        [Fact]
+        public void ChecksTripped_trips_on_a_content_finding_at_or_above_the_severity_threshold()
+        {
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    ContentFilter = new GuardrailChecksContentFilterResult
+                    {
+                        Results = new List<GuardrailChecksContentFilterResultEntry>
+                        {
+                            new() { Category = "HATE", SeverityScore = 0.9 }
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 0.5, confidenceThreshold: 0.5, out var summary);
+
+            Assert.True(tripped);
+            Assert.Contains("HATE", summary);
+        }
+
+        [Fact]
+        public void ChecksTripped_does_not_trip_on_a_prompt_attack_finding_with_no_severity_score()
+        {
+            // Prompt-attack results are also per-evaluated-category, so a null severity is benign, not a trip.
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    PromptAttack = new GuardrailChecksPromptAttackResult
+                    {
+                        Results = new List<GuardrailChecksPromptAttackResultEntry>
+                        {
+                            new() { Category = "PROMPT_INJECTION" } // SeverityScore deliberately unset (null).
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 0.5, confidenceThreshold: 0.5, out var summary);
+
+            Assert.False(tripped);
+            Assert.Equal("no checks tripped", summary);
+        }
+
+        [Fact]
+        public void ChecksTripped_does_not_trip_on_a_prompt_attack_finding_below_the_severity_threshold()
+        {
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    PromptAttack = new GuardrailChecksPromptAttackResult
+                    {
+                        Results = new List<GuardrailChecksPromptAttackResultEntry>
+                        {
+                            new() { Category = "PROMPT_INJECTION", SeverityScore = 0.2 }
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 0.5, confidenceThreshold: 0.5, out _);
+
+            Assert.False(tripped);
+        }
+
+        [Fact]
+        public void ChecksTripped_treats_a_pii_finding_with_no_confidence_score_as_tripped()
+        {
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    SensitiveInformation = new GuardrailChecksSensitiveInformationResult
+                    {
+                        Results = new List<GuardrailChecksSensitiveInformationResultEntry>
+                        {
+                            new() { Type = "US_SOCIAL_SECURITY_NUMBER" } // ConfidenceScore deliberately unset (null).
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 1.0, confidenceThreshold: 1.0, out var summary);
+
+            Assert.True(tripped);
+            Assert.Contains("US_SOCIAL_SECURITY_NUMBER", summary);
+        }
+
+        [Fact]
+        public void ChecksTripped_trips_on_a_content_finding_at_the_severity_threshold()
+        {
+            // Boundary case: severity EXACTLY equal to the threshold must trip, pinning the `>=` predicate.
+            // A future change from `>=` to `>` would make this case pass through, and this test would catch it.
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    ContentFilter = new GuardrailChecksContentFilterResult
+                    {
+                        Results = new List<GuardrailChecksContentFilterResultEntry>
+                        {
+                            new() { Category = "HATE", SeverityScore = 0.5 }
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 0.5, confidenceThreshold: 0.5, out var summary);
+
+            Assert.True(tripped);
+            Assert.Contains("HATE", summary);
+        }
+
+        [Fact]
+        public void ChecksTripped_trips_on_a_prompt_attack_finding_at_the_severity_threshold()
+        {
+            // Boundary case: prompt-attack shares the severity predicate, so severity == threshold must trip too.
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    PromptAttack = new GuardrailChecksPromptAttackResult
+                    {
+                        Results = new List<GuardrailChecksPromptAttackResultEntry>
+                        {
+                            new() { Category = "PROMPT_INJECTION", SeverityScore = 0.5 }
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 0.5, confidenceThreshold: 0.5, out var summary);
+
+            Assert.True(tripped);
+            Assert.Contains("PROMPT_INJECTION", summary);
+        }
+
+        [Fact]
+        public void ChecksTripped_trips_on_a_pii_finding_at_the_confidence_threshold()
+        {
+            // Boundary case: confidence EXACTLY equal to the threshold must trip, pinning the `>=` predicate.
+            // A future change from `>=` to `>` would let a threshold-confidence detection slip through.
+            var response = new InvokeGuardrailChecksResponse
+            {
+                Results = new GuardrailChecksResults
+                {
+                    SensitiveInformation = new GuardrailChecksSensitiveInformationResult
+                    {
+                        Results = new List<GuardrailChecksSensitiveInformationResultEntry>
+                        {
+                            new() { Type = "US_SOCIAL_SECURITY_NUMBER", ConfidenceScore = 0.5 }
+                        }
+                    }
+                }
+            };
+
+            var tripped = GuardrailResponseMapper.ChecksTripped(response, severityThreshold: 0.5, confidenceThreshold: 0.5, out var summary);
+
+            Assert.True(tripped);
+            Assert.Contains("US_SOCIAL_SECURITY_NUMBER", summary);
+        }
     }
 }

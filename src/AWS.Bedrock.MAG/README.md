@@ -2,11 +2,11 @@
 
 AWS backends for [Microsoft's Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit). This package plugs AWS managed services into the toolkit's existing extension points, so a .NET AI agent gets Bedrock-backed policy, PII sanitization, and durable audit with about two lines of configuration.
 
-- **Bedrock Guardrails policy backend**: ML policy evaluation added alongside the toolkit's rule, OPA, and Cedar backends. Fails closed on error.
+- **Bedrock Guardrails policy backend**: ML policy evaluation added alongside the toolkit's rule, OPA, and Cedar backends. Use a pre-created guardrail (`GuardrailId`) or define checks inline (`InlineChecks`) with no guardrail resource to manage. Fails closed on error.
 - **Bedrock Guardrails PII sanitization**: redacts or blocks 30+ PII entity types in MCP tool output.
 - **CloudWatch audit sink**: writes governance events to CloudWatch Logs with aggregated metrics.
 
-> Preview (0.1.0). The API may change while the toolkit's extension surface stabilizes. Inline guardrail checks (no pre-created Bedrock guardrail required) ship in a follow-up preview release.
+> Preview (0.1.0). The API may change while the toolkit's extension surface stabilizes.
 
 ## Install
 
@@ -53,11 +53,33 @@ kernel.AddBedrockGuardrailsPolicy(o => o.GuardrailId = "gr-abc123");
 using var audit = kernel.AddCloudWatchAudit(o => o.LogGroupName = "/agent-governance/audit");
 ```
 
+### Inline guardrail checks (no pre-created guardrail)
+
+When you don't want to manage a Bedrock guardrail resource, define the checks inline. The policy backend calls `InvokeGuardrailChecks` with the categories/entities from the request; a check trips the deny when its score meets the configured threshold. Detection only — this mode does not mask text, so PII sanitization still needs `GuardrailId`.
+
+```csharp
+builder.Services.AddBedrockGovernance(o =>
+{
+    o.EnablePiiSanitization = false;
+    o.Policy.InlineChecks   = new GuardrailChecksOptions
+    {
+        ContentFilterCategories      = { "HATE", "INSULTS", "VIOLENCE" },
+        PromptAttackCategories       = { "PROMPT_INJECTION", "JAILBREAK" },
+        SensitiveInformationEntities = { "US_SOCIAL_SECURITY_NUMBER", "EMAIL" },
+        SeverityThreshold            = 0.5,   // content filter + prompt attack
+        ConfidenceThreshold          = 0.5,   // PII
+    };
+});
+```
+
+`InlineChecks` composes with every entry point (`WithBedrockGovernance`, `AddBedrockGovernance`, and the imperative `AddBedrockGuardrailsPolicy`); set either `GuardrailId` or `InlineChecks`. When both are set the pre-created guardrail wins.
+
 ## Required IAM
 
 The credentials the agent runs under need:
 
 - `bedrock:ApplyGuardrail` on the guardrail (policy and PII sanitization).
+- `bedrock:InvokeGuardrailChecks` (inline-checks policy mode; no guardrail resource is referenced).
 - `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents` on the audit log group (audit sink).
 - `cloudwatch:PutMetricData` (audit metrics, when `EmitMetrics` is on).
 
@@ -69,7 +91,7 @@ PII sanitization covers the **text** blocks of an MCP tool result, matching the 
 
 ## Cost
 
-This package calls billed AWS services: Bedrock Guardrails (priced per text unit evaluated, once for policy on the input and once for PII on the output), CloudWatch Logs ingestion and storage, and CloudWatch custom metrics. Tune `FlushInterval` to trade audit latency against request volume.
+This package calls billed AWS services: Bedrock Guardrails (priced per text unit evaluated, once for policy on the input and once for PII on the output; inline checks are billed on the same per-text-unit basis), CloudWatch Logs ingestion and storage, and CloudWatch custom metrics. Tune `FlushInterval` to trade audit latency against request volume.
 
 ## License
 

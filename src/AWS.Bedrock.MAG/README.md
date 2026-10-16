@@ -1,12 +1,12 @@
 # AWS.Bedrock.MAG
 
-AWS backends for [Microsoft's Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit). This package plugs AWS managed services into the toolkit's extension points so a .NET AI agent can pick up Bedrock-backed policy, PII sanitization, and durable audit with a few lines of configuration.
+AWS backends for [Microsoft's Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit). This package plugs AWS managed services into the toolkit's existing extension points, so a .NET AI agent gets Bedrock-backed policy, PII sanitization, and durable audit with about two lines of configuration.
 
 - **Bedrock Guardrails policy backend**: ML policy evaluation added alongside the toolkit's rule, OPA, and Cedar backends. Fails closed on error.
-- **CloudWatch audit sink**: writes governance events to CloudWatch Logs with aggregated metrics.
 - **Bedrock Guardrails PII sanitization**: redacts or blocks 30+ PII entity types in MCP tool output.
+- **CloudWatch audit sink**: writes governance events to CloudWatch Logs with aggregated metrics.
 
-> Preview (0.1.0). The API may change while the toolkit's extension surface stabilizes. Remaining features (high-level MCP/DI entry points, inline guardrail checks) ship in follow-up preview releases.
+> Preview (0.1.0). The API may change while the toolkit's extension surface stabilizes. Inline guardrail checks (no pre-created Bedrock guardrail required) ship in a follow-up preview release.
 
 ## Install
 
@@ -18,45 +18,46 @@ Targets net8.0. Requires `Microsoft.AgentGovernance` 5.0.0.
 
 ## Use it
 
-### Imperative (you already hold a kernel)
+### MCP server (primary)
 
-Attach the policy backend and audit sink directly to a `GovernanceKernel` you constructed:
+Add `WithBedrockGovernance` after the toolkit's `WithGovernance`:
+
+```csharp
+builder.Services.AddMcpServer()
+    .WithGovernance(o => o.PolicyPaths.Add("policies/default.yaml"))  // Microsoft's toolkit
+    .WithBedrockGovernance(o =>                                        // this package
+    {
+        o.Policy.GuardrailId    = "gr-abc123";
+        o.EnablePiiSanitization = true;                               // ANONYMIZE tool output
+        o.Audit.LogGroupName    = "/agent-governance/audit";
+    });
+```
+
+### Non-MCP agent (plain DI)
+
+```csharp
+builder.Services.AddBedrockGovernance(o =>
+{
+    o.Policy.GuardrailId    = "gr-abc123";
+    o.Audit.MetricNamespace = "AgentGovernance/Bedrock";
+});
+// Requires a GovernanceKernel already in DI (from the toolkit).
+```
+
+### Imperative (you already hold a kernel)
 
 ```csharp
 var kernel = new GovernanceKernel(new GovernanceOptions { PolicyPaths = { "policies/default.yaml" } });
 
-kernel.PolicyEngine.AddExternalBackend(
-    new BedrockGuardrailsPolicyBackend(new BedrockGuardrailsPolicyOptions
-    {
-        GuardrailId = "gr-abc123",
-    }));
-
-using var audit = new CloudWatchAuditSink(new CloudWatchAuditOptions
-{
-    LogGroupName    = "/agent-governance/audit",
-    MetricNamespace = "AgentGovernance/Bedrock",
-});
-audit.Subscribe(kernel.AuditEmitter);
-```
-
-### PII sanitization on MCP tool output
-
-`BedrockGuardrailsSanitizer` runs the ANONYMIZE action on the text blocks of an MCP tool result. The MCP server wiring that plugs it in for you (via `WithBedrockGovernance`) lands in the next preview; in the meantime you can construct the sanitizer directly to feed it tool-result text:
-
-```csharp
-var sanitizer = new BedrockGuardrailsSanitizer(new BedrockSanitizationOptions
-{
-    GuardrailId = "gr-abc123",
-});
-
-var scrubbed = await sanitizer.SanitizeAsync(rawToolText, cancellationToken);
+kernel.AddBedrockGuardrailsPolicy(o => o.GuardrailId = "gr-abc123");
+using var audit = kernel.AddCloudWatchAudit(o => o.LogGroupName = "/agent-governance/audit");
 ```
 
 ## Required IAM
 
 The credentials the agent runs under need:
 
-- `bedrock:ApplyGuardrail` on the guardrail (policy backend and PII sanitization).
+- `bedrock:ApplyGuardrail` on the guardrail (policy and PII sanitization).
 - `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents` on the audit log group (audit sink).
 - `cloudwatch:PutMetricData` (audit metrics, when `EmitMetrics` is on).
 

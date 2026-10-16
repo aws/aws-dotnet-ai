@@ -1344,6 +1344,15 @@ internal sealed partial class BedrockChatClient : IChatClient
                 schemaDictionary["required"] = new Document(required);
             }
 
+            // Keep the definitions that "$ref" pointers in the properties refer to.
+            foreach (string definitionsKeyword in new[] { "$defs", "definitions" })
+            {
+                if (f.JsonSchema.TryGetProperty(definitionsKeyword, out JsonElement definitions))
+                {
+                    schemaDictionary[definitionsKeyword] = ToDocument(definitions);
+                }
+            }
+
             if (strict)
             {
                 // Bedrock strict tool use requires the input schema to forbid extra properties.

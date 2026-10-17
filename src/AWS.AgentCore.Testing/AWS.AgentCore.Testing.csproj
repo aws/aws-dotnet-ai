@@ -24,10 +24,6 @@
     <WarningsAsErrors>true</WarningsAsErrors>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,7 +34,6 @@
     <PackageReference Include="AWSSDK.BedrockAgentCore" Version="4.0.23.3" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.40" />
     <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.8" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
   </ItemGroup>
 
   <!-- Embed wwwroot files as resources so they're self-contained in the DLL.

@@ -401,6 +401,26 @@ internal sealed partial class BedrockChatClient : IChatClient
 
                         yield return textUpdate;
                     }
+                    else if (contentBlockDelta.Delta.Citation is { } citation &&
+                        (citation.Title is not null || citation.SourceContent is { Count: > 0 }))
+                    {
+                        // ContentBlockDelta is a union: Bedrock streams citations in their own deltas, without text.
+                        yield return new(ChatRole.Assistant, [new AIContent()
+                        {
+                            Annotations = [new CitationAnnotation()
+                            {
+                                Title = citation.Title,
+                                Snippet = citation.SourceContent?.Select(c => c.Text).FirstOrDefault(),
+                            }],
+                        }])
+                        {
+                            CreatedAt = DateTimeOffset.UtcNow,
+                            MessageId = messageId,
+                            RawRepresentation = update,
+                            FinishReason = finishReason,
+                            ResponseId = responseId,
+                        };
+                    }
 
                     if (contentBlockDelta.Delta.ReasoningContent is { } reasoningContent)
                     {

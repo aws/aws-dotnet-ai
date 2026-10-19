@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Bedrock.MEAI",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Fixed BedrockChatClient streaming dropping citations, which Bedrock sends in their own content block deltas."
+      ]
+    }
+  ]
+}

@@ -1392,6 +1392,37 @@ public class BedrockChatClientTests
 
     [Fact]
     [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetStreamingResponseAsync_WithCitationInSeparateDelta()
+    {
+        IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
+        {
+            var stream = CreateEventStream(
+                CreateMessageStartEvent(),
+                CreateContentBlockStartEvent(0),
+                CreateContentBlockDeltaEvent(0, "Cited text."),
+                CreateContentBlockDeltaEventWithCitationOnly(0, "Source document", "source snippet"),
+                CreateContentBlockStopEvent(0),
+                CreateMessageStopEvent("end_turn"),
+                CreateMetadataEvent(10, 5));
+            return new ConverseStreamResponse { Stream = new ConverseStreamOutput(stream) };
+        });
+
+        IChatClient chatClient = mock.AsIChatClient("claude");
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var u in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "Test")], cancellationToken: TestContext.Current.CancellationToken))
+        {
+            updates.Add(u);
+        }
+
+        Assert.Equal("Cited text.", string.Concat(updates.Select(u => u.Text)));
+        CitationAnnotation citation = Assert.IsType<CitationAnnotation>(
+            Assert.Single(updates.SelectMany(u => u.Contents).SelectMany(c => c.Annotations ?? [])));
+        Assert.Equal("Source document", citation.Title);
+        Assert.Equal("source snippet", citation.Snippet);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetStreamingResponseAsync_SurfacesStopReasonOnStopUpdate()
     {
         IAmazonBedrockRuntime mock = CreateMock(onConverseStreamRequest: request =>
@@ -5198,6 +5229,10 @@ public class BedrockChatClientTests
         var escapedText = text.Replace("\"", "\\\"");
         return CreateEventMessage("ContentBlockDelta", Encoding.UTF8.GetBytes($"{{\"contentBlockIndex\":{contentBlockIndex},\"delta\":{{\"text\":\"{escapedText}\"}}}}"));
     }
+
+    private static byte[] CreateContentBlockDeltaEventWithCitationOnly(int contentBlockIndex, string title, string snippet) =>
+        CreateEventMessage("ContentBlockDelta", Encoding.UTF8.GetBytes(
+            $"{{\"contentBlockIndex\":{contentBlockIndex},\"delta\":{{\"citation\":{{\"title\":\"{title}\",\"sourceContent\":[{{\"text\":\"{snippet}\"}}]}}}}}}"));
 
     private static byte[] CreateContentBlockDeltaEventWithToolUse(int contentBlockIndex, string input)
     {

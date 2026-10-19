@@ -1206,6 +1206,12 @@ internal sealed partial class BedrockChatClient : IChatClient
                 return props;
 
             case JsonValueKind.Null:
+                // Map JSON null to a null Document (the AWS SDK marshals a default Document as JSON
+                // null). Without this, null in a tool schema, tool-call argument, tool result, or
+                // ResponseFormat schema is sent to Bedrock as "" (issue #89). This matches the tool-
+                // result path, which already maps a null value to a null Document (_ => default).
+                return default;
+
             default:
                 return string.Empty;
         }

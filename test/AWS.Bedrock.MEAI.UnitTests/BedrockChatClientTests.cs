@@ -4209,6 +4209,113 @@ public class BedrockChatClientTests
 
     [Fact]
     [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_ToolSchema_JsonNullDefault_SerializedAsNullDocument()
+    {
+        // Issue #89: a JSON null in a tool schema (M.E.AI emits "default": null for an optional
+        // nullable parameter) must reach Bedrock as a null Document, not an empty string.
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var props = request.ToolConfig.Tools[0].ToolSpec.InputSchema.Json.AsDictionary()["properties"].AsDictionary();
+            Assert.True(props["filter"].AsDictionary()["default"].IsNull());
+            return CreateResponse("ok");
+        });
+        IChatClient client = mock.AsIChatClient("claude");
+        AIFunction tool = AIFunctionFactory.Create((string? filter = null) => "ok", "search");
+
+        await client.GetResponseAsync("hi", new ChatOptions { Tools = [tool] }, cancellationToken: TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_ToolCallArguments_JsonNull_SerializedAsNullDocument()
+    {
+        // Issue #89: JSON null in replayed tool-call arguments (incl. nested) must serialize as a null
+        // Document. Guard: an explicit empty string must stay "" (not be conflated with null).
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var input = request.Messages[1].Content[0].ToolUse.Input.AsDictionary();
+            Assert.True(input["a"].IsNull());
+            Assert.True(input["b"].AsList()[0].IsNull());
+            Assert.True(input["b"].AsList()[1].IsInt());   // 1 stays an int
+            Assert.True(input["c"].IsString());            // explicit "" stays a string
+            Assert.Equal("", input["c"].AsString());
+            return CreateResponse("ok");
+        });
+        IChatClient client = mock.AsIChatClient("claude");
+
+        var toolArgs = new Dictionary<string, object?>
+        {
+            ["a"] = JsonDocument.Parse("null").RootElement,
+            ["b"] = JsonDocument.Parse("[null,1]").RootElement,
+            ["c"] = JsonDocument.Parse("\"\"").RootElement,
+        };
+        ChatMessage[] messages =
+        [
+            new(ChatRole.User, "hi"),
+            new(ChatRole.Assistant, [new FunctionCallContent("id1", "tool", toolArgs)]),
+            new(ChatRole.Tool, [new FunctionResultContent("id1", "ok")]),
+        ];
+
+        await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_ToolResult_NullProperty_SerializedAsNullDocument()
+    {
+        // Issue #89 (most common path): a tool result with a null property must serialize as a null
+        // Document, not an empty string.
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var obj = request.Messages[0].Content[0].ToolResult.Content[0].Json.AsDictionary()["result"].AsDictionary();
+            Assert.True(obj["k"].IsNull());
+            return CreateResponse("ok");
+        });
+        IChatClient client = mock.AsIChatClient("claude");
+
+        ChatMessage[] messages =
+        [
+            new(ChatRole.User, [new FunctionResultContent("call", new Dictionary<string, string?> { ["k"] = null })]),
+        ];
+
+        await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_ResponseFormatSchema_NullInEnum_SerializedAsNullDocument()
+    {
+        // Issue #89: a null inside an enum in a ResponseFormat schema (synthetic-tool mode) must
+        // serialize as a null Document; sending "" would change the allowed values.
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var en = request.ToolConfig.Tools[0].ToolSpec.InputSchema.Json
+                .AsDictionary()["properties"].AsDictionary()["x"].AsDictionary()["enum"].AsList();
+            Assert.Equal("a", en[0].AsString());
+            Assert.True(en[1].IsNull());
+            return new ConverseResponse
+            {
+                Output = new ConverseOutput
+                {
+                    Message = new Message
+                    {
+                        Role = ConversationRole.Assistant,
+                        Content = [new ContentBlock { ToolUse = new ToolUseBlock { ToolUseId = "t", Name = "generate_response", Input = new Document(new Dictionary<string, Document> { ["x"] = new Document("a") }) } }],
+                    }
+                },
+                StopReason = new StopReason("tool_use"),
+            };
+        });
+        IChatClient client = mock.AsIChatClient("claude-3", BedrockStructuredOutputMode.SyntheticTool);
+
+        var schema = JsonDocument.Parse("""{"type":"object","properties":{"x":{"enum":["a",null]}},"required":["x"]}""").RootElement;
+        var options = new ChatOptions { ResponseFormat = ChatResponseFormat.ForJsonSchema(schema) };
+
+        await client.GetResponseAsync("hi", options, cancellationToken: TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
     public async Task IChatClient_GetResponseAsync_ToolCallArguments_NonPrimitiveTypes_AreSerializedNotDropped()
     {
         // Issue #90: argument values whose type isn't bool/int/long/float/double/string/JsonElement

@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Bedrock.MEAI",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Fixed BedrockChatClient silently dropping tool-call argument values whose type is not bool/int/long/float/double/string/JsonElement (e.g. null, decimal, Guid, DateTime, nested dictionaries, collections, POCOs). Such values are now serialized into ToolUseBlock.Input, matching the tool-result path (null becomes a JSON null)."
+      ]
+    }
+  ]
+}

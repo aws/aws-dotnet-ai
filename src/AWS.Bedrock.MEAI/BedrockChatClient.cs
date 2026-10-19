@@ -1083,6 +1083,18 @@ internal sealed partial class BedrockChatClient : IChatClient
                     case double argumentDouble: inputs.Add(argument.Key, argumentDouble); break;
                     case string argumentString: inputs.Add(argument.Key, argumentString); break;
                     case JsonElement json: inputs.Add(argument.Key, ToDocument(json)); break;
+
+                    default:
+                        // Mirror the tool-result path: null -> null Document, else serialize via the
+                        // shared BedrockJsonContext options. Under Native AOT an unregistered type
+                        // throws (same as the result path); under reflection it serializes. Without
+                        // this default, non-primitive/non-JsonElement arguments were silently dropped
+                        // from ToolUseBlock.Input (issue #90).
+                        inputs.Add(argument.Key, argument.Value is null
+                            ? default
+                            : ToDocument(JsonSerializer.SerializeToElement(
+                                argument.Value, BedrockJsonContext.DefaultOptions.GetTypeInfo(argument.Value.GetType()))));
+                        break;
                 }
             }
         }

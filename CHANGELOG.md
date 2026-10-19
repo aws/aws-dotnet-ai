@@ -1,3 +1,8 @@
+## Release 2026-10-19
+
+### AWS.Bedrock.MEAI (1.1.1)
+* Fixed BedrockChatClient streaming to treat a parameterless tool call (empty or whitespace tool input) as an empty argument set instead of surfacing a spurious "Unable to parse tool input." exception with null arguments.
+
 ## Release 2026-10-08
 
 ### AWS.Bedrock.MEAI (1.1.0)

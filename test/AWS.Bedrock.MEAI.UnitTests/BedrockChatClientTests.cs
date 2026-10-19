@@ -4314,6 +4314,71 @@ public class BedrockChatClientTests
         await client.GetResponseAsync("hi", options, cancellationToken: TestContext.Current.CancellationToken);
     }
 
+    [Fact]
+    [Trait("UnitTest", "BedrockRuntime")]
+    public async Task IChatClient_GetResponseAsync_ToolCallArguments_NonPrimitiveTypes_AreSerializedNotDropped()
+    {
+        // Issue #90: argument values whose type isn't bool/int/long/float/double/string/JsonElement
+        // were silently dropped from ToolUseBlock.Input. They are now serialized via the shared
+        // BedrockJsonContext options (mirroring the tool-result path); null becomes a null Document.
+        IAmazonBedrockRuntime mock = CreateMock(onConverseRequest: request =>
+        {
+            var input = request.Messages[1].Content[0].ToolUse.Input.AsDictionary();
+
+            // Every supplied argument survives (previously the non-primitive ones vanished).
+            foreach (var key in new[] { "int", "string", "decimal", "guid", "datetime", "nested", "list", "null" })
+            {
+                Assert.True(input.ContainsKey(key), $"argument '{key}' was dropped");
+            }
+
+            // Spot-check converted shapes.
+            Assert.True(input["null"].IsNull());
+            Assert.True(input["nested"].IsDictionary());
+            Assert.Equal(1, input["nested"].AsDictionary()["x"].AsInt());
+            Assert.True(input["list"].IsList());
+            Assert.Equal(2, input["list"].AsList().Count);
+            Assert.True(input["guid"].IsString());
+            Assert.True(input["decimal"].IsDouble());
+            Assert.True(input["int"].IsInt());
+
+            // A POCO serializes to a JSON object (Web defaults => camelCase property names).
+            Assert.True(input["poco"].IsDictionary());
+            Assert.Equal(5, input["poco"].AsDictionary()["a"].AsInt());
+
+            // Regression guard: the primitive switch cases are untouched by the new default.
+            Assert.True(input["bool"].IsBool());
+            Assert.True(input["long"].IsLong());
+            Assert.True(input["double"].IsDouble());
+
+            return CreateResponse("ok");
+        });
+        IChatClient client = mock.AsIChatClient("claude");
+
+        var toolArgs = new Dictionary<string, object?>
+        {
+            ["int"]      = 7,
+            ["string"]   = "s",
+            ["bool"]     = true,
+            ["long"]     = 9999999999L,
+            ["double"]   = 2.5,
+            ["decimal"]  = 1.5m,
+            ["guid"]     = Guid.NewGuid(),
+            ["datetime"] = DateTime.UtcNow,
+            ["nested"]   = new Dictionary<string, object?> { ["x"] = 1 },
+            ["list"]     = new List<int> { 1, 2 },
+            ["poco"]     = new { A = 5 },
+            ["null"]     = null,
+        };
+        ChatMessage[] messages =
+        [
+            new(ChatRole.User, "hi"),
+            new(ChatRole.Assistant, [new FunctionCallContent("id1", "tool", toolArgs)]),
+            new(ChatRole.Tool, [new FunctionResultContent("id1", "ok")]),
+        ];
+
+        await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
+    }
+
     [Theory]
     [Trait("UnitTest", "BedrockRuntime")]
     [InlineData(3.14f)]

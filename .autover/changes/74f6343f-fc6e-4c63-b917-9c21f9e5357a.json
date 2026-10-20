@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Bedrock.MEAI",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Fixed BedrockChatClient dropping the $defs and definitions of user tool schemas, which left $ref pointers in the tool input schema unresolved."
+      ]
+    }
+  ]
+}

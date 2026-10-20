@@ -1,3 +1,9 @@
+## Release 2026-10-20
+
+### AWS.Bedrock.MEAI (1.1.2)
+* Fixed BedrockChatClient silently dropping tool-call argument values whose type is not bool/int/long/float/double/string/JsonElement (e.g. null, decimal, Guid, DateTime, nested dictionaries, collections, POCOs). Such values are now serialized into ToolUseBlock.Input, matching the tool-result path (null becomes a JSON null).
+* Fixed BedrockChatClient converting JSON null to an empty string in tool schemas, tool-call arguments, tool results, and ResponseFormat schemas; a JSON null is now sent to Bedrock as a null value instead of "".
+
 ## Release 2026-10-19
 
 ### AWS.Bedrock.MEAI (1.1.1)

@@ -1,3 +1,8 @@
+## Release 2026-10-27
+
+### AWS.AgentCore.Testing (1.0.2)
+* Declare the generated web SDK entry point as an internal partial Program class so AWS.AgentCore.Testing no longer exports a public Program type into consumers' global namespace, which previously caused CS0433 'type Program exists in both' errors in test projects using WebApplicationFactory<Program>.
+
 ## Release 2026-10-20
 
 ### AWS.Bedrock.MEAI (1.1.2)

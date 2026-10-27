@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore.Testing",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Declare the generated web SDK entry point as an internal partial Program class so AWS.AgentCore.Testing no longer exports a public Program type into consumers' global namespace, which previously caused CS0433 'type Program exists in both' errors in test projects using WebApplicationFactory<Program>."
+      ]
+    }
+  ]
+}

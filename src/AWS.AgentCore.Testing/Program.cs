@@ -6,3 +6,11 @@
 // RuntimeEmulatorServer.Create(), and MemoryEmulatorServer.Create().
 // This entry point is never invoked directly by consumers.
 return;
+
+// The Microsoft.NET.Sdk.Web + top-level statements combination would otherwise emit a
+// 'public class Program' into the global namespace, which this package exports via
+// lib/<tfm>/AWS.AgentCore.Testing.dll. Consumers that reference this package transitively
+// and use WebApplicationFactory<Program> then get two global Program types and fail to
+// compile. Declaring Program as internal here merges with the compiler-generated partial
+// and keeps it out of consumers' compilations while still satisfying the Exe entry point.
+internal partial class Program { }

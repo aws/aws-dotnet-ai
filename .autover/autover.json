@@ -14,6 +14,11 @@
     {
       "Name": "AWS.Bedrock.MEAI",
       "Path": "src/AWS.Bedrock.MEAI/AWS.Bedrock.MEAI.csproj"
+    },
+    {
+      "Name": "AWS.Bedrock.MAG",
+      "Path": "src/AWS.Bedrock.MAG/AWS.Bedrock.MAG.csproj",
+      "PrereleaseLabel": "preview"
     }
   ],
   "UseCommitsForChangelog": false,

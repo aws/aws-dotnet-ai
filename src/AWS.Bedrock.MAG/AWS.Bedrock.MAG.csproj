@@ -5,7 +5,7 @@
         <Nullable>enable</Nullable>
         <LangVersion>Latest</LangVersion>
         <IsAotCompatible>true</IsAotCompatible>
-        <Version>0.1.0-preview</Version>
+        <Version>0.2.0-preview</Version>
         <IsPackable>true</IsPackable>
         <PackageId>AWS.Bedrock.MAG</PackageId>
         <Product>AI Integrations on AWS for .NET</Product>

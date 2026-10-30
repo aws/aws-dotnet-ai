@@ -22,10 +22,6 @@
         <NoWarn>$(NoWarn);MEAI001</NoWarn>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>..\..\public.snk</AssemblyOriginatorKeyFile>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <IncludeSymbols>true</IncludeSymbols>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
 
     <!-- Trimming is only supported on net8.0+; the realtime (Nova Sonic) APIs are net8.0-only. -->
@@ -36,7 +32,6 @@
     <ItemGroup>
         <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.17.5" />
         <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.3" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
     </ItemGroup>
 
     <!-- Reference assemblies so net472 compiles on Linux CI (CodeBuild has .NET only). -->

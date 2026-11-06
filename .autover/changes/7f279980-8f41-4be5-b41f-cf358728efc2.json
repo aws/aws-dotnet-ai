@@ -1,0 +1,11 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.AgentCore.Testing",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Complete Source Link support (deterministic build, CI build flag, explicit SourceRoot) for reliable source debugging"
+      ]
+    }
+  ]
+}

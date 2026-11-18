@@ -687,6 +687,56 @@ public class BedrockChatClientTests
         Assert.False(schemaDict["additionalProperties"].AsBool());
     }
 
+    [Theory]
+    [Trait("UnitTest", "BedrockRuntime")]
+    [InlineData("$defs")]
+    [InlineData("definitions")]
+    public async Task Tool_WithSchemaDefinitions_KeepsDefinitions(string definitionsKeyword)
+    {
+        // Arrange
+        var mockRuntime = new Mock<IAmazonBedrockRuntime>();
+        ConverseRequest? capturedRequest = null;
+
+        mockRuntime
+            .Setup(x => x.ConverseAsync(It.IsAny<ConverseRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<ConverseRequest, CancellationToken>((req, ct) => capturedRequest = req)
+            .ReturnsAsync(CreateResponse("ok"));
+
+        var client = mockRuntime.Object.AsIChatClient("claude-3");
+        var messages = new[] { new ChatMessage(ChatRole.User, "Test") };
+
+        var schema = JsonDocument.Parse($$"""
+            {
+              "type": "object",
+              "properties": { "location": { "$ref": "#/{{definitionsKeyword}}/Location" } },
+              "required": ["location"],
+              "{{definitionsKeyword}}": {
+                "Location": {
+                  "type": "object",
+                  "properties": { "city": { "type": "string" } },
+                  "required": ["city"]
+                }
+              }
+            }
+            """).RootElement;
+        var tool = new TestAIFunction("get_weather", "Get the weather", schema);
+
+        var options = new ChatOptions { Tools = new[] { tool } };
+
+        // Act
+        await client.GetResponseAsync(messages, options, cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.NotNull(capturedRequest);
+        var schemaDict = capturedRequest.ToolConfig.Tools[0].ToolSpec.InputSchema.Json.AsDictionary();
+        Assert.Equal($"#/{definitionsKeyword}/Location", schemaDict["properties"].AsDictionary()["location"].AsDictionary()["$ref"].AsString());
+        Assert.True(schemaDict.ContainsKey(definitionsKeyword));
+        var location = schemaDict[definitionsKeyword].AsDictionary()["Location"].AsDictionary();
+        Assert.Equal("object", location["type"].AsString());
+        Assert.Equal("string", location["properties"].AsDictionary()["city"].AsDictionary()["type"].AsString());
+        Assert.Equal("city", location["required"].AsList()[0].AsString());
+    }
+
     [Fact]
     [Trait("UnitTest", "BedrockRuntime")]
     public async Task ResponseFormat_Json_Native_ModelReturnsText_ParsedAsContent()

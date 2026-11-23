@@ -24,244 +24,312 @@ namespace AWS.Speech.MEAI;
 /// </summary>
 /// <remarks>
 /// Two producers write to the output channel: the STT consumer (transcripts) and the reasoning worker
-/// (turn lifecycle plus assistant text and audio). Barge-in is not yet wired: the reasoning worker
-/// completes the current turn before starting the next.
+/// (turn lifecycle plus assistant text and audio). When barge-in is enabled, a qualifying STT partial
+/// arriving during an active turn cancels that turn's per-turn token; the reasoning worker observes the
+/// cancellation, emits <see cref="VoiceAgentUpdateKind.Cancelled"/>, and moves on to the next turn.
 /// </remarks>
 internal static class VoiceAgentPipeline
 {
-    public static async IAsyncEnumerable<VoiceAgentUpdate> RunAsync(
+    public static IAsyncEnumerable<VoiceAgentUpdate> RunAsync(
         ISpeechToTextClient stt, IChatClient chat, ITextToSpeechClient tts,
-        VoiceAgentOptions options, Stream microphonePcm,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        VoiceAgentOptions options, Stream microphonePcm, CancellationToken cancellationToken) =>
+        new Runner(stt, chat, tts, options).RunAsync(microphonePcm, cancellationToken);
+
+    private sealed class Runner
     {
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var token = linkedCts.Token;
+        private readonly ISpeechToTextClient _stt;
+        private readonly IChatClient _chat;
+        private readonly ITextToSpeechClient _tts;
+        private readonly VoiceAgentOptions _options;
 
-        // Single-reader output funnel: two producer tasks write, the caller's foreach drains.
-        var output = Channel.CreateUnbounded<VoiceAgentUpdate>(
-            new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        // Guards the current turn's cancellation source so the STT consumer can interrupt the reasoning
+        // worker's in-flight turn without a data race between the two producer tasks.
+        private readonly object _turnLock = new();
+        private CancellationTokenSource? _activeTurnCts;
 
-        // The STT consumer enqueues each finalized user utterance; the reasoning worker drains it.
-        var userTurns = Channel.CreateUnbounded<string>(
-            new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
-
-        // Conversation history is owned by the reasoning worker; both readers see it single-threaded.
-        var history = new List<ChatMessage>();
-        if (!string.IsNullOrEmpty(options.Instructions))
+        public Runner(ISpeechToTextClient stt, IChatClient chat, ITextToSpeechClient tts, VoiceAgentOptions options)
         {
-            history.Add(new ChatMessage(ChatRole.System, options.Instructions));
+            _stt = stt;
+            _chat = chat;
+            _tts = tts;
+            _options = options;
         }
 
-        var sttTask = Task.Run(() => StreamTranscriptsAsync(stt, microphonePcm, options, output.Writer, userTurns.Writer, token), token);
-        var reasoningTask = Task.Run(() => DriveTurnsAsync(chat, tts, options, history, userTurns.Reader, output.Writer, token), token);
-
-        Exception? failure = null;
-        try
+        public async IAsyncEnumerable<VoiceAgentUpdate> RunAsync(
+            Stream microphonePcm, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            while (await output.Reader.WaitToReadAsync(token).ConfigureAwait(false))
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var token = linkedCts.Token;
+
+            var output = Channel.CreateUnbounded<VoiceAgentUpdate>(
+                new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+            var userTurns = Channel.CreateUnbounded<string>(
+                new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+
+            var history = new List<ChatMessage>();
+            if (!string.IsNullOrEmpty(_options.Instructions))
             {
-                while (output.Reader.TryRead(out var update))
-                {
-                    yield return update;
-                }
+                history.Add(new ChatMessage(ChatRole.System, _options.Instructions));
             }
-        }
-        finally
-        {
-            linkedCts.Cancel();
-            // Await the reasoning worker first so its root failure wins over any secondary teardown
-            // exception (a cancellation/ChannelClosedException) that awaiting STT first could capture.
-            failure = await AwaitAndCaptureAsync(reasoningTask, failure).ConfigureAwait(false);
-            failure = await AwaitAndCaptureAsync(sttTask, failure).ConfigureAwait(false);
-        }
 
-        // Cancellation is expected on caller-driven teardown; anything else is a real failure.
-        if (failure is not null and not OperationCanceledException)
-        {
-            ExceptionDispatchInfo.Capture(failure).Throw();
-        }
-    }
+            var sttTask = Task.Run(() => StreamTranscriptsAsync(microphonePcm, output.Writer, userTurns.Writer, token), token);
+            var reasoningTask = Task.Run(() => DriveTurnsAsync(history, userTurns.Reader, output.Writer, token), token);
 
-    private static async Task StreamTranscriptsAsync(
-        ISpeechToTextClient stt, Stream microphonePcm, VoiceAgentOptions options,
-        ChannelWriter<VoiceAgentUpdate> output, ChannelWriter<string> userTurns, CancellationToken token)
-    {
-        try
-        {
-            var sttOptions = new SpeechToTextOptions
+            Exception? failure = null;
+            try
             {
-                SpeechLanguage = options.Language,
-                SpeechSampleRate = options.InputSampleRateHertz,
-            };
-
-            await foreach (var update in stt.GetStreamingTextAsync(microphonePcm, sttOptions, token).ConfigureAwait(false))
-            {
-                if (update.Kind == SpeechToTextResponseUpdateKind.TextUpdating)
+                while (await output.Reader.WaitToReadAsync(token).ConfigureAwait(false))
                 {
-                    await output.WriteAsync(
-                        new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.UserTranscriptPartial, Text = update.Text, IsFinal = false },
-                        token).ConfigureAwait(false);
-                }
-                else if (update.Kind == SpeechToTextResponseUpdateKind.TextUpdated)
-                {
-                    var text = update.Text ?? string.Empty;
-                    await output.WriteAsync(
-                        new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.UserTranscriptFinal, Text = text, IsFinal = true },
-                        token).ConfigureAwait(false);
-
-                    if (!string.IsNullOrWhiteSpace(text))
+                    while (output.Reader.TryRead(out var update))
                     {
-                        await userTurns.WriteAsync(text, token).ConfigureAwait(false);
+                        yield return update;
                     }
                 }
-                else if (update.Kind == SpeechToTextResponseUpdateKind.Error)
+            }
+            finally
+            {
+                linkedCts.Cancel();
+                // Await the reasoning worker first so its root failure wins over any secondary teardown
+                // exception (a cancellation/ChannelClosedException) that awaiting STT first could capture.
+                failure = await AwaitAndCaptureAsync(reasoningTask, failure).ConfigureAwait(false);
+                failure = await AwaitAndCaptureAsync(sttTask, failure).ConfigureAwait(false);
+            }
+
+            if (failure is not null and not OperationCanceledException)
+            {
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            }
+        }
+
+        private async Task StreamTranscriptsAsync(
+            Stream microphonePcm, ChannelWriter<VoiceAgentUpdate> output, ChannelWriter<string> userTurns, CancellationToken token)
+        {
+            try
+            {
+                var sttOptions = new SpeechToTextOptions
                 {
-                    // Resilience (reconnect/resume) is a non-goal, but a stream failure is a real error:
-                    // propagate it so RunAsync rethrows a non-cancellation failure instead of ending the
-                    // voice loop as if the user simply stopped talking.
-                    if (update.RawRepresentation is Exception ex)
+                    SpeechLanguage = _options.Language,
+                    SpeechSampleRate = _options.InputSampleRateHertz,
+                };
+
+                await foreach (var update in _stt.GetStreamingTextAsync(microphonePcm, sttOptions, token).ConfigureAwait(false))
+                {
+                    if (update.Kind == SpeechToTextResponseUpdateKind.TextUpdating)
                     {
-                        ExceptionDispatchInfo.Capture(ex).Throw();
+                        await output.WriteAsync(
+                            new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.UserTranscriptPartial, Text = update.Text, IsFinal = false },
+                            token).ConfigureAwait(false);
+
+                        if (_options.EnableBargeIn && BargeInDetector.ShouldInterrupt(update.Text))
+                        {
+                            InterruptActiveTurn();
+                        }
+                    }
+                    else if (update.Kind == SpeechToTextResponseUpdateKind.TextUpdated)
+                    {
+                        var text = update.Text ?? string.Empty;
+                        await output.WriteAsync(
+                            new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.UserTranscriptFinal, Text = text, IsFinal = true },
+                            token).ConfigureAwait(false);
+
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            await userTurns.WriteAsync(text, token).ConfigureAwait(false);
+                        }
+                    }
+                    else if (update.Kind == SpeechToTextResponseUpdateKind.Error)
+                    {
+                        // Resilience (reconnect/resume) is a non-goal, but a stream failure is a real error:
+                        // propagate it so RunAsync rethrows a non-cancellation failure instead of ending the
+                        // voice loop as if the user simply stopped talking.
+                        if (update.RawRepresentation is Exception ex)
+                        {
+                            ExceptionDispatchInfo.Capture(ex).Throw();
+                        }
+
+                        throw new InvalidOperationException(
+                            string.IsNullOrEmpty(update.Text) ? "The speech-to-text stream reported an error." : update.Text);
+                    }
+                }
+            }
+            finally
+            {
+                userTurns.TryComplete();
+            }
+        }
+
+        // Cancels the reasoning worker's in-flight turn, if any. Called from the STT consumer.
+        private void InterruptActiveTurn()
+        {
+            lock (_turnLock)
+            {
+                var cts = _activeTurnCts;
+                if (cts is not null && !cts.IsCancellationRequested)
+                {
+                    try { cts.Cancel(); }
+                    catch (ObjectDisposedException) { /* turn finished between the null check and Cancel */ }
+                }
+            }
+        }
+
+        private async Task DriveTurnsAsync(
+            List<ChatMessage> history, ChannelReader<string> userTurns,
+            ChannelWriter<VoiceAgentUpdate> output, CancellationToken loopToken)
+        {
+            try
+            {
+                while (await userTurns.WaitToReadAsync(loopToken).ConfigureAwait(false))
+                {
+                    while (userTurns.TryRead(out var userText))
+                    {
+                        await ProcessTurnAsync(history, userText, output, loopToken).ConfigureAwait(false);
+                    }
+                }
+            }
+            finally
+            {
+                output.TryComplete();
+            }
+        }
+
+        private async Task ProcessTurnAsync(
+            List<ChatMessage> history, string userText,
+            ChannelWriter<VoiceAgentUpdate> output, CancellationToken loopToken)
+        {
+            history.Add(new ChatMessage(ChatRole.User, userText));
+
+            using var turnCts = CancellationTokenSource.CreateLinkedTokenSource(loopToken);
+            lock (_turnLock) { _activeTurnCts = turnCts; }
+            var turnToken = turnCts.Token;
+
+            var accumulated = new StringBuilder();
+            string? responseId = null;
+            UsageDetails? lastUsage = null;
+            bool cancelled = false;
+
+            try
+            {
+                await output.WriteAsync(new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.TurnStarted }, loopToken)
+                    .ConfigureAwait(false);
+
+                var chatOptions = new ChatOptions { ModelId = _options.ModelId, Tools = _options.Tools };
+                var textBuffer = new StringBuilder();
+
+                await foreach (var chunk in _chat.GetStreamingResponseAsync(history, chatOptions, turnToken).ConfigureAwait(false))
+                {
+                    responseId ??= chunk.ResponseId;
+                    foreach (var usage in chunk.Contents.OfType<UsageContent>())
+                    {
+                        lastUsage = usage.Details;
                     }
 
-                    throw new InvalidOperationException(
-                        string.IsNullOrEmpty(update.Text) ? "The speech-to-text stream reported an error." : update.Text);
-                }
-            }
-        }
-        finally
-        {
-            userTurns.TryComplete();
-        }
-    }
+                    var delta = chunk.Text;
+                    if (string.IsNullOrEmpty(delta)) continue;
 
-    private static async Task DriveTurnsAsync(
-        IChatClient chat, ITextToSpeechClient tts, VoiceAgentOptions options,
-        List<ChatMessage> history, ChannelReader<string> userTurns,
-        ChannelWriter<VoiceAgentUpdate> output, CancellationToken token)
-    {
-        try
-        {
-            while (await userTurns.WaitToReadAsync(token).ConfigureAwait(false))
-            {
-                while (userTurns.TryRead(out var userText))
+                    textBuffer.Append(delta);
+                    accumulated.Append(delta);
+
+                    // Turn-owned output is gated on the per-turn token so a barge-in interrupt stops the
+                    // interrupted turn from publishing further assistant text after the interrupting partial.
+                    await output.WriteAsync(
+                        new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.AssistantText, Text = delta, ResponseId = responseId },
+                        turnToken).ConfigureAwait(false);
+
+                    int flush;
+                    while ((flush = ClauseChunker.NextClauseBoundary(textBuffer)) > 0)
+                    {
+                        var clause = textBuffer.ToString(0, flush).Trim();
+                        textBuffer.Remove(0, flush);
+                        if (clause.Length > 0)
+                        {
+                            await SpeakClauseAsync(clause, output, responseId, turnToken).ConfigureAwait(false);
+                        }
+                    }
+                }
+
+                if (textBuffer.Length > 0)
                 {
-                    await ProcessTurnAsync(chat, tts, options, history, userText, output, token).ConfigureAwait(false);
+                    var tail = textBuffer.ToString().Trim();
+                    if (tail.Length > 0)
+                    {
+                        await SpeakClauseAsync(tail, output, responseId, turnToken).ConfigureAwait(false);
+                    }
                 }
-            }
-        }
-        finally
-        {
-            output.TryComplete();
-        }
-    }
 
-    private static async Task ProcessTurnAsync(
-        IChatClient chat, ITextToSpeechClient tts, VoiceAgentOptions options,
-        List<ChatMessage> history, string userText,
-        ChannelWriter<VoiceAgentUpdate> output, CancellationToken token)
-    {
-        history.Add(new ChatMessage(ChatRole.User, userText));
-
-        await output.WriteAsync(
-            new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.TurnStarted },
-            token).ConfigureAwait(false);
-
-        var chatOptions = new ChatOptions
-        {
-            ModelId = options.ModelId,
-            Tools = options.Tools,
-        };
-
-        var accumulated = new StringBuilder();
-        var textBuffer = new StringBuilder();
-        string? responseId = null;
-        UsageDetails? lastUsage = null;
-
-        await foreach (var chunk in chat.GetStreamingResponseAsync(history, chatOptions, token).ConfigureAwait(false))
-        {
-            responseId ??= chunk.ResponseId;
-
-            foreach (var usage in chunk.Contents.OfType<UsageContent>())
-            {
-                lastUsage = usage.Details;
-            }
-
-            var delta = chunk.Text;
-            if (string.IsNullOrEmpty(delta)) continue;
-
-            textBuffer.Append(delta);
-            accumulated.Append(delta);
-
-            await output.WriteAsync(
-                new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.AssistantText, Text = delta, ResponseId = responseId },
-                token).ConfigureAwait(false);
-
-            int flush;
-            while ((flush = ClauseChunker.NextClauseBoundary(textBuffer)) > 0)
-            {
-                var clause = textBuffer.ToString(0, flush).Trim();
-                textBuffer.Remove(0, flush);
-                if (clause.Length > 0)
+                // A barge-in can cancel the turn after the final provider iteration without either provider
+                // throwing; check the per-turn token before committing so a late interrupt still routes to the
+                // Cancelled path instead of emitting TurnComplete.
+                if (turnToken.IsCancellationRequested)
                 {
-                    await SpeakClauseAsync(tts, clause, options, output, responseId, token).ConfigureAwait(false);
+                    cancelled = true;
+                }
+                else
+                {
+                    history.Add(new ChatMessage(ChatRole.Assistant, accumulated.ToString()));
+                    await output.WriteAsync(
+                        new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.TurnComplete, Usage = lastUsage, ResponseId = responseId },
+                        loopToken).ConfigureAwait(false);
                 }
             }
-        }
-
-        // Flush any tail text with no trailing punctuation as a final clause.
-        if (textBuffer.Length > 0)
-        {
-            var tail = textBuffer.ToString().Trim();
-            textBuffer.Clear();
-            if (tail.Length > 0)
+            catch (OperationCanceledException) when (turnToken.IsCancellationRequested && !loopToken.IsCancellationRequested)
             {
-                await SpeakClauseAsync(tts, tail, options, output, responseId, token).ConfigureAwait(false);
+                cancelled = true;
             }
-        }
-
-        history.Add(new ChatMessage(ChatRole.Assistant, accumulated.ToString()));
-
-        await output.WriteAsync(
-            new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.TurnComplete, Usage = lastUsage, ResponseId = responseId },
-            token).ConfigureAwait(false);
-    }
-
-    private static async Task SpeakClauseAsync(
-        ITextToSpeechClient tts, string clause, VoiceAgentOptions options,
-        ChannelWriter<VoiceAgentUpdate> output, string? responseId, CancellationToken token)
-    {
-        var ttsOptions = new TextToSpeechOptions
-        {
-            VoiceId = options.Voice.Value,
-        };
-
-        await foreach (var update in tts.GetStreamingAudioAsync(clause, ttsOptions, token).ConfigureAwait(false))
-        {
-            foreach (var content in update.Contents.OfType<DataContent>())
+            finally
             {
+                lock (_turnLock)
+                {
+                    if (ReferenceEquals(_activeTurnCts, turnCts)) _activeTurnCts = null;
+                }
+            }
+
+            if (cancelled)
+            {
+                // Keep the partial reply the caller already heard so conversation state stays coherent.
+                if (accumulated.Length > 0)
+                {
+                    history.Add(new ChatMessage(ChatRole.Assistant, accumulated.ToString()));
+                }
                 await output.WriteAsync(
-                    new VoiceAgentUpdate
-                    {
-                        Kind = VoiceAgentUpdateKind.AssistantAudio,
-                        Audio = content.Data,
-                        ResponseId = responseId,
-                    },
-                    token).ConfigureAwait(false);
+                    new VoiceAgentUpdate { Kind = VoiceAgentUpdateKind.Cancelled, ResponseId = responseId },
+                    loopToken).ConfigureAwait(false);
             }
         }
-    }
 
-    private static async ValueTask<Exception?> AwaitAndCaptureAsync(Task task, Exception? first)
-    {
-        try
+        private async Task SpeakClauseAsync(
+            string clause, ChannelWriter<VoiceAgentUpdate> output, string? responseId, CancellationToken turnToken)
         {
-            await task.ConfigureAwait(false);
-            return first;
+            var ttsOptions = new TextToSpeechOptions { VoiceId = _options.Voice.Value };
+
+            await foreach (var update in _tts.GetStreamingAudioAsync(clause, ttsOptions, turnToken).ConfigureAwait(false))
+            {
+                foreach (var content in update.Contents.OfType<DataContent>())
+                {
+                    // Turn-owned audio is gated on the per-turn token: once the turn is interrupted, an
+                    // already-fetched audio chunk is dropped rather than published after the user's barge-in.
+                    await output.WriteAsync(
+                        new VoiceAgentUpdate
+                        {
+                            Kind = VoiceAgentUpdateKind.AssistantAudio,
+                            Audio = content.Data,
+                            ResponseId = responseId,
+                        },
+                        turnToken).ConfigureAwait(false);
+                }
+            }
         }
-        catch (Exception ex)
+
+        private static async ValueTask<Exception?> AwaitAndCaptureAsync(Task task, Exception? first)
         {
-            return first ?? ex;
+            try
+            {
+                await task.ConfigureAwait(false);
+                return first;
+            }
+            catch (Exception ex)
+            {
+                return first ?? ex;
+            }
         }
     }
 }

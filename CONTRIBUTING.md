@@ -81,6 +81,7 @@ The available projects are:
 - AWS.AgentCore.Testing
 - AWS.Bedrock.MEAI
 - AWS.Bedrock.MAG
+- AWS.Speech.MEAI
 
 The possible increment types are:
 

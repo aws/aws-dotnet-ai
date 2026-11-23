@@ -1,0 +1,25 @@
+{
+  "Projects": [
+    {
+      "Name": "AWS.Speech.MEAI",
+      "Type": "Minor",
+      "ChangelogMessages": [
+        "Added the initial AWS.Speech.MEAI package scaffold. Microsoft.Extensions.AI speech clients over Amazon Transcribe and Amazon Polly, plus a VoiceAgent that composes speech-to-text, an IChatClient, and text-to-speech into a full-duplex voice loop, land in subsequent PRs of the stack."
+      ]
+    },
+    {
+      "Name": "AWS.Bedrock.MEAI",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Updated the AWSSDK.BedrockRuntime dependency to 4.0.101.1 to align AWSSDK.Core with the Amazon Transcribe and Amazon Polly SDKs used by AWS.Speech.MEAI."
+      ]
+    },
+    {
+      "Name": "AWS.AgentCore.Hosting",
+      "Type": "Patch",
+      "ChangelogMessages": [
+        "Updated the direct AWSSDK.BedrockRuntime dependency to 4.0.101.1 to match the version now required transitively through AWS.Bedrock.MEAI."
+      ]
+    }
+  ]
+}

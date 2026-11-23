@@ -34,7 +34,8 @@ public class VoiceAgentLoopIntegrationTests
         // Speak a question with Amazon Polly, then feed it through the full loop. A second of trailing
         // silence lets Transcribe endpoint the utterance so the agent takes its turn.
         using var polly = new AmazonPollyClient();
-        var tts = polly.AsITextToSpeechClient(defaultSampleRateHertz: 16000);
+        var tts = polly.AsITextToSpeechClient(
+            new PollyTextToSpeechClientOptions { DefaultSampleRateHertz = 16000 });
         var question = await tts.GetAudioAsync(
             "In one word, what color is a clear daytime sky?", cancellationToken: TestContext.Current.CancellationToken);
         var speech = question.Contents.OfType<DataContent>().Single().Data.ToArray();

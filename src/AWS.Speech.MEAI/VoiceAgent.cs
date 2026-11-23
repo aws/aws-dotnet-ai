@@ -94,7 +94,11 @@ public sealed class VoiceAgent : IAsyncDisposable
         {
             var transcribe = CreateTranscribeClient(options.Credentials, options.Region);
             owned.Add(transcribe);
-            stt = transcribe.AsISpeechToTextClient(options.Language, options.InputSampleRateHertz);
+            stt = transcribe.AsISpeechToTextClient(new TranscribeSpeechToTextClientOptions
+            {
+                DefaultLanguage = options.Language,
+                DefaultSampleRateHertz = options.InputSampleRateHertz,
+            });
         }
 
         var chat = options.ChatClient;
@@ -110,7 +114,12 @@ public sealed class VoiceAgent : IAsyncDisposable
         {
             var polly = CreatePollyClient(options.Credentials, options.Region);
             owned.Add(polly);
-            tts = polly.AsITextToSpeechClient(options.Voice, Engine.Neural, options.OutputSampleRateHertz);
+            tts = polly.AsITextToSpeechClient(new PollyTextToSpeechClientOptions
+            {
+                DefaultVoice = options.Voice,
+                DefaultEngine = Engine.Neural,
+                DefaultSampleRateHertz = options.OutputSampleRateHertz,
+            });
         }
 
         return new VoiceAgent(stt, chat, tts, options, owned);

@@ -31,7 +31,8 @@ public class RealtimeAdapterIntegrationTests
     public async Task AsIRealtimeClient_RunsPipelineThroughRealtimeContract()
     {
         using var polly = new AmazonPollyClient();
-        var tts = polly.AsITextToSpeechClient(defaultSampleRateHertz: 16000);
+        var tts = polly.AsITextToSpeechClient(
+            new PollyTextToSpeechClientOptions { DefaultSampleRateHertz = 16000 });
         var question = await tts.GetAudioAsync(
             "In one word, what color is a clear daytime sky?", cancellationToken: TestContext.Current.CancellationToken);
         var speech = question.Contents.OfType<DataContent>().Single().Data.ToArray();

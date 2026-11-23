@@ -30,5 +30,6 @@
     <Project Path="test/AWS.Bedrock.MAG.UnitTests/AWS.Bedrock.MAG.UnitTests.csproj" />
     <Project Path="test/AWS.Bedrock.MAG.IntegrationTests/AWS.Bedrock.MAG.IntegrationTests.csproj" />
     <Project Path="test/AWS.Speech.MEAI.UnitTests/AWS.Speech.MEAI.UnitTests.csproj" />
+    <Project Path="test/AWS.Speech.MEAI.IntegrationTests/AWS.Speech.MEAI.IntegrationTests.csproj" />
   </Folder>
 </Solution>

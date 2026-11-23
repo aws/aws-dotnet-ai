@@ -32,14 +32,12 @@ internal sealed class TranscribeSpeechToTextClient : ISpeechToTextClient
     private readonly string _defaultLanguage;
     private readonly int _defaultSampleRateHertz;
 
-    public TranscribeSpeechToTextClient(
-        IAmazonTranscribeStreaming client,
-        string? defaultLanguage = "en-US",
-        int defaultSampleRateHertz = 16000)
+    public TranscribeSpeechToTextClient(IAmazonTranscribeStreaming client, TranscribeSpeechToTextClientOptions? options = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
-        _defaultLanguage = string.IsNullOrEmpty(defaultLanguage) ? "en-US" : defaultLanguage!;
-        _defaultSampleRateHertz = defaultSampleRateHertz;
+        options ??= new TranscribeSpeechToTextClientOptions();
+        _defaultLanguage = string.IsNullOrEmpty(options.DefaultLanguage) ? "en-US" : options.DefaultLanguage!;
+        _defaultSampleRateHertz = options.DefaultSampleRateHertz;
     }
 
     /// <inheritdoc/>

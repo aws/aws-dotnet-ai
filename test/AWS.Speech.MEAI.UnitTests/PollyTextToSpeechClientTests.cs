@@ -88,7 +88,8 @@ public class PollyTextToSpeechClientTests
     public async Task GetAudioAsync_UnsupportedPcmSampleRate_Throws()
     {
         var (mock, _) = CreateMock();
-        ITextToSpeechClient tts = mock.Object.AsITextToSpeechClient(defaultSampleRateHertz: 24000);
+        ITextToSpeechClient tts = mock.Object.AsITextToSpeechClient(
+            new PollyTextToSpeechClientOptions { DefaultSampleRateHertz = 24000 });
 
         await Assert.ThrowsAsync<ArgumentException>(() => tts.GetAudioAsync("hi"));
     }

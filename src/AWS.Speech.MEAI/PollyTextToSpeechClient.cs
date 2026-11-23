@@ -33,16 +33,13 @@ internal sealed class PollyTextToSpeechClient : ITextToSpeechClient
     private readonly Engine _defaultEngine;
     private readonly int _defaultSampleRateHertz;
 
-    public PollyTextToSpeechClient(
-        IAmazonPolly polly,
-        VoiceId? defaultVoice = null,
-        Engine? defaultEngine = null,
-        int defaultSampleRateHertz = 16000)
+    public PollyTextToSpeechClient(IAmazonPolly polly, PollyTextToSpeechClientOptions? options = null)
     {
         _polly = polly ?? throw new ArgumentNullException(nameof(polly));
-        _defaultVoice = defaultVoice ?? VoiceId.Matthew;
-        _defaultEngine = defaultEngine ?? Engine.Neural;
-        _defaultSampleRateHertz = defaultSampleRateHertz;
+        options ??= new PollyTextToSpeechClientOptions();
+        _defaultVoice = options.DefaultVoice ?? VoiceId.Matthew;
+        _defaultEngine = options.DefaultEngine ?? Engine.Neural;
+        _defaultSampleRateHertz = options.DefaultSampleRateHertz;
     }
 
     /// <inheritdoc/>

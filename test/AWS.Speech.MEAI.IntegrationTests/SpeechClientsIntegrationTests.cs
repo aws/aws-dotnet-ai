@@ -71,7 +71,8 @@ public class SpeechClientsIntegrationTests
         // Synthesize the phrase with Amazon Polly (16 kHz mono PCM), then transcribe it with Amazon
         // Transcribe. This exercises both clients end to end without a checked-in audio fixture.
         using var polly = new AmazonPollyClient();
-        var tts = polly.AsITextToSpeechClient(defaultSampleRateHertz: 16000);
+        var tts = polly.AsITextToSpeechClient(
+            new PollyTextToSpeechClientOptions { DefaultSampleRateHertz = 16000 });
         var synthesized = await tts.GetAudioAsync(SpokenPhrase, cancellationToken: TestContext.Current.CancellationToken);
         var speech = synthesized.Contents.OfType<DataContent>().Single().Data.ToArray();
         Assert.True(speech.Length > 0, "Amazon Polly returned no audio to transcribe.");
@@ -82,7 +83,8 @@ public class SpeechClientsIntegrationTests
         Array.Copy(speech, pcm, speech.Length);
 
         using var transcribe = new AmazonTranscribeStreamingClient();
-        var stt = transcribe.AsISpeechToTextClient("en-US", 16000);
+        var stt = transcribe.AsISpeechToTextClient(
+            new TranscribeSpeechToTextClientOptions { DefaultLanguage = "en-US", DefaultSampleRateHertz = 16000 });
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(60));

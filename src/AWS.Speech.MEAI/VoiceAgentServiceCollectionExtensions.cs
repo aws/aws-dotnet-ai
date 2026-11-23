@@ -70,7 +70,11 @@ public static class VoiceAgentServiceCollectionExtensions
         services.TryAddAWSService<IAmazonTranscribeStreaming>();
         services.TryAddSingleton<ISpeechToTextClient>(sp =>
             sp.GetRequiredService<IAmazonTranscribeStreaming>()
-                .AsISpeechToTextClient(options.Language, options.InputSampleRateHertz));
+                .AsISpeechToTextClient(new TranscribeSpeechToTextClientOptions
+                {
+                    DefaultLanguage = options.Language,
+                    DefaultSampleRateHertz = options.InputSampleRateHertz,
+                }));
     }
 
     private static void RegisterChat(IServiceCollection services, VoiceAgentOptions options)
@@ -97,7 +101,12 @@ public static class VoiceAgentServiceCollectionExtensions
         services.TryAddAWSService<IAmazonPolly>();
         services.TryAddSingleton<ITextToSpeechClient>(sp =>
             sp.GetRequiredService<IAmazonPolly>()
-                .AsITextToSpeechClient(options.Voice, Engine.Neural, options.OutputSampleRateHertz));
+                .AsITextToSpeechClient(new PollyTextToSpeechClientOptions
+                {
+                    DefaultVoice = options.Voice,
+                    DefaultEngine = Engine.Neural,
+                    DefaultSampleRateHertz = options.OutputSampleRateHertz,
+                }));
     }
 }
 #endif

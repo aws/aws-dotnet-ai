@@ -28,6 +28,7 @@ using AWS.Speech.MEAI;
 // Polly "Matthew" Neural 16 kHz PCM out, barge-in on. Just pick a Bedrock model to reason with.
 await using var agent = VoiceAgent.Create(o => o.ModelId = "anthropic.claude-3-5-haiku-20241022-v1:0");
 
+// microphonePcmStream and speaker are your own audio I/O — the package never accesses mic/speaker hardware.
 await foreach (var update in agent.RunAsync(microphonePcmStream))   // 16 kHz mono 16-bit PCM in
     if (update.Audio is { } pcm) speaker.Write(pcm.Span);          // spoken reply, 16 kHz mono PCM
 ```

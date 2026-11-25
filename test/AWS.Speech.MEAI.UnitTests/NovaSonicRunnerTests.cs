@@ -37,7 +37,7 @@ public class NovaSonicRunnerTests
 
         var session = new FakeSession(scripted);
         var client = new FakeRealtimeClient(session);
-        var options = new VoiceAgentOptions { ModelId = "amazon.nova-sonic-v1:0" };
+        var options = new VoiceAgentOptions { ModelId = "amazon.nova-2-5-sonic" };
         using var mic = new MemoryStream(new byte[] { 1, 2, 3, 4 });
 
         var updates = new List<VoiceAgentUpdate>();
@@ -58,7 +58,7 @@ public class NovaSonicRunnerTests
 
         var sessionOptions = client.LastOptions;
         Assert.NotNull(sessionOptions);
-        Assert.Equal("amazon.nova-sonic-v1:0", sessionOptions!.Model);
+        Assert.Equal("amazon.nova-2-5-sonic", sessionOptions!.Model);
         Assert.Equal("audio/lpcm", sessionOptions.InputAudioFormat!.MediaType);
     }
 

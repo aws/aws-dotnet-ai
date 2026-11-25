@@ -25,10 +25,10 @@ public class VoiceAgentRealtimeClientTests
         var tts = new EchoTextToSpeech();
 
         await using var agent = new VoiceAgent(stt, chat, tts);
-        using var realtime = agent.AsIRealtimeClient("amazon.nova-sonic-v1:0");
+        using var realtime = agent.AsIRealtimeClient("amazon.nova-2-5-sonic");
 
         var session = await realtime.CreateSessionAsync(
-            new RealtimeSessionOptions { Model = "amazon.nova-sonic-v1:0" }, CancellationToken.None);
+            new RealtimeSessionOptions { Model = "amazon.nova-2-5-sonic" }, CancellationToken.None);
 
         // Push a little audio (the scripted STT ignores it, but this exercises the input path).
         await session.SendAsync(
@@ -52,7 +52,7 @@ public class VoiceAgentRealtimeClientTests
         Assert.Contains(messages, m => m.Type.Value == RealtimeServerMessageType.OutputAudioDelta.Value);
         Assert.Contains(messages, m => m.Type.Value == RealtimeServerMessageType.ResponseDone.Value);
 
-        Assert.Equal("amazon.nova-sonic-v1:0", session.Options?.Model);
+        Assert.Equal("amazon.nova-2-5-sonic", session.Options?.Model);
     }
 
     [Fact]

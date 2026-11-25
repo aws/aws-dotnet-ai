@@ -94,7 +94,7 @@ Same call sites; one option change moves reasoning-plus-speech onto the single-m
 await using var agent = VoiceAgent.Create(o =>
 {
     o.Backend = VoiceAgentBackend.NovaSonic;   // was Pipeline
-    o.ModelId = "amazon.nova-sonic-v1:0";
+    o.ModelId = "amazon.nova-2-5-sonic";
 });
 // RunAsync and the VoiceAgentUpdate stream are unchanged.
 ```
